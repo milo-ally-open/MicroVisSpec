@@ -2,6 +2,10 @@
   <img src="readme/assets/logo.png" alt="云哨边缘智枢 Logo" width="180" />
 </p>
 
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License: Apache 2.0" /></a>
+</p>
+
 <h1 align="center">云哨 边缘智枢</h1>
 
 <p align="center"><em>让边缘看见异常，让协同抵达现场，让智能推动改进。</em></p>
