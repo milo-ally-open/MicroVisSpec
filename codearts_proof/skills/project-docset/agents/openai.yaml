@@ -1,0 +1,3 @@
+interface:
+  display_name: "Engineering Docset"
+  short_description: "Build traceable docs through user-led PRD and SPEC rounds"
