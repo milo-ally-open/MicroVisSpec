@@ -1,5 +1,7 @@
+# 个人
 .token
 .assistant/
+.playwright-cli
 
 # 第三方仓库
 /project/repos/rknn-toolkit2/
