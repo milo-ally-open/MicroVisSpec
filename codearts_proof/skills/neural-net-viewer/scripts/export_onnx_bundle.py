@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Export a Netron SVG/PNG and an ONNX graph manifest with cross-referenced nodes."""
+"""Export a preferred Netron PNG (or SVG) and a matching ONNX graph manifest."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ import copy
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -25,6 +26,40 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def validate_png_content(path: Path) -> tuple[int, int]:
+    """Reject empty or all-white Netron PNG downloads instead of trusting file existence."""
+    try:
+        from PIL import Image, ImageChops
+    except ImportError as error:
+        raise RuntimeError("Pillow is required to verify PNG content. Install it with: pip install pillow") from error
+
+    try:
+        with Image.open(path) as image:
+            image.load()
+            rgb = image.convert("RGB")
+            if ImageChops.difference(rgb, Image.new("RGB", rgb.size, "white")).getbbox() is None:
+                raise RuntimeError(f"Netron exported a blank white PNG: {path}")
+            return image.size
+    except RuntimeError:
+        raise
+    except Exception as error:
+        raise RuntimeError(f"Netron did not produce a valid PNG at {path}: {error}") from error
+
+
+def svg_dimensions(path: Path) -> tuple[int, int]:
+    text = path.read_text(encoding="utf-8", errors="replace")
+    root = re.search(r"<svg\b([^>]*)>", text, flags=re.IGNORECASE)
+    if not root:
+        raise RuntimeError(f"Netron did not produce a valid SVG at {path}")
+    dimensions = {}
+    for name in ("width", "height"):
+        match = re.search(rf"\b{name}=\"([0-9.]+)", root.group(1))
+        if not match:
+            raise RuntimeError(f"Netron SVG is missing its {name}: {path}")
+        dimensions[name] = max(1, round(float(match.group(1))))
+    return dimensions["width"], dimensions["height"]
 
 
 def json_safe(value: Any, *, max_array_items: int = 256) -> Any:
@@ -146,9 +181,36 @@ def tensor_json(tensor: Any, onnx: Any, source_dir: Path, external_files: dict[s
     return item
 
 
+def attribute_value_kind(attribute: Any, onnx: Any) -> str | None:
+    """Support both older AttributeProto schemas and newer value-oneof schemas."""
+    oneof_names = {oneof.name for oneof in attribute.DESCRIPTOR.oneofs}
+    if "value" in oneof_names:
+        return attribute.WhichOneof("value")
+    legacy_fields = {
+        "FLOAT": "f",
+        "INT": "i",
+        "STRING": "s",
+        "TENSOR": "t",
+        "GRAPH": "g",
+        "SPARSE_TENSOR": "sparse_tensor",
+        "TYPE_PROTO": "tp",
+        "FLOATS": "floats",
+        "INTS": "ints",
+        "STRINGS": "strings",
+        "TENSORS": "tensors",
+        "GRAPHS": "graphs",
+        "SPARSE_TENSORS": "sparse_tensors",
+        "TYPE_PROTOS": "type_protos",
+    }
+    try:
+        return legacy_fields.get(onnx.AttributeProto.AttributeType.Name(attribute.type))
+    except ValueError:
+        return None
+
+
 def attribute_json(attribute: Any, graph_id: str, node_id: str, graph_builder: Any, onnx: Any, source_dir: Path, external_files: dict[str, dict[str, Any]]) -> dict[str, Any]:
     item: dict[str, Any] = {"name": attribute.name, "type": onnx.AttributeProto.AttributeType.Name(attribute.type)}
-    kind = attribute.WhichOneof("value")
+    kind = attribute_value_kind(attribute, onnx)
     if kind in ("g", "graphs"):
         graphs = [attribute.g] if kind == "g" else list(attribute.graphs)
         graph_ids = []
@@ -298,10 +360,6 @@ def export_with_netron(model_path: Path, output_dir: Path, formats: list[str], t
         import netron
     except ImportError as error:
         raise RuntimeError("Netron is required. Install it with: pip install netron") from error
-    try:
-        from playwright.sync_api import sync_playwright
-    except ImportError as error:
-        raise RuntimeError("Automated image export needs Playwright. Install it with: pip install playwright, then run: playwright install chromium") from error
 
     address = netron.serve(str(model_path), address=("127.0.0.1", 0), browse=False)
     base_url = f"http://127.0.0.1:{address[1]}/"
@@ -315,24 +373,28 @@ def export_with_netron(model_path: Path, output_dir: Path, formats: list[str], t
         js_lines = [
             "async (page) => {",
             f"  const timeout = {int(timeout * 1000)};",
+            "  await page.setViewportSize({ width: 1600, height: 1000 });",
             f"  await page.getByText({json.dumps(first_node_op)}, {{ exact: false }}).first().waitFor({{ state: 'visible', timeout }});",
             "  await page.keyboard.press('Control+u');",
             f"  await page.getByText({json.dumps('[' + first_visual_id + ']')}, {{ exact: false }}).first().waitFor({{ state: 'visible', timeout }});",
+            # Let Netron finish graph layout and its SVG transition. PNG content is checked below.
+            "  await page.waitForTimeout(1500);",
         ]
-        for extension in formats:
-            shortcut = "Control+Alt+e" if extension == "svg" else "Control+Shift+e"
-            save_path = json.dumps(str((output_dir / f"model.{extension}").resolve()))
+        with tempfile.TemporaryDirectory(prefix="onnx-netron-playwright-") as cli_temp:
+            cli_dir = Path(cli_temp)
+            wants_svg = "svg" in formats
+            svg_path = output_dir / "model.svg" if wants_svg else cli_dir / "raster-source.svg"
+            svg_save_path = json.dumps(str(svg_path.resolve()))
             js_lines.extend([
                 "  {",
                 "    const downloadPromise = page.waitForEvent('download', { timeout });",
-                f"    await page.keyboard.press('{shortcut}');",
+                "    await page.keyboard.press('Control+Alt+e');",
                 "    const download = await downloadPromise;",
-                f"    await download.saveAs({save_path});",
+                f"    await download.saveAs({svg_save_path});",
                 "  }",
+                "  return 'Netron SVG export complete';",
+                "}",
             ])
-        js_lines.extend(["  return 'Netron export complete';", "}"])
-        with tempfile.TemporaryDirectory(prefix="onnx-netron-playwright-") as cli_temp:
-            cli_dir = Path(cli_temp)
             code_path = cli_dir / "export.js"
             code_path.write_text("\n".join(js_lines), encoding="utf-8")
             try:
@@ -349,11 +411,47 @@ def export_with_netron(model_path: Path, output_dir: Path, formats: list[str], t
                 run = subprocess.run([cli, session_arg, "run-code", "--filename", str(code_path)], capture_output=True, text=True, timeout=timeout * max(1, len(formats)) + 30, check=False, cwd=cli_dir)
                 if run.returncode != 0:
                     raise RuntimeError(f"playwright-cli Netron export failed: {run.stderr or run.stdout}")
-                for extension in formats:
-                    target = output_dir / f"model.{extension}"
-                    if not target.is_file():
-                        raise RuntimeError(f"Netron export did not create {target.name}: {run.stdout}")
-                    hashes[target.name] = sha256_file(target)
+                if not svg_path.is_file():
+                    raise RuntimeError(f"Netron export did not create model.svg: {run.stdout}")
+                if wants_svg:
+                    hashes["model.svg"] = sha256_file(svg_path)
+                if "png" in formats:
+                    raster_source = cli_dir / "raster-source.svg"
+                    if svg_path != raster_source:
+                        shutil.copy2(svg_path, raster_source)
+                    svg_width, svg_height = svg_dimensions(svg_path)
+                    max_edge = 8192
+                    scale = min(1.0, max_edge / max(svg_width, svg_height))
+                    png_width = max(1, round(svg_width * scale))
+                    png_height = max(1, round(svg_height * scale))
+                    preview_path = cli_dir / "raster-preview.html"
+                    preview_path.write_text(
+                        "<!doctype html><html><head><meta charset='utf-8'>"
+                        "<style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#fff}"
+                        "img{display:block;width:100vw;height:100vh;object-fit:contain}</style></head>"
+                        "<body><img src='raster-source.svg' alt='Netron graph'></body></html>",
+                        encoding="utf-8",
+                    )
+                    png_path = output_dir / "model.png"
+                    raster_code = cli_dir / "rasterize.js"
+                    raster_code.write_text("\n".join([
+                        "async (page) => {",
+                        f"  await page.setViewportSize({{ width: {png_width}, height: {png_height} }});",
+                        f"  await page.goto({json.dumps(preview_path.as_uri())});",
+                        "  await page.locator('img').waitFor({ state: 'visible' });",
+                        "  await page.waitForTimeout(750);",
+                        f"  await page.screenshot({{ path: {json.dumps(str(png_path.resolve()))}, fullPage: true }});",
+                        "  return 'PNG rasterized from the Netron SVG';",
+                        "}",
+                    ]), encoding="utf-8")
+                    raster = subprocess.run([cli, session_arg, "run-code", "--filename", str(raster_code)], capture_output=True, text=True, timeout=timeout + 30, check=False, cwd=cli_dir)
+                    if raster.returncode != 0:
+                        raise RuntimeError(f"Playwright could not rasterize the Netron SVG: {raster.stderr or raster.stdout}")
+                    if not png_path.is_file():
+                        raise RuntimeError(f"Playwright did not create {png_path.name}: {raster.stdout}")
+                    width, height = validate_png_content(png_path)
+                    print(f"Verified non-blank PNG content: {width}x{height}")
+                    hashes["model.png"] = sha256_file(png_path)
             finally:
                 subprocess.run([cli, session_arg, "close"], capture_output=True, text=True, timeout=20, check=False, cwd=cli_dir)
     finally:
@@ -365,7 +463,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Create a paired Netron image and ONNX graph JSON bundle.")
     parser.add_argument("model", type=Path, help="input ONNX model")
     parser.add_argument("--out", type=Path, default=None, help="output directory (default: <model>.inspect)")
-    parser.add_argument("--format", choices=("svg", "png", "both"), default="svg", help="Netron image format")
+    parser.add_argument("--format", choices=("svg", "png", "both"), default="png", help="Netron image format (default: png)")
     parser.add_argument("--timeout", type=int, default=120, help="Netron browser load/export timeout in seconds")
     parser.add_argument("--json-only", action="store_true", help="write structured JSON without launching Netron")
     args = parser.parse_args()

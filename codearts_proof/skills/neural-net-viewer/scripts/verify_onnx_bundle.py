@@ -68,6 +68,7 @@ def main() -> int:
                     print(f"OK: external data hash matches {external_path}")
 
     node_ids: set[str] = set()
+    node_types: dict[str, str] = {}
     visual_node_ids: set[str] = set()
     visual_ids: set[str] = set()
     tensor_ids: set[str] = set()
@@ -88,6 +89,7 @@ def main() -> int:
                 errors.append(f"duplicate node id: {node_id}")
             else:
                 node_ids.add(node_id)
+                node_types[node_id] = node.get("op_type", "unknown")
             if not visual_id:
                 if graph.get("visualized_in_overview") is not False and not graph.get("id", "").startswith("training/"):
                     errors.append(f"node {node_id} has no visual_id")
@@ -140,7 +142,18 @@ def main() -> int:
                         errors.append(f"SVG overview lists {node_id} but its visual ID is missing")
                 not_in_overview = set(expected_mapping) - overview_ids
                 if not_in_overview:
-                    warnings.append(f"{len(not_in_overview)} mapped node(s) are not visible in this overview SVG; they may belong to collapsed nested graphs")
+                    hidden_types = {node_types.get(node_id, "unknown") for node_id in not_in_overview}
+                    if hidden_types == {"Constant"}:
+                        warnings.append(
+                            f"{len(not_in_overview)} Constant node(s) are not separate boxes in the overview SVG; "
+                            "Netron represents eligible Constant outputs as initializer tensors. Their full node records remain in the JSON manifest."
+                        )
+                    else:
+                        type_summary = ", ".join(sorted(hidden_types))
+                        warnings.append(
+                            f"{len(not_in_overview)} mapped node(s) ({type_summary}) are not visible in this overview SVG. "
+                            "Netron may omit or collapse these nodes in its overview; their records remain in the JSON manifest."
+                        )
 
     if errors:
         for error in errors:
