@@ -2,6 +2,7 @@
 .token
 .assistant/
 .playwright-cli
+.weights/
 
 # 第三方仓库
 /project/repos/rknn-toolkit2/
