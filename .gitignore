@@ -7,3 +7,29 @@
 
 # 第三方仓库
 /project/repos/rknn-toolkit2/
+
+# Frontend build artifacts
+node_modules/
+dist/
+dist-ssr/
+dev-dist/
+coverage/
+*.tsbuildinfo
+.vite/
+.turbo/
+playwright-report/
+test-results/
+*.local
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Local environment settings; keep shareable examples in version control
+.env
+.env.*
+!.env.example
+!.env.*.example
