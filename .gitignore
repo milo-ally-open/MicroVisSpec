@@ -3,6 +3,7 @@
 .assistant/
 .playwright-cli
 .weights/
+.codeartsdoer
 
 # 第三方仓库
 /project/repos/rknn-toolkit2/
