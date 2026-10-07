@@ -1,17 +1,17 @@
-# 个人
+# Local and personal files
 .token
 .assistant/
-.playwright-cli
+.playwright-cli/
 .weights/
-.codeartsdoer
+.codeartsdoer/
 
-# 第三方仓库
+# Vendored repositories
 /project/repos/rknn-toolkit2/
 
-# Frontend build artifacts
+# Frontend build artifacts and local dependencies
 node_modules/
 dist/
-dist-ssr/ 
+dist-ssr/
 dev-dist/
 coverage/
 *.tsbuildinfo
@@ -28,12 +28,22 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Python caches and virtual environments
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
 # Local environment settings; keep shareable examples in version control
 .env
 .env.*
 !.env.example
 !.env.*.example
 
-# ignore datasets 
+# Downloaded training data and generated analysis output
 project/preparation/model_train/datasets/
 project/preparation/model_train/dataset_analysis/
+project/preparation/model_train/runs/
