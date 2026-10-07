@@ -1,7 +1,10 @@
 from pathlib import Path
 from collections import Counter
-import random, cv2, yaml
+import math, random, cv2, yaml
 import pandas as pd
+import matplotlib
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 DATASETS = {
@@ -19,7 +22,59 @@ def load_classes(root):
 def read_label(path):
     if not path.exists():
         return []
-    return [list(map(float, x.split()[:5])) for x in path.read_text().splitlines() if x.strip()]
+
+    boxes = []
+    for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if not line.strip():
+            continue
+
+        fields = line.split()
+        is_box = len(fields) == 5
+        is_polygon = len(fields) >= 7 and (len(fields) - 1) % 2 == 0
+        if not (is_box or is_polygon):
+            raise ValueError(
+                f"Invalid YOLO label in {path}:{line_number}: expected a 5-value "
+                "bounding box or a class ID followed by at least 3 (x, y) points"
+            )
+
+        try:
+            values = list(map(float, fields))
+        except ValueError as exc:
+            raise ValueError(
+                f"Invalid YOLO label in {path}:{line_number}: values must be numeric"
+            ) from exc
+
+        if not all(map(math.isfinite, values)):
+            raise ValueError(
+                f"Invalid YOLO label in {path}:{line_number}: values must be finite"
+            )
+
+        cls = values[0]
+        if cls < 0 or not cls.is_integer():
+            raise ValueError(
+                f"Invalid YOLO label in {path}:{line_number}: class ID must be a "
+                "non-negative integer"
+            )
+
+        if is_box:
+            xc, yc, bw, bh = values[1:]
+        else:
+            points = list(zip(values[1::2], values[2::2]))
+            xs, ys = zip(*points)
+            x1, x2 = min(xs), max(xs)
+            y1, y2 = min(ys), max(ys)
+            xc, yc = (x1 + x2) / 2, (y1 + y2) / 2
+            bw, bh = x2 - x1, y2 - y1
+
+        if not all(0 <= value <= 1 for value in (xc, yc, bw, bh)) or bw <= 0 or bh <= 0:
+            raise ValueError(
+                f"Invalid YOLO label in {path}:{line_number}: box values must be "
+                "normalized to [0, 1], with positive width and height"
+            )
+
+        boxes.append([cls, xc, yc, bw, bh])
+
+    return boxes
 
 def plot_save(x, y, title, path, rotate=False):
     plt.figure(figsize=(10, 6))
@@ -65,7 +120,11 @@ def analyze(name, root):
         if not base.exists():
             continue
 
-        imgs = list((base / "images").glob("*.*"))
+        images_dir = base / "images"
+        if not images_dir.is_dir():
+            raise FileNotFoundError(f"Expected image directory: {images_dir}")
+
+        imgs = list(images_dir.glob("*.*"))
         objects, empty = 0, 0
 
         for img in imgs:
@@ -84,7 +143,7 @@ def analyze(name, root):
                 class_count[cls] += 1
                 bbox_rows.append([names.get(cls, str(cls)), bw, bh, bw*bh])
 
-        split_rows.append([split, len(imgs), objects, empty])
+        split_rows.append([base.name, len(imgs), objects, empty])
 
     class_df = pd.DataFrame(
         [[i, names[i], class_count[i]] for i in names],

@@ -1,0 +1,4 @@
+split,images,objects,empty_images
+train,20873,491861,99
+valid,1997,50057,9
+test,945,22343,2
