@@ -11,7 +11,7 @@
 # Frontend build artifacts
 node_modules/
 dist/
-dist-ssr/
+dist-ssr/ 
 dev-dist/
 coverage/
 *.tsbuildinfo
@@ -36,3 +36,4 @@ lerna-debug.log*
 
 # ignore datasets 
 project/preparation/model_train/datasets/
+project/preparation/model_train/dataset_analysis/
