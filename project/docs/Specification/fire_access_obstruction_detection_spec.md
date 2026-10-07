@@ -25,10 +25,10 @@
 
 ### 2\.1 两个垂直检测模型
 
-|模型  |场景        |数据集                                                                                                |主要类别                                                            |预训练权重      |
-|----|----------|---------------------------------------------------------------------------------------------------|----------------------------------------------------------------|-----------|
-|模型 A|楼道消防通道杂物检测|[Roboflow Hazard Detection](https://universe.roboflow.com/safetekimagerecog/hazard-detection-iw6n4)|cardboard-box、blocking-object、debris-on-floor、cleaning-equipment|**YOLO11n**|
-|模型 B|消防车通道车辆检测 |[Roboflow Vehicle Detection](https://universe.roboflow.com/csdm3/vehicle-detection-ckrxi-wxotj)    |car、truck、bus、motorbike                                         |**YOLO11n**|
+| 模型 | 场景 | 数据集 | 主要类别 | 预训练权重 |
+|---|---|---|---|---|
+| 模型 A | 楼道消防通道杂物检测 | [Roboflow Warehouse Detection](https://universe.roboflow.com/warehouse-recognition/warehouse-detection-xtbsn) | pallet、fitting box、full box、pallet_truck、palletjack、small_load_carrier、stillage、Toolbox | **YOLO11n** |
+| 模型 B | 消防车通道车辆检测 | [Roboflow Vehicle Detection](https://universe.roboflow.com/jey-mtuyv/vehicle-detection-tqbaf-7cck5) | car、truck、bus、motorcycle | **YOLO11n** |
 
 YOLO11 参考：
 
