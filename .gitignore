@@ -33,3 +33,6 @@ lerna-debug.log*
 .env.*
 !.env.example
 !.env.*.example
+
+# ignore datasets 
+project/preparation/model_train/datasets/
