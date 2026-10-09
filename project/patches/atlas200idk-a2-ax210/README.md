@@ -25,6 +25,7 @@
 - `scripts/scan.sh`：解除软阻断、启用无线接口并列出附近信号。
 - `scripts/uninstall-board.sh`：卸载本工程文件，若安装前已有同名文件则恢复备份。
 - `scripts/verify-board.sh`：核对 PCI 绑定、模块、rfkill 和扫描结果。
+- `tools/wifi-menu/`：C 语言交互式热点选择器工程，构建后安装为 `wifi-menu`。
 - `artifacts/`：板端原始配置快照、已构建模块、固件及离线扫描工具包。
 
 ## 输入文件
@@ -100,6 +101,18 @@ rfkill unblock wifi
 ip link set wlan0 up
 iw dev wlan0 scan
 ```
+
+## 交互式联网
+
+板端运行：
+
+```bash
+wifi-menu
+```
+
+方向键选择扫描到的热点，Enter 连接，按 `r` 重新扫描；按 `d` 在连接中取消，或在空闲时断开。Esc、Ctrl-C 也可取消扫描或连接；按 `?` 查看帮助，按 `q` 退出。启动和重扫时，后台会请求扫描并在约 3.5 秒后读取结果；扫描期间界面仍可响应按键。当前连接与目标热点分开展示，界面只在状态或输入变化时重绘。每次连接前，工具会清除目标热点配置中保存的 PSK、关闭该配置的自动连接并设为每次询问密码；密码只用于当前连接，不保存在持久配置中。工具只管理 `wlan0`，不编辑 Netplan。
+
+源码和详细使用说明位于 `tools/wifi-menu/`。板端自带 AArch64 GCC，可在该目录执行 `make clean all && make install` 安装到 `/usr/local/bin/wifi-menu`。默认构建使用 `-O3` 与 LTO，不依赖 ncurses、Python 或其他 UI 库；热点列表有固定上限并按信号强度排序。
 
 查看完整状态：
 
