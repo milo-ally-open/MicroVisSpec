@@ -47,3 +47,6 @@ venv/
 project/preparation/model_train/datasets/
 project/preparation/model_train/dataset_analysis/
 project/preparation/model_train/runs/
+
+# zip 
+readme/Ascend-hdk-310b-sdk-soc_23.0.rc3.zip
