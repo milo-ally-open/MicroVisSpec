@@ -1,3 +1,0 @@
-interface:
-  display_name: "Neural Network Viewer"
-  short_description: "Pair Netron diagrams with verified ONNX graph structure"
