@@ -30,7 +30,7 @@
 
 ## 输入文件
 
-SDK ZIP 保存在仓库的 `readme/Ascend-hdk-310b-sdk-soc_23.0.rc3.zip`，约 541 MiB。它由用户提供，未复制进修复工程，也不要提交到 Git；重建脚本直接读取这个路径。ZIP SHA-256：
+SDK ZIP 保存在本机 `readme/assets/Ascend-hdk-310b-sdk-soc_23.0.rc3.zip`，约 541 MiB。它由用户提供，未复制进修复工程，并已由仓库 `.gitignore` 排除；重建脚本从这个本地路径读取。ZIP SHA-256：
 
 ```text
 e64b9cf9e1f1af3ab9f00465a9754fbf56ef120e6a2e9073d531e0d69c42729d

@@ -32,7 +32,7 @@ NetworkManager/网络接口中没有无线设备
 
 ## 源码和版本匹配
 
-用户提供的官方 SDK 包放在仓库 `readme/Ascend-hdk-310b-sdk-soc_23.0.rc3.zip`，大小约 541 MiB，SHA-256：
+用户提供的官方 SDK 包保存在本机 `readme/assets/Ascend-hdk-310b-sdk-soc_23.0.rc3.zip`，大小约 541 MiB。该大文件已由仓库 `.gitignore` 排除，不会随代码提交。SHA-256：
 
 ```text
 e64b9cf9e1f1af3ab9f00465a9754fbf56ef120e6a2e9073d531e0d69c42729d
