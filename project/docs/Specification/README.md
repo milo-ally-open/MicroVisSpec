@@ -1,60 +1,52 @@
 # Specification 文档组
 
-本文档组规定云哨项目如何将一项需求或缺陷转成可审阅、可执行、可验收的开发工作。工作流借鉴了 Spec Kit 的澄清、方案分析和一致性检查，OpenSpec 的变更增量与归档，Kiro 的功能/缺陷双路径，以及 BMad 对上游依据和下游文档责任的划分；这些是基于公开资料的项目裁剪方案，不代表采用了这些工具或其原样流程。比较与取舍见[调研比较](COMPARISON.md)。
+`Specification/` 按服务或领域维护长期有效的产品行为与工程合同。每组的四份文档各有唯一职责：`proposal.md` 说明目标和范围，`spec.md` 定义需求与验收，`design.md` 说明必要的技术选择，`tasks.md` 记录实施与验证状态。它们共同描述同一组工作，不能各自定义另一套需求、接口或状态。
 
-## 入口与文档职责
+代码与规格通过 Git 分支、提交和 PR 留下修改历史。开发时更新现有服务/领域组；只有新服务或新领域确实没有合适的组时，才初始化新组。不要为每次代码修改复制整套规格。
 
-| 文档 | 用途 | 事实来源 |
-|---|---|---|
-| [工作流](WORKFLOW.md) | 选择轻量、标准、跨边界或缺陷流程；定义评审、实现、验收和归档 | 本项目执行约定 |
-| [方案比较](COMPARISON.md) | 记录调研范围、常见形式、优缺点和选择理由 | 官方公开资料，访问日期 2026-10-09 |
-| 模板 | 创建变更说明、行为规格、技术设计和任务清单 | 每项具体变更的工作文件 |
-| [全局技术 SPEC](../Analysis/SPEC.md) | 跨服务技术合同与产品需求落点 | 平台级长期基线 |
-| [系统结构](../Design/STRUCTURE.md) | 服务职责、系统边界、数据流和架构原则 | 平台级结构基线 |
-| 服务规格 | [auth-service](auth_service_spec.md)、[device-service](device_service_spec.md)、[event-service](event_service_spec.md)、[media-service](media_service_spec.md)、[push-service](push_service_spec.md) | 相应服务的详细规格/实施任务书 |
-| 领域规格 | [消防通道检测](fire_access_obstruction_detection_spec.md) | 算法/业务域专用的阶段说明；不等同于平台服务合同 |
-
-`Analysis/PRD.md` 是产品需求和范围的唯一入口；`Research/RESEARCH.md` 保存会影响方案的外部证据与取舍；`Design/STRUCTURE.md` 记录高层结构；`Analysis/SPEC.md` 保存平台级跨服务技术合同。全局 SPEC 沿用仓库现有 `Analysis/` 路径，但在流程上属于结合 Research 和 Design 后形成的技术规格，不表示它先于这两个阶段。`Specification/<service>_service_spec.md` 保存相应服务的详细合同和实施阶段。现有服务文件多为“实现任务书”，其中描述的是目标合同和计划，不等于代码已实现；开始任务时必须对照源码核实。新变更包只描述增量，不复制整份 PRD 或全局 SPEC。修改完成后，应把长期有效的行为/接口合同回写到其唯一基线文档。
-
-## 目录约定
+## 目录结构
 
 ```text
 project/docs/Specification/
 ├── README.md
 ├── WORKFLOW.md
 ├── COMPARISON.md
-├── assets/                         # 规格文档使用的图片或其他附件
-├── templates/
+├── auth_service/
 │   ├── proposal.md
 │   ├── spec.md
 │   ├── design.md
 │   └── tasks.md
-├── changes/
-│   ├── <YYYY-MM-DD>-<short-name>/   # 当前变更包；与实现放在同一任务分支
-│   └── archive/
-│       └── <YYYY-MM-DD>-<short-name>/ # 已完成变更的决策和验收记录
-├── auth_service_spec.md
-├── device_service_spec.md
-├── event_service_spec.md
-├── media_service_spec.md
-├── push_service_spec.md
-└── fire_access_obstruction_detection_spec.md # 领域专属规格
+├── device_service/
+├── event_service/
+├── media_service/
+├── push_service/
+├── fire_access_obstruction_detection/
+└── project_spec_workflow/
 ```
 
-仓库已有目录名为 `Specification`（单数），并已有多份服务规格。为避免破坏链接和制造重复基线，沿用该目录名；“Specifications”指这一整组文档。`changes/` 按需创建；没有活跃变更时不必保留空目录。算法或领域专属规格（例如消防通道检测算法）继续按其实际责任边界维护，不自动并入平台服务合同。
+各组按需维护四份文档。轻量工作可以只改 `proposal.md`；没有新增技术选择时，`design.md` 写明沿用哪份合同即可。新服务/领域组可运行 Skill 的 `init_spec_group.py`，从仓库模板建立初始结构；脚本拒绝覆盖已有目录。
 
-## 变更状态
+## 文档职责与事实来源
 
-状态写在变更包 `proposal.md` 的元数据中：`探索中`、`待评审`、`可实现`、`实现中`、`待验收`、`已完成`、`已取消`。`可实现`只表示该变更包已通过适用的技术/范围评审、没有阻塞实现的未决项；它不代表用户或产品责任人已批准其中的业务决策。高风险或超出 PRD 的业务决策仍须由相应责任人明确确认，并在状态进入 `可实现` 前记录该决定。
+| 文档 | 负责回答 | 权威内容 |
+|---|---|---|
+| [工作流](WORKFLOW.md) | 本项目如何选择文档深度、评审、实现和验收 | 项目流程约定 |
+| [调研比较](COMPARISON.md) | 为什么采用当前 Spec 范式 | 外部官方资料及项目取舍 |
+| [产品需求](../Analysis/PRD.md) | 用户、产品范围和承诺 | 产品基线 |
+| [研究记录](../Research/RESEARCH.md) | 外部证据和方案依据 | 研究基线 |
+| [系统结构](../Design/STRUCTURE.md) | 服务职责、边界和数据流 | 架构基线 |
+| [全局技术 SPEC](../Analysis/SPEC.md) | 跨服务接口、身份、数据和部署合同 | 平台技术基线 |
+| 各领域组 | 服务/领域内行为、技术合同与实施状态 | 对应源码、接口和验证证据 |
 
-一般状态流转为 `探索中 → 待评审 → 可实现 → 实现中 → 待验收 → 已完成`；评审要求修改时回到 `探索中` 并更新材料。轻量变更可跳过正式评审，材料具备且开始编码后进入 `实现中`。任何未完成阶段都可在记录原因后转为 `已取消`。原型结论不确定时保持 `探索中`，写清下一步验证；规格/设计/任务不再各自维护第二套生命周期状态。
+遇到冲突时，产品范围以 PRD 为准，跨服务合同以全局 SPEC 为准，系统边界以 STRUCTURE 为准，服务内行为以对应领域组为准。目标规格不等于已交付事实；实现状态必须由代码、测试、日志或设备证据核对。
 
-## 使用方式
+## 单组内的关系
 
-从 [工作流](WORKFLOW.md) 根据改动大小与风险选择路径。标准路径按 `proposal → spec → design → tasks → review → implement → verify → reconcile/archive` 推进。小改动允许压缩为一个轻量变更说明；缺陷使用缺陷字段；探索性原型可以先验证，但结论需回写成可检查的规格再进入正式实现。
+- `proposal.md` 是范围与决策入口。对长期服务组，状态 `基线` 表示规格持续维护，不表示实现已完成；活跃工作可记录 `探索中`、`待评审`、`可实现`、`实现中`、`待验收`、`已完成` 或 `已取消`。
+- `spec.md` 是唯一需求和验收定义处，需求用 `REQ-xx`，验收用 `AC-xx.n`。其他文档引用这些 ID，不另抄写或改变其含义。
+- `design.md` 只写本次实现需要的技术决策；详细接口或数据合同若已在 `spec.md`，此处链接到对应章节。
+- `tasks.md` 用 `T-xx` 引用 REQ/AC，记录实际任务进度和验收证据。未核查代码或设备时写“待核验”，不推断完成状态。
 
-本工作流是 Markdown 文档约定，不要求安装 Spec Kit、OpenSpec、Kiro 或 BMAD，也不要求迁移现有 Git 分支/PR 流程。
+通常按 `proposal → spec → design → tasks → review → implement → verify → reconcile` 阅读和维护；轻量工作可跳过不必要的文档。每次只改动受影响的文件和唯一事实来源，不复制无关基线。
 
-模板：[proposal.md](templates/proposal.md) · [spec.md](templates/spec.md) · [design.md](templates/design.md) · [tasks.md](templates/tasks.md)。
-
-变更包目录的用途和归档步骤见 [changes/README.md](changes/README.md)。
+流程以 Markdown 和 Git 为基础，不要求安装 Spec Kit、OpenSpec、Kiro 或 BMAD。

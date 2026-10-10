@@ -1,10 +1,42 @@
 # push-service 实现任务书
 
-> 状态：首发实现任务书；以[产品需求](../Analysis/PRD.md)、[架构设计](../Design/STRUCTURE.md)和[总技术规格](../Analysis/SPEC.md)为准。
+> 状态：首发实现任务书；以[产品需求](../../Analysis/PRD.md)、[架构设计](../../Design/STRUCTURE.md)和[总技术规格](../../Analysis/SPEC.md)为准。
 >
 > 责任边界：push-service 管理浏览器 Push 订阅及通知投递；event-service 拥有事件并可靠发出 `event.created`；auth-service 拥有会话并发出 `session.revoked`；Vue PWA 负责权限交互和 service worker 展示。
 >
 > 首发边界：向当前账号已授权的手机 PWA 发送事件摘要并打开详情。原生 Android、iOS、Harmony 推送和“用户已读”回执不在首发范围。
+
+## 稳定需求与验收索引
+
+> 本索引用于跨文档追踪；详细行为以本文件正文为准。编号保持稳定，需求变更时同步更新。
+
+### REQ-01 订阅身份与租户
+
+订阅绑定经验证账号和会话。
+
+- **AC-01.1**：订阅操作校验身份并安全存储密钥。
+- **AC-01.2**：账号切换或 endpoint 复用不串发旧账号通知。
+
+### REQ-02 幂等与撤销
+
+重复上游事件不重复建任务，撤销能抑制投递。
+
+- **AC-02.1**：重复事件不产生重复 inbox/delivery。
+- **AC-02.2**：会话撤销停用相关订阅和待投递任务。
+
+### REQ-03 投递结果
+
+投递按临时/永久失败分类，结果语义准确。
+
+- **AC-03.1**：临时失败重试，永久无效订阅停止并清理。
+- **AC-03.2**：发送被接受不等价于用户收到或已读。
+
+### REQ-04 PWA 与隐私
+
+用户主动授权后可收到通知并安全打开详情。
+
+- **AC-04.1**：点击进入受鉴权事件详情。
+- **AC-04.2**：载荷和 service worker 缓存不暴露敏感信息。
 
 ## 一、任务目标
 
@@ -62,7 +94,7 @@
 
 ### 4.1 服务间接口
 
-push-service 在内网 `/internal/v1/inbox` 接收经服务凭据认证的 `event.created` 与 `session.revoked`。请求须包含生产者、`event_type`、稳定 `event_id`、`schema_version`、`occurred_at` 和负载；具体消息合同遵照[总技术规格 §4.2](../Analysis/SPEC.md)。
+push-service 在内网 `/internal/v1/inbox` 接收经服务凭据认证的 `event.created` 与 `session.revoked`。请求须包含生产者、`event_type`、稳定 `event_id`、`schema_version`、`occurred_at` 和负载；具体消息合同遵照[总技术规格 §4.2](../../Analysis/SPEC.md)。
 
 ### 4.2 实现任务
 

@@ -1,7 +1,7 @@
 # 行为规格：<简短名称>
 
 > 关联提案：[proposal.md](proposal.md)<br>
-> 变更包统一状态见 `proposal.md`。<br>
+> 本文档组状态见 `proposal.md`。<br>
 > 来源：<PRD 故事、已确认决策或缺陷报告>
 
 ## 范围和术语

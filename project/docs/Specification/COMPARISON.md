@@ -1,42 +1,33 @@
-# Vibe Coding 中 Spec 工作流的形式与项目取舍
+# Spec 工作流调研与项目取舍
 
-> 调研日期：2026-10-09。只比较公开、可复核的官方流程说明；不同工具/版本会演进。Vibe coding 没有单一强制标准，以下是常见的 Spec 驱动开发形态，而非完整市场普查。
+> 调研日期：2026-10-10。下列内容依据项目官方文档；工具流程会随版本演进。本节记录云哨的裁剪理由，不表示安装或采用这些工具。
 
-## 项目背景
+## 常见模式
 
-云哨是云边端视频事件平台，首发采用 RK3588，先围绕单个消防通道点位验证完整闭环，再扩展到最多 12 路活动视频通道。平台包含 Vue Web/PWA、Go/Gin/GORM 业务服务（auth、device、event、media、push）、Python/视觉算法与边缘设备链路，以及 Nginx、PostgreSQL、Mosquitto、MediaMTX 等基础设施。产品数据按个人账号隔离，实时媒体、设备消息、事件截图和 Web Push 各有独立边界。[PRD](../Analysis/PRD.md) [系统结构](../Design/STRUCTURE.md)
+| 项目 | 常见流程与强项 | 对云哨的借鉴 |
+|---|---|---|
+| GitHub Spec Kit | Constitution、需求澄清、规格、计划、任务，以及跨文档一致性分析；适合把目标、约束和实施方案分开检查 | 先澄清范围；编码前检查需求、设计、任务之间的一致性；任务必须能追溯到可验收需求 |
+| OpenSpec | 以需求提案、能力规格、设计、任务组成可审阅的规格驱动循环，强调规格差异与已交付系统合同的同步 | 每次工作只更新受影响的需求；完成时同步持久规格，避免规格和实现漂移 |
+| Kiro | 功能规格分为需求、设计、任务；缺陷路径突出环境、复现、当前/预期行为和根因分析 | 功能和缺陷使用不同的提案关注点；根因未经验证时标为假设 |
+| BMad | 从产品简报/PRD 到 UX、架构、规格和任务，强调上游责任与单一事实来源 | 让产品范围、研究证据、系统结构、跨服务合同和服务合同各自有唯一落点 |
 
-现有文档已包括产品 PRD、商用方案研究、系统结构、平台级技术 SPEC、服务级规格/实施任务书和算法专属说明。工作方式既有先明确接口合同再拆服务实现的文档驱动，也会在模拟联调、模型/边缘验证或小型原型中先获得证据，再修正规格。因此单一“先写完整规格再编码”的刚性流程不适配所有改动；同时，仅写一个提示词和任务清单会遗漏账号隔离、消息幂等、媒体授权、设备兼容等跨边界约束。
+公开资料：[Spec Kit 的 Agentic SDD](https://github.github.com/spec-kit/reference/agentic-sdd.html)、[OpenSpec 的 spec-driven schema](https://openspec.dev/docs/schemas/spec-driven)、[OpenSpec Quickstart](https://openspec.dev/docs/quickstart)、[Kiro Specs](https://kiro.dev/docs/specs/)、[BMad 组织内规划](https://docs.bmad-method.org/plan/plan-inside-an-organization/)。
 
-## 常见形式比较
+## 云哨采用的范式
 
-| 形式 | 典型产物与循环 | 优点 | 代价/风险 | 对云哨的适配 |
-|---|---|---|---|---|
-| GitHub Spec Kit（完整 SDD） | 项目原则/constitution → specify → clarify → plan → tasks → analyze → implement；在规格、方案、任务间做检查 | 需求澄清和跨产物一致性有明确步骤；适合先确定产品/技术合同再实现 | 完整流程对小任务较重；命令和产物受工具约定影响，直接照搬会和已有 PRD、全局 SPEC 重复 | 采用澄清、需求追踪、实施前一致性检查；不强制其命令或 constitution 文件 |
-| OpenSpec（变更增量） | explore → proposal → 按能力描述 spec 增量 → 可选 design → tasks → apply → archive；归档时把已交付增量合并回当前规格 | 围绕一次变更组织上下文；增量和长期基线分开，易审阅、续做、追溯；文本文件对 Vibe Coding 友好 | 增加变更包维护；若忘记回写/归档，基线仍会漂移；对产品发现和既有架构的详细治理较轻 | 作为日常变更包和归档主形态；用项目规则补足产品追踪及系统风险评审 |
-| Kiro 功能规格/缺陷规格 | 功能：requirements → design → tasks；缺陷：分析现状/期望并形成修复设计与任务；任务逐项执行 | 功能与缺陷走不同路径；需求可写用户故事/验收条件；任务有依赖和进度 | 主要关注单个 feature/bug 包；长期规格基线、归档回写需项目自行规定；一次快速生成所有产物可能跳过有价值的评审 | 采用功能/缺陷双路径及当前/期望/回归关注点，不照搬 IDE 专属状态管理 |
-| BMad（角色/层级文档链） | brief/PRD → UX/architecture spine → epic spec → tickets/build → review/retro | 明确产品真相源、架构基线和团队责任；适合多角色、较大项目、审计需要 | 角色和文档层级较多；小团队或一个人带 AI 开发时容易流程过重；“所有下游从上游派生”需持续维护 | 借鉴单一事实来源与变更落点规则；不引入完整角色编排 |
-| 纯提示词/一次性 plan | 一段需求或 plan + 直接编码 | 启动快、适合小且可逆的改动 | 需求边界、失败情形、任务状态和规格回写依赖记忆；上下文切换后难续做 | 只用于低风险、局部、容易回滚的改动，并保留简短验收记录 |
+云哨使用按服务或领域分组的持久文档：`proposal.md` 描述领域目标与范围，`spec.md` 定义行为和验收，`design.md` 记录影响实现的技术选择，`tasks.md` 追踪当前实施工作。每次需求只改动相关组和受影响的全局基线；代码与文档通过同一 Git 分支、提交和 PR 留下历史。小改动允许精简文档，风险较高时增加追踪矩阵和兼容、安全、回滚及运维细节。
 
-以上过程描述来自各自官方文档：[Spec Kit workflow](https://github.github.com/spec-kit/reference/workflows.html)、[Spec Kit agentic SDD](https://github.github.com/spec-kit/reference/agentic-sdd.html)、[OpenSpec quickstart](https://openspec.dev/docs/quickstart)、[OpenSpec spec-driven schema](https://openspec.dev/docs/schemas/spec-driven)、[Kiro feature and bugfix specs](https://kiro.dev/docs/specs/)、[BMad organization planning](https://docs.bmad-method.org/plan/plan-inside-an-organization/)。访问日期均为 2026-10-09。
+此设计融合了 Spec Kit 的澄清和一致性分析、OpenSpec 的增量同步理念、Kiro 的功能/缺陷分流、BMad 的事实来源责任划分，同时保留云哨已有的 PRD、Research、Design 和服务合同路径。它不要求每次开发都复制整套文档，也不另造 Git 已能提供的历史记录。
 
-## 选择：风险分级的增量 Spec
+## 事实来源
 
-采用 **OpenSpec 式变更包作为执行骨架，Spec Kit 式澄清/一致性分析作为标准路径检查点，Kiro 式功能与缺陷分流，BMad 式单一事实来源和责任落点**。变更包由普通 Markdown 构成，不依赖第三方 CLI。它和现有文档映射如下：
-
-| 问题 | 事实来源 / 变更落点 |
+| 信息 | 唯一维护位置 |
 |---|---|
-| 用户是谁、解决什么问题、交付范围是什么 | 先看 `Analysis/PRD.md`；如需改变业务范围，先更新 PRD 并由业务责任人确认 |
-| 方案依据是否有证据 | `Research/RESEARCH.md` 与相关研究记录；外部事实注明来源和访问日期 |
-| 系统边界和高层组件如何协作 | `Design/STRUCTURE.md` |
-| 跨服务长期接口、身份/数据/部署合同 | `Analysis/SPEC.md` |
-| 某服务内部的详细合同和阶段实施计划 | 对应 `<service>_service_spec.md` |
-| 本次要增加/修改/删除什么及其任务状态 | `Specification/changes/<date>-<slug>/`；完成后回写上述基线并移入 `changes/archive/` |
+| 产品用户、范围和承诺 | `project/docs/Analysis/PRD.md` |
+| 外部证据和研究结论 | `project/docs/Research/RESEARCH.md` |
+| 高层系统边界和数据流 | `project/docs/Design/STRUCTURE.md` |
+| 跨服务接口与技术合同 | `project/docs/Analysis/SPEC.md` |
+| 服务/领域行为和技术约定 | `project/docs/Specification/<domain>/` |
+| 每次修改的历史与审查 | Git 分支、提交、PR |
 
-**优点**：每次 Vibe Coding 会话有明确上下文包；服务并行实现仍共享全局合同；规格承接可验收行为，任务清单承接实现状态；原型结论可以回补，避免把尚未验证的设计误写成已知事实；小改动不被完整文档链拖慢。
-
-**代价与控制**：多一层变更包维护，并要求实现完成时显式更新长期文档。用按风险选择路径、只写变更差异、不复制上游文档、变更包与代码一起提交、任务验收后回写及归档来控制成本。未确认的产品决策标记 `[待确认]`，技术推断标记 `[假设]`，不得由 AI 静默定案。
-
-## 文档边界说明
-
-本组是为该项目拟定的工作约定，不宣称是某门课程或外部方法论的原文标准。现有 `Specification/` 为单数且已经被链接使用，因此保留路径；没有迁移到工具私有目录，也没有把服务实施任务书改写成新的重复基线。
+领域组中的目标说明不能替代对源码和运行证据的检查。实现与规格不一致时，先确认是实现缺陷还是需求决策改变，再更新负责该事实的唯一文档。
