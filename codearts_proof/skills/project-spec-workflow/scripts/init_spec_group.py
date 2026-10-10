@@ -16,9 +16,11 @@ FILES_BY_MODE = {
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Create a persistent Yunshao Specification domain group from the project templates."
+        description="Create a specification group from this skill's templates."
     )
-    parser.add_argument("--root", default=".", help="repository root (default: current directory)")
+    parser.add_argument("--root", default=".", help="repository root used to discover a documentation root (default: current directory)")
+    parser.add_argument("--spec-root", help="specification directory that will contain the new group")
+    parser.add_argument("--template-root", help="template directory (default: this skill's templates)")
     parser.add_argument("--name", required=True, help="new group name using lowercase letters, digits, hyphens, or underscores")
     parser.add_argument("--title", required=True, help="human-readable group title")
     parser.add_argument("--mode", choices=FILES_BY_MODE, default="standard")
@@ -28,12 +30,21 @@ def main():
         parser.error("--name must be a simple lowercase directory name without path separators")
 
     root = Path(args.root).resolve()
-    spec_root = root / "project" / "docs" / "Specification"
-    template_root = root / "codearts_proof" / "skills" / "project-spec-workflow" / "templates"
+    template_root = Path(args.template_root).resolve() if args.template_root else Path(__file__).resolve().parent.parent / "templates"
+    if args.spec_root:
+        spec_root = Path(args.spec_root).resolve()
+    else:
+        candidates = [root / "docs" / "Specification", root / "project" / "docs" / "Specification", root / "Specification"]
+        matches = [path for path in candidates if path.is_dir()]
+        if not matches:
+            parser.error("could not discover a specification directory; pass --spec-root")
+        if len(matches) > 1:
+            parser.error("multiple specification directories found; pass --spec-root to choose one")
+        spec_root = matches[0]
     if not spec_root.is_dir():
-        parser.error("could not find project/docs/Specification under --root")
+        parser.error("specification root does not exist: " + str(spec_root))
     if not template_root.is_dir():
-        parser.error("could not find this skill's templates under --root")
+        parser.error("template directory does not exist: " + str(template_root))
 
     destination = spec_root / args.name
     if destination.exists():
