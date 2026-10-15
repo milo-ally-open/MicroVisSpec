@@ -1,0 +1,17 @@
+{
+  "created_utc": "2026-10-15T14:54:53.273370+00:00",
+  "ultralytics_version": "8.4.118",
+  "imgsz": 640,
+  "opset": 17,
+  "dynamic": false,
+  "device": "cpu",
+  "models": [
+    {
+      "dataset": "vehicle_detection",
+      "checkpoint": "/mnt/e/workspace/Yunshao/project/preparation/model_vehicle_detection/model_train/train_result/yolo11n_vehicle_detection_best.pt",
+      "checkpoint_sha256": "d250b5f17782bf0422b28e7137ade0d0bd79b6c6a194dbd21cc2db2c6d30646a",
+      "onnx": "/mnt/e/workspace/Yunshao/project/preparation/model_vehicle_detection/model_export/artifacts/yolo11n_vehicle_detection_best.onnx",
+      "onnx_sha256": "d587446b4b80f263dda374b987341cccf28d2d6513ec5c1c88a6edff25f27a16"
+    }
+  ]
+}

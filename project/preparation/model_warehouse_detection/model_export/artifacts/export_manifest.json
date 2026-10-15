@@ -1,0 +1,17 @@
+{
+  "created_utc": "2026-10-15T14:54:53.201755+00:00",
+  "ultralytics_version": "8.4.118",
+  "imgsz": 640,
+  "opset": 17,
+  "dynamic": false,
+  "device": "cpu",
+  "models": [
+    {
+      "dataset": "warehouse_detection",
+      "checkpoint": "/mnt/e/workspace/Yunshao/project/preparation/model_warehouse_detection/model_train/train_result/yolo11n_warehouse_detection_best.pt",
+      "checkpoint_sha256": "290db622d8147cf6f94d4bed8c6d62e137fc238641a8eb4625b207767840354c",
+      "onnx": "/mnt/e/workspace/Yunshao/project/preparation/model_warehouse_detection/model_export/artifacts/yolo11n_warehouse_detection_best.onnx",
+      "onnx_sha256": "06dd1e047f9722c71929a6dcaa7c668d8fc7d68042fe6241bdafb1d721de1f72"
+    }
+  ]
+}

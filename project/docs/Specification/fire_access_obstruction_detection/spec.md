@@ -1,6 +1,6 @@
 # 消防通道静止目标检测阶段化说明
 
-> 状态：算法路线草案；训练数据与场景适配、通道区域判定方法、RK3588 实机条件待团队确认
+> 状态：算法路线草案；训练数据与场景适配、通道区域判定方法、Atlas 200I DK A2 实机条件待团队确认
 > 责任边界：队友负责图片/算法及边缘推理；平台事件接入由双方约定
 > 注意：本文件描述的阶段和技术方案不是当前前后端模拟联调版的已批准交付范围。
 
@@ -18,10 +18,10 @@
 
 ### REQ-02 端侧推理
 
-区分桌面实验与 RK3588 实机结果并可复现。
+区分桌面实验与 Atlas 200I DK A2 实机结果并可复现。
 
 - **AC-02.1**：实机记录转换、精度、时延、内存和稳定性。
-- **AC-02.2**：桌面或模拟结果不得标为 RK3588/NPU 实测。
+- **AC-02.2**：桌面或模拟结果不得标为 Atlas 200I DK A2/NPU 实测。
 
 ### REQ-03 静止判定
 
@@ -39,7 +39,7 @@
 
 ## 一、任务目标
 
-针对两类消防通道场景，完成目标检测、静止目标判断、RK3588 端侧验证及 C/C\+\+ 最小工程部署。
+针对两类消防通道场景，完成目标检测、静止目标判断、Atlas 200I DK A2 端侧验证及 C/C\+\+ 最小工程部署。
 
 整体划分为三个阶段：
 
@@ -139,19 +139,19 @@ PC 训练环境下首先完成标准检测性能评估。
 
 ---
 
-## 六、RK3588 模型端侧验证
+## 六、Atlas 200I DK A2 模型端侧验证
 
-模型训练完成后，在 RK3588 上完成完整的模型端侧验证。
+模型训练完成后，将 ONNX 转换为适配 Ascend 310B4 的 OM，并在 Atlas 200I DK A2 上完成完整的模型端侧验证。当前图像选定基线为 Desktop-Image 23.0.RC3、CANN 7.0.RC1；每次转换前记录板端 `npu-smi info` 的芯片型号及实际 CANN/驱动版本。转换命令至少固定输入名称与形状、ATC 版本、`--soc_version=Ascend310B4` 和输出精度策略；OM 必须用同一板端数据集复测。
 
-Rockchip 相关工具：
+首发工具链：
 
-- [RKNN\-Toolkit2](https://github.com/airockchip/rknn-toolkit2)
-- [RKNN Model Zoo](https://github.com/airockchip/rknn_model_zoo)
-- [RKNN Model Zoo YOLO11 示例](https://github.com/airockchip/rknn_model_zoo/tree/main/examples/yolo11)
+- [Atlas 200I DK A2 模型转换官方说明](https://www.hiascend.com/document/detail/zh/Atlas200IDKA2DeveloperKit/23.0.RC2/Getting%20Started%20with%20Application%20Development/iaqd/iaqd_0018.html)
+- [CANN 7.0.RC1 ATC 工具使用指南](https://www.hiascend.com/doc_center/source/zh/canncommercial/70RC1/inferapplicationdev/atctool/CANN%207.0.RC1%20ATC%E5%B7%A5%E5%85%B7%E4%BD%BF%E7%94%A8%E6%8C%87%E5%8D%97%2001.pdf)
+- [AscendCL C/C++ 应用开发指南](https://www.hiascend.com/document/detail/zh/Atlas200IDKA2DeveloperKit/23.0.RC2/Application%20Development%20Guide/aadgc/aclcppdevg_000000.html)
 
 基本模型链路：
 
-**YOLO11n PyTorch → ONNX → RKNN → RK3588 NPU**
+**YOLO11n PyTorch → ONNX → CANN ATC（Ascend310B4）→ OM → AscendCL**
 
 ### 6\.1 模型精度分析
 
@@ -161,8 +161,8 @@ Rockchip 相关工具：
 |-----------------|------------|
 |YOLO11n PyTorch  |PC          |
 |YOLO11n ONNX     |PC          |
-|YOLO11n RKNN     |RK3588      |
-|YOLO11n RKNN INT8|RK3588，如采用量化|
+|YOLO11n OM     |Atlas 200I DK A2 / Ascend 310B4      |
+|YOLO11n OM INT8|Atlas 200I DK A2 / Ascend 310B4，如采用量化|
 
 统计：
 
@@ -174,11 +174,11 @@ Rockchip 相关工具：
 - 典型误检、漏检
 - 量化精度损失
 
-最终形成 PC 模型与 RK3588 模型精度对比结果。
+最终形成 PC 模型与 Atlas 200I DK A2 模型精度对比结果。
 
 ### 6\.2 模型性能评估
 
-在 RK3588 实机统计：
+在 Atlas 200I DK A2 实机统计：
 
 |指标         |内容          |
 |-----------|------------|
@@ -194,13 +194,13 @@ Rockchip 相关工具：
 
 |指标           |内容        |
 |-------------|----------|
-|RKNN 文件大小    |模型磁盘空间    |
+|OM 文件大小    |模型磁盘空间    |
 |Runtime 初始化内存|加载运行环境后的占用|
 |模型加载内存       |模型加载后的内存增量|
 |推理峰值内存       |连续推理过程峰值  |
 |总进程峰值        |完整测试进程内存  |
 
-第一阶段的 RK3588 精度、性能和内存测试统一称为：
+第一阶段的 Atlas 200I DK A2 精度、性能和内存测试统一称为：
 
 > **模型端侧验证**
 
@@ -211,11 +211,11 @@ Rockchip 相关工具：
 - 楼道杂物 YOLO11n 模型
 - 消防车通道车辆 YOLO11n 模型
 - ONNX 模型
-- RKNN 模型
+- OM 模型
 - 模型训练评估结果
-- RK3588 精度分析
-- RK3588 性能评估
-- RK3588 内存评估
+- Atlas 200I DK A2 精度分析
+- Atlas 200I DK A2 性能评估
+- Atlas 200I DK A2 内存评估
 - 典型推理结果
 
 ---
@@ -392,7 +392,7 @@ EMA 参数作为算法内部固定参数，不暴露给普通用户。
 
 ## 十四、第三阶段：算法迁移
 
-第三阶段将 YOLO11n RKNN 模型、ByteTrack 和静止目标后处理整体迁移至 RK3588 C/C\+\+ 环境。
+第三阶段将 YOLO11n OM 模型、AscendCL 推理、ByteTrack 和静止目标后处理整体迁移至 Atlas 200I DK A2 C/C\+\+ 环境。
 
 开发语言：
 
@@ -400,11 +400,11 @@ EMA 参数作为算法内部固定参数，不暴露给普通用户。
 
 运行环境：
 
-**RK3588 Linux**
+**Atlas 200I DK A2 Linux**
 
 目标：
 
-> **形成一套可以在 RK3588 上独立运行的最小推理工程 Demo。**
+> **形成一套可以在 Atlas 200I DK A2 上独立运行的最小推理工程 Demo。**
 
 该 Demo 不仅面向本地测试视频，还需要为后续实际工程中的 **RTSP 摄像机视频流**提供统一输入接口。
 
@@ -438,7 +438,7 @@ MediaReader 对下游统一输出解码后的视频帧，使检测、跟踪和�
 - 本地视频 EOF 处理
 - 统一图像格式输出
 
-实现上可结合 FFmpeg、GStreamer 或设备现有媒体框架，具体方式根据 RK3588 软件环境确定。
+实现上可结合 FFmpeg、GStreamer 和 Atlas 200I DK A2 提供的媒体接口；视频编解码走套件支持的 VDEC/VENC 路径，并以当前镜像可用的头文件、动态库和示例为准。
 
 ---
 
@@ -458,7 +458,7 @@ MediaReader 对下游统一输出解码后的视频帧，使检测、跟踪和�
 
 ↓
 
-**YOLO11n RKNN / RK3588 NPU**
+**YOLO11n OM / AscendCL / Ascend 310B4**
 
 ↓
 
@@ -492,7 +492,7 @@ MediaReader 对下游统一输出解码后的视频帧，使检测、跟踪和�
 |----------------|--------------------------------|
 |**MediaReader** |本地视频 / RTSP 等媒体源读取与解码           |
 |Preprocess      |Resize、Letterbox、颜色格式转换         |
-|RKNN Detector   |YOLO11n RKNN 模型加载及 NPU 推理       |
+|OM Detector   |YOLO11n OM 模型加载及 NPU 推理       |
 |YOLO Postprocess|检测结果解析、置信度过滤、NMS                |
 |ByteTrack       |多目标跟踪及 Track ID 管理              |
 |Motion Analyzer |归一化视觉速度计算及 EMA                  |
@@ -511,7 +511,7 @@ MediaReader 对下游统一输出解码后的视频帧，使检测、跟踪和�
 
 1. 从本地视频文件读取媒体；
 2. MediaReader 设计上支持后续接入 RTSP；
-3. 使用 RK3588 NPU 执行 YOLO11n RKNN 推理；
+3. 使用 AscendCL 在 Ascend 310B4 上执行 YOLO11n OM 推理；
 4. 输出目标 Bounding Box；
 5. 为目标维护 Track ID；
 6. 独立判断 MOVING / STATIONARY / ALARM；
@@ -533,7 +533,7 @@ MediaReader 对下游统一输出解码后的视频帧，使检测、跟踪和�
 |------------------|--------------|
 |MediaReader 解码耗时  |媒体读取及解码       |
 |Preprocess 耗时     |图像前处理         |
-|YOLO 推理时间         |RK3588 NPU    |
+|YOLO 推理时间         |Atlas 200I DK A2 NPU    |
 |YOLO 后处理时间        |输出解析及 NMS     |
 |ByteTrack 时间      |多目标跟踪         |
 |Motion Analyzer 时间|速度 + EMA + 状态机|
@@ -555,9 +555,9 @@ MediaReader 对下游统一输出解码后的视频帧，使检测、跟踪和�
 
 最终交付：
 
-- RK3588 C/C\+\+ 最小工程源码
-- 楼道 YOLO11n RKNN 模型
-- 消防车通道 YOLO11n RKNN 模型
+- Atlas 200I DK A2 C/C\+\+ 最小工程源码
+- 楼道 YOLO11n OM 模型
+- 消防车通道 YOLO11n OM 模型
 - **MediaReader 模块**
 - ByteTrack 模块
 - Motion Analyzer 模块
@@ -580,7 +580,7 @@ MediaReader 至少保留：
 
 ### 第一阶段：模型训练及端侧验证
 
-**数据集 → YOLO11n 迁移学习 → PC 模型评估 → ONNX → RKNN → RK3588 精度 / 性能 / 内存验证**
+**数据集 → YOLO11n 迁移学习 → PC 模型评估 → ONNX → CANN ATC → OM → Atlas 200I DK A2（Ascend 310B4）精度 / 性能 / 内存验证**
 
 ### 第二阶段：静止目标判断
 
@@ -588,8 +588,8 @@ MediaReader 至少保留：
 
 ### 第三阶段：C/C\+\+ 算法迁移
 
-**MediaReader → YOLO11n RKNN → ByteTrack → EMA → 状态机 → RK3588 最小 Demo**
+**MediaReader → YOLO11n OM → ByteTrack → EMA → 状态机 → Atlas 200I DK A2 最小 Demo**
 
 最终形成：
 
-> **两个 YOLO11n 垂直检测模型、一套轻量静止目标后处理算法，以及一套以 MediaReader 为统一媒体入口、能够扩展到 RTSP 实时流的 RK3588 C/C++ 最小推理工程。**
+> **两个 YOLO11n 垂直检测模型、一套轻量静止目标后处理算法，以及一套以 MediaReader 为统一媒体入口、能够扩展到 RTSP 实时流的 Atlas 200I DK A2 C/C++ 最小推理工程。**

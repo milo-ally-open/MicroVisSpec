@@ -24,7 +24,7 @@
 | --- | --- | --- |
 | 注册、登录、个人账号数据归属 | auth-service 账号与会话；Nginx 身份转发；所有业务服务按 account_id 再授权。 | 两个账号相互无法读取或修改对方设备、事件、截图、流与推送订阅。 |
 | 旧密码改密并确认新密码 | auth-service 改密接口、旧密码验证、会话撤销事件。 | 错误旧密码和确认不一致被拒绝；改密后旧会话失效。 |
-| 手动登记 IP、名称、位置 | device-service 设备登记与一次性激活。 | 用户能登记设备，现场 RK3588 激活后状态可见。 |
+| 手动登记 IP、名称、位置 | device-service 设备登记与一次性激活。 | 用户能登记设备，现场 Atlas 200I DK A2 激活后状态可见。 |
 | 查看状态、摄像头、算法、参数并配置受支持参数 | device-service 资产、心跳、算法期望/实报配置及 MQTT 命令回执。 | 在线、算法与视频状态分开显示；配置失败不会显示为已生效。 |
 | 桌面实时监控 | media-service 管理路径和观看配额，MediaMTX 拉 RTSP，WebRTC 优先、HLS 回退。 | 最多 12 路活动源流、两个完整 12 分屏桌面会话；手机 PWA 无监控大屏。 |
 | 通用事件、查询、详情和截图 | event-service 消费 MQTT、校验设备归属、唯一约束去重；证据经 HTTPS 上传。 | 重复上报只生成一条事件；可筛选并在 24 小时内查看截图，过期后显示原因。 |
@@ -119,7 +119,7 @@ Nginx 对受保护 /api/v1 请求调用 auth-service 的内部会话校验，清
 
 media-service 将配置与 MediaMTX 实际路径对账，首发路径为 opaque stream_id，RTSP source 按观看需求拉取，显式开启 sourceOnDemand。MediaMTX 的控制 API、RTSP 入口及来源凭据留在私有网络。公网只经 Nginx 提供受保护的 /media/{streamId}/whep 和 /media/{streamId}/index.m3u8；Nginx 对每个信令、播放列表及分片请求调用 media-service 授权子请求。媒体授权同时检查会话和摄像头归属；MediaMTX 的直接 HTTP 读取需要内部身份，不保留匿名读权限。HLS 播放组件必须让分片请求携带同源 Cookie，不用无法附带鉴权信息的公开 iframe。[MediaMTX 配置](https://mediamtx.org/docs/references/configuration-file)、[鉴权](https://mediamtx.org/docs/features/authentication)、[浏览器播放](https://mediamtx.org/docs/read/web-browsers)
 
-媒体准入限制全平台最多 12 条活动源流和 24 个观看连接，其中一个完整 12 分屏桌面会话占 12 个观看连接。租约为 30 秒，播放器每 15 秒续租；异常关闭通过租约过期与 MediaMTX 会话对账回收。显式退出或改密撤销会话时，media-service 终止关联的 WebRTC/HLS 会话；不能只依靠握手时的一次 HTTP 鉴权。首发 RK3588 每台默认一路 720p/15 fps、H.264 Baseline 无 B 帧、1.5 Mb/s 的处理后 RTSP，MediaMTX 不承担重编码。园区内网 WebRTC 使用 UDP 8189，失败或园区外桌面访问回退 HTTPS HLS，不部署 STUN/TURN。[架构设计 §5.2](../Design/STRUCTURE.md)
+媒体准入限制全平台最多 12 条活动源流和 24 个观看连接，其中一个完整 12 分屏桌面会话占 12 个观看连接。租约为 30 秒，播放器每 15 秒续租；异常关闭通过租约过期与 MediaMTX 会话对账回收。显式退出或改密撤销会话时，media-service 终止关联的 WebRTC/HLS 会话；不能只依靠握手时的一次 HTTP 鉴权。首发 Atlas 200I DK A2 每台默认一路 720p/15 fps、H.264 Baseline 无 B 帧、1.5 Mb/s 的处理后 RTSP，MediaMTX 不承担重编码。园区内网 WebRTC 使用 UDP 8189，失败或园区外桌面访问回退 HTTPS HLS，不部署 STUN/TURN。[架构设计 §5.2](../Design/STRUCTURE.md)
 
 ### 3.5 push-service 与 PWA
 
@@ -200,17 +200,17 @@ event.events 建 (account_id,occurred_at DESC,id DESC) 主列表索引，以及�
 | 指标 | 首发设计值或行为 |
 | --- | --- |
 | 视频源与观看 | 全平台最多 12 路活动源、24 个观看连接，相当于两个同时完整观看的桌面 12 分屏。 |
-| 边缘视频 | RK3588 每台默认 1 路处理后 RTSP；H.264 Baseline、无 B 帧、720p、15 fps、目标 1.5 Mb/s、约 2 秒关键帧间隔。 |
+| 边缘视频 | Atlas 200I DK A2 每台默认 1 路处理后 RTSP；H.264 Baseline、无 B 帧、720p、15 fps、目标 1.5 Mb/s、约 2 秒关键帧间隔。 |
 | 网络预算 | 12 路视频净入站约 18 Mb/s；两个完整大屏净出站约 36 Mb/s，另留协议余量。服务器内网千兆；若两个大屏通过公网 HLS 观看，园区公网可用上行至少 100 Mb/s。 |
 | MQTT 与告警 | 设备心跳 30 秒，90 秒未见心跳判离线；事件 QoS 1 加业务 ACK 和唯一键去重。 |
 | 查询与统计 | 告警默认近 7 天、每页 20/最多 100；统计支持今天、近 7 天、近 30 天，前台每 60 秒刷新。 |
 | 留存 | 截图上传后 24 小时到期；已闭环事件及处置记录终态后 90 天，未闭环记录保留至闭环。 |
 
-视频参数是 MVP 的资源配置与验收目标，RK3588 的标称编码能力不能替代实际“采集、推理、叠加、编码”整链路测量。首发联调需用目标设备与园区网络验证 12 路拉取、两个大屏观看和 WebRTC 失败后 HLS 可用；PRD 未设置额外的通知送达率或事件处理时效产品承诺。[RK3588 官方规格](https://www.rock-chips.com/a/cn/product/RK35xilie/2022/0926/1656.html)、[MediaMTX WebRTC 要求](https://mediamtx.org/docs/features/webrtc-specific-features)
+视频参数是 MVP 的资源配置与验收目标，Atlas 200I DK A2 的标称编码能力不能替代实际“采集、推理、叠加、编码”整链路测量。首发联调需用目标设备与园区网络验证 12 路拉取、两个大屏观看和 WebRTC 失败后 HLS 可用；PRD 未设置额外的通知送达率或事件处理时效产品承诺。[Atlas 200I DK A2 VENC 应用开发指南](https://www.hiascend.com/document/detail/zh/Atlas200IDKA2DeveloperKit/23.0.RC2/Application%20Development%20Guide/aadgc/aclcppdevg_000033.html)、[MediaMTX WebRTC 要求](https://mediamtx.org/docs/features/webrtc-specific-features)
 
 ### 7.2 安全边界
 
-- 公网只开放 Nginx HTTPS；园区内网允许 RK3588 到 MQTT/TLS、后端到 RTSP 源、桌面到 MediaMTX UDP 8189。PostgreSQL、Mosquitto 管理口、MediaMTX 控制 API、Go 服务内部端口和截图卷不公开。[架构设计 §2](../Design/STRUCTURE.md)
+- 公网只开放 Nginx HTTPS；园区内网允许 Atlas 200I DK A2 到 MQTT/TLS、后端到 RTSP 源、桌面到 MediaMTX UDP 8189。PostgreSQL、Mosquitto 管理口、MediaMTX 控制 API、Go 服务内部端口和截图卷不公开。[架构设计 §2](../Design/STRUCTURE.md)
 - MQTT 设备按 client_id 和主题 ACL 限制发布/订阅。设备 IP、payload 中的 account_id 和 RTSP URL 都不能作为身份凭据。设备注销时撤销 broker 凭据、停止媒体流，历史事件按留存规则保存。
 - Nginx 校验浏览器会话和 Origin，清理伪造的 X-Account-ID 等身份头；各服务按账号与资源 ID 二次授权。对媒体请求同样执行鉴权，不能只保护播放信息 API。已建立的 WebRTC 会话由 media-service 租约和会话撤销管理。[MediaMTX 鉴权](https://mediamtx.org/docs/features/authentication)
 - 密码哈希、会话 token 哈希、设备激活凭据哈希、RTSP 凭据加密值和 Push 订阅密钥分别按用途保存；加密密钥、VAPID 私钥、服务凭据来自部署机密，不写入仓库、镜像和日志。截图路径、防路径穿越、MIME 与文件签名校验、最大文件大小均由 event-service 执行。
@@ -231,21 +231,21 @@ PostgreSQL 做定期备份并验证恢复；Mosquitto 持久化与安全配置�
 | 五个运行中的 Go 服务，mcp-service 后置 | 与已确认的业务边界和 Go/Gin/GORM 栈一致，服务数据归属清晰。 | 一开始部署 MCP：工具权限和审计尚无产品范围，会扩大发布面。 |
 | PostgreSQL 单实例、分 schema/账号 | 首发运维成本可控，仍保留服务数据隔离及事务 outbox。 | 每服务独立数据库实例：当前 12 路规模没有足够收益，备份和运维成本更高。 |
 | Mosquitto + MQTT 3.1.1 控制面 | 边缘设备可主动连接、离线重连，适合状态/事件/命令。 | SSH 作为业务通信：连接方向、可恢复性和消息确认不符合设备常规上报；SSH 留给人工运维。 |
-| MediaMTX 数据面 + media-service 控制面 | 复用成熟 RTSP 拉流与 WebRTC/HLS，业务层保留账号授权、来源配置和观看配额。 | Go 服务自行转发或统一软件转码：媒体协议与 12 路处理复杂度更高；MVP 在 RK3588 侧生成兼容码流。 |
-| RK3588 输出 H.264 Baseline 预览流 | 与主流浏览器 WebRTC 的无 B 帧要求匹配，12 分屏按 720p/15 fps 控制解码负载。 | H.265 作为首发浏览器流：WebRTC 浏览器支持范围较窄；统一后端转码会增加资源与部署复杂度。 |
+| MediaMTX 数据面 + media-service 控制面 | 复用成熟 RTSP 拉流与 WebRTC/HLS，业务层保留账号授权、来源配置和观看配额。 | Go 服务自行转发或统一软件转码：媒体协议与 12 路处理复杂度更高；MVP 在 Atlas 200I DK A2 侧生成兼容码流。 |
+| Atlas 200I DK A2 输出 H.264 Baseline 预览流 | 与主流浏览器 WebRTC 的无 B 帧要求匹配，12 分屏按 720p/15 fps 控制解码负载。 | H.265 作为首发浏览器流：WebRTC 浏览器支持范围较窄；统一后端转码会增加资源与部署复杂度。 |
 | PostgreSQL outbox + 内部投递 | 事件落库与通知意图同事务，首发不必维护第三套消息基础设施。 | 直接在请求事务里调用 Push 或引入 Kafka/NATS：前者可能丢通知或拖慢入库，后者增加部署和运维。 |
 | Web/PWA 共用 Vue 客户端 | 首发满足桌面管理与手机后台通知，并复用页面与账号体系。 | 本期分别制作原生 App：超出已确认的客户端范围。 |
 | 统计由 device/event 聚合 | 数据由原所有者计算，前端可组合账号级图表。 | 独立 analysis-service：基础统计阶段会复制数据与增加一致性成本。 |
 | 后端私有文件卷、截图 24 小时 | MVP 数据量可控且符合已确定的短期证据用途。 | 本期对象存储与长期截图归档：超出首发范围；服务器故障可能丢失未过期图片，UI 必须说明。 |
 
-主要剩余实施风险是：边缘算法在 RK3588 上的真实帧率与编码负载、浏览器 12 分屏的解码性能、园区公网 HLS 上行带宽，以及不同浏览器的 PWA 推送行为。这些是既定方案的联调验证项，不作为悬而未决的产品范围。若实机无法满足两屏观看，应先定位边缘推理、媒体分发、网络或客户端瓶颈，再按实测结果调整码率、分辨率或观看预算；不能用 RK3588 编码器标称能力代替证据。
+主要剩余实施风险是：边缘算法在 Atlas 200I DK A2 上的真实帧率与编码负载、浏览器 12 分屏的解码性能、园区公网 HLS 上行带宽，以及不同浏览器的 PWA 推送行为。这些是既定方案的联调验证项，不作为悬而未决的产品范围。若实机无法满足两屏观看，应先定位边缘推理、媒体分发、网络或客户端瓶颈，再按实测结果调整码率、分辨率或观看预算；不能用 Atlas 200I DK A2 编码器标称能力代替证据。
 
 ## 9. 首发验收清单
 
 | 链路 | 必须观察到的结果 |
 | --- | --- |
 | 账号与隔离 | A/B 两个账号可独立注册登录；改密需旧密码并撤销旧会话；跨账号设备、事件、截图、媒体和订阅请求被拒绝。 |
-| 设备接入 | RK3588 由一次性凭据激活并连入 MQTT；心跳状态、摄像头、算法及参数可查看；离线后状态更新，命令以实报结果为准。 |
+| 设备接入 | Atlas 200I DK A2 由一次性凭据激活并连入 MQTT；心跳状态、摄像头、算法及参数可查看；离线后状态更新，命令以实报结果为准。 |
 | 视频 | MediaMTX 从边缘拉取处理后 RTSP；桌面 WebRTC 可看画面及状态；WebRTC 不通时 HLS 可播放；12 路活动源、两屏观看和超额提示按配置执行。 |
 | 事件与截图 | 一次边缘事件被保存并通知；重复 QoS 1 上报不产生第二条；截图在 24 小时内可看，过期后返回 410，事件详情仍存在。 |
 | 处置 | 待处置 → 处理中 → 已解除或误报；记录处理账号、时间与结果；非法和并发冲突请求被拒绝。 |
@@ -259,5 +259,6 @@ PostgreSQL 做定期备份并验证恢复；Mosquitto 持久化与安全配置�
 
 | 日期 | 变更 |
 | --- | --- |
-| 2026-10-04 | 依据 PRD、调研与架构设计建立首发 SPEC，明确五个运行服务和 MCP 占位、Web/PWA、RK3588/MQTT/媒体、事件/证据、Push、统计、留存、部署及验收合同。 |
+| 2026-10-04 | 依据 PRD、调研与架构设计建立首发 SPEC，明确五个运行服务和 MCP 占位、Web/PWA、Atlas 200I DK A2/MQTT/媒体、事件/证据、Push、统计、留存、部署及验收合同。 |
 | 2026-10-04 | 增加五份服务实现任务书索引；mcp-service 继续保持待设计状态。 |
+| 2026-10-15 | 首发边缘设备改为华为 Atlas 200I DK A2（Ascend 310B4），模型链路改为 CANN ATC/OM/AscendCL。 |

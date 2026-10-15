@@ -1,0 +1,12 @@
+Toolbox
+bottles
+extinguisher
+fitting box
+forklift
+full box
+pallet
+pallet_truck
+palletjack
+person
+small_load_carrier
+stillage

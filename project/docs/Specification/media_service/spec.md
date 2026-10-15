@@ -38,11 +38,11 @@
 
 ## 一、任务目标
 
-在 `project/src/services/media-service/` 实现独立的 Go/Gin/GORM 控制面，使 RK3588 处理后的 RTSP 流经 MediaMTX 向桌面浏览器提供 WebRTC，失败时回退 HTTPS HLS。完整链路为：
+在 `project/src/services/media-service/` 实现独立的 Go/Gin/GORM 控制面，使 Atlas 200I DK A2 处理后的 RTSP 流经 MediaMTX 向桌面浏览器提供 WebRTC，失败时回退 HTTPS HLS。完整链路为：
 
 **摄像头归属 → 流来源登记 → MediaMTX 配置/拉流 → 账号授权与观看配额 → WebRTC/HLS 播放 → 状态与故障反馈**。
 
-任务按五个阶段实施。首发由 RK3588 侧生成兼容浏览器的码流；本服务不承载视频帧、不对视频软件转码。流路径和来源凭据均不得直接暴露给未授权的浏览器。[MediaMTX 文档](https://mediamtx.org/docs/read/web-browsers)
+任务按五个阶段实施。首发由 Atlas 200I DK A2 侧生成兼容浏览器的码流；本服务不承载视频帧、不对视频软件转码。流路径和来源凭据均不得直接暴露给未授权的浏览器。[MediaMTX 文档](https://mediamtx.org/docs/read/web-browsers)
 
 ## 二、第一阶段：服务骨架与数据所有权
 
@@ -115,18 +115,18 @@
 
 ---
 
-## 五、第四阶段：RK3588 流与浏览器播放
+## 五、第四阶段：Atlas 200I DK A2 流与浏览器播放
 
 ### 5.1 边缘输出约定
 
 | 参数 | 首发值 |
 | --- | --- |
-| 每台 RK3588 | 默认 1 路处理后 RTSP 预览流；算法可使用与展示不同的输入分辨率。 |
+| 每台 Atlas 200I DK A2 | 默认 1 路处理后 RTSP 预览流；算法可使用与展示不同的输入分辨率。 |
 | 编码 | H.264/AVC Baseline、8-bit 4:2:0、无 B 帧；首发不含音频。 |
 | 展示流 | 1280 × 720、15 fps、目标码率 1.5 Mb/s、关键帧间隔约 2 秒。 |
-| 媒体拓扑 | 后端与 RK3588 同园区可路由内网；MediaMTX 拉 RTSP。园区桌面用 WebRTC UDP 8189；UDP 不通或园区外桌面用 HTTPS HLS。 |
+| 媒体拓扑 | 后端与 Atlas 200I DK A2 同园区可路由内网；MediaMTX 拉 RTSP。园区桌面用 WebRTC UDP 8189；UDP 不通或园区外桌面用 HTTPS HLS。 |
 
-瑞芯微官方规格确认 RK3588 具备 H.264/H.265 硬件编码能力；这不能直接证明算法推理、叠加和编码组合的实际帧率。H.264 B 帧在浏览器 WebRTC 中不兼容，需在 RK3588 端正确配置 MPP 编码；MediaMTX 首发只做拉流与分发，不承担统一后端转码。[RK3588 官方规格](https://www.rock-chips.com/a/cn/product/RK35xilie/2022/0926/1656.html)、[MediaMTX WebRTC 说明](https://mediamtx.org/docs/features/webrtc-specific-features)
+华为官方开发指南为 Atlas 200I DK A2 提供 VENC 视频编码接口，可编码 H.264/H.265；这不能直接证明算法推理、叠加和编码组合的实际帧率。H.264 B 帧在浏览器 WebRTC 中不兼容，需在设备侧配置兼容参数并实测。MediaMTX 首发只做拉流与分发，不承担统一后端转码。[Atlas 200I DK A2 VENC 应用开发指南](https://www.hiascend.com/document/detail/zh/Atlas200IDKA2DeveloperKit/23.0.RC2/Application%20Development%20Guide/aadgc/aclcppdevg_000033.html)、[MediaMTX WebRTC 说明](https://mediamtx.org/docs/features/webrtc-specific-features)
 
 ### 5.2 实现任务
 
@@ -137,8 +137,8 @@
 
 ### 5.3 交付物与阶段验收
 
-- RK3588 → RTSP → MediaMTX → WebRTC/HLS 的可复现联调说明和浏览器状态展示。
-- 目标 RK3588 与园区网络上完成 12 路拉取和两个完整大屏同时观看；禁用 UDP 时，受控 HLS 可回退；不兼容编码有明确错误。
+- Atlas 200I DK A2 → RTSP → MediaMTX → WebRTC/HLS 的可复现联调说明和浏览器状态展示。
+- 目标 Atlas 200I DK A2 与园区网络上完成 12 路拉取和两个完整大屏同时观看；禁用 UDP 时，受控 HLS 可回退；不兼容编码有明确错误。
 - PWA 手机入口不出现 `/monitor` 大屏；园区外桌面不会因没有公网 UDP 而错误声称 WebRTC 已连接。
 
 ---
@@ -162,4 +162,4 @@
 
 | 日期 | 变更 |
 | --- | --- |
-| 2026-10-04 | 从总技术规格拆分 media-service 实现任务，明确流配置、MediaMTX 对账、观看授权与配额、RK3588 视频参数及阶段验收。 |
+| 2026-10-04 | 从总技术规格拆分 media-service 实现任务，明确流配置、MediaMTX 对账、观看授权与配额、Atlas 200I DK A2 视频参数及阶段验收。 |
