@@ -1,13 +1,15 @@
 #include <acl/acl.h>
 #include <opencv2/core.hpp>
 #include <opencv2/dnn.hpp>
-#include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
-#include <opencv2/videoio.hpp>
+
+#include <media_pipeline.hpp>
+#include <region_osd.hpp>
 
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <cstdlib>
 #include <fstream>
 #include <iomanip>
@@ -22,12 +24,10 @@ namespace {
 
 constexpr int kInputWidth = 640;
 constexpr int kInputHeight = 640;
-constexpr int kWarmup = 5;
-
 struct Options {
     std::string model;
     std::string video;
-    std::string output = "detected.mp4";
+    std::string output = "detected.h264";
     std::string labels = "classes.txt";
     float confidence = 0.25F;
     float iou = 0.45F;
@@ -38,8 +38,6 @@ struct LetterboxInfo {
     float scale;
     int left;
     int top;
-    int width;
-    int height;
 };
 
 struct Detection {
@@ -72,7 +70,7 @@ Options parse_options(int argc, char** argv) {
         else if (arg == "--iou") options.iou = std::stof(value("--iou"));
         else if (arg == "--device") options.device = std::stoi(value("--device"));
         else if (arg == "--help" || arg == "-h") {
-            std::cout << "Usage: atlas_yolo_acl_demo --model model.om --video input.mp4 [--output detected.mp4] [--labels classes.txt] [--conf 0.25] [--iou 0.45] [--device 0]\n";
+            std::cout << "Usage: atlas_yolo_acl_demo --model model.om --video input.mp4|rtsp://... [--output detected.h264] [--labels classes.txt] [--conf 0.25] [--iou 0.45] [--device 0]\n";
             std::exit(0);
         } else throw std::invalid_argument("unknown option: " + arg);
     }
@@ -95,25 +93,14 @@ std::vector<std::string> read_labels(const std::string& path) {
     return labels;
 }
 
-cv::Mat preprocess(const cv::Mat& image, LetterboxInfo& info) {
-    const float scale = std::min(static_cast<float>(kInputWidth) / image.cols,
-                                 static_cast<float>(kInputHeight) / image.rows);
-    const int resized_width = static_cast<int>(std::round(image.cols * scale));
-    const int resized_height = static_cast<int>(std::round(image.rows * scale));
-    const int horizontal = kInputWidth - resized_width;
-    const int vertical = kInputHeight - resized_height;
-    const int left = static_cast<int>(std::round(horizontal / 2.0F - 0.1F));
-    const int right = static_cast<int>(std::round(horizontal / 2.0F + 0.1F));
-    const int top = static_cast<int>(std::round(vertical / 2.0F - 0.1F));
-    const int bottom = static_cast<int>(std::round(vertical / 2.0F + 0.1F));
-    cv::Mat resized;
-    cv::resize(image, resized, cv::Size(resized_width, resized_height), 0, 0, cv::INTER_LINEAR);
-    cv::Mat canvas;
-    cv::copyMakeBorder(resized, canvas, top, bottom, left, right, cv::BORDER_CONSTANT, cv::Scalar(114, 114, 114));
-    cv::Mat blob;
-    cv::dnn::blobFromImage(canvas, blob, 1.0 / 255.0, cv::Size(kInputWidth, kInputHeight), cv::Scalar(), true, false, CV_32F);
-    info = {scale, left, top, resized_width, resized_height};
-    return blob;
+LetterboxInfo letterbox_for(int width, int height) {
+    const float scale = std::min(static_cast<float>(kInputWidth) / width,
+                                 static_cast<float>(kInputHeight) / height);
+    const int resized_width = static_cast<int>(std::round(width * scale));
+    const int resized_height = static_cast<int>(std::round(height * scale));
+    return {scale,
+            static_cast<int>(std::round((kInputWidth - resized_width) / 2.0F - 0.1F)),
+            static_cast<int>(std::round((kInputHeight - resized_height) / 2.0F - 0.1F))};
 }
 
 double resident_megabytes() {
@@ -139,9 +126,13 @@ public:
         }
         input_size_ = aclmdlGetInputSizeByIndex(descriptor_, 0);
         output_size_ = aclmdlGetOutputSizeByIndex(descriptor_, 0);
-        if (input_size_ != static_cast<size_t>(3 * kInputWidth * kInputHeight * sizeof(float))) {
-            throw std::runtime_error("model input is not float32 NCHW 1x3x640x640");
-        }
+        const size_t float_input_size = static_cast<size_t>(3 * kInputWidth * kInputHeight * sizeof(float));
+        const size_t nv21_input_size = static_cast<size_t>(kInputWidth * kInputHeight * 3 / 2);
+        const aclDataType input_type = aclmdlGetInputDataType(descriptor_, 0);
+        if (input_size_ == float_input_size && input_type == ACL_FLOAT) aipp_nv21_ = false;
+        else if (input_size_ == nv21_input_size && input_type == ACL_UINT8) aipp_nv21_ = true;
+        else throw std::runtime_error("model input must be float32 NCHW or static-AIPP NV21 640x640");
+        if (!aipp_nv21_) throw std::runtime_error("VDEC/VPSS pipeline requires the static-AIPP NV21 OM model");
         ACL_CHECK(aclrtMalloc(&input_device_, input_size_, ACL_MEM_MALLOC_HUGE_FIRST));
         ACL_CHECK(aclrtMalloc(&output_device_, output_size_, ACL_MEM_MALLOC_HUGE_FIRST));
         input_buffer_ = aclCreateDataBuffer(input_device_, input_size_);
@@ -166,7 +157,18 @@ public:
     ~AclModel() { release(); }
 
     const float* infer(const cv::Mat& blob, std::vector<float>& host_output) {
+        if (aipp_nv21_) throw std::runtime_error("static-AIPP model requires infer_nv21_device");
         ACL_CHECK(aclrtMemcpy(input_device_, input_size_, blob.ptr<float>(), input_size_, ACL_MEMCPY_HOST_TO_DEVICE));
+        ACL_CHECK(aclmdlExecute(model_id_, input_dataset_, output_dataset_));
+        host_output.resize(output_size_ / sizeof(float));
+        ACL_CHECK(aclrtMemcpy(host_output.data(), output_size_, output_device_, output_size_, ACL_MEMCPY_DEVICE_TO_HOST));
+        return host_output.data();
+    }
+
+    const float* infer_nv21_device(const void* nv21_device, size_t bytes, std::vector<float>& host_output) {
+        if (!aipp_nv21_) throw std::runtime_error("model does not have a static NV21 AIPP input");
+        if (nv21_device == nullptr || bytes != input_size_) throw std::runtime_error("invalid NV21 device input buffer");
+        ACL_CHECK(aclrtMemcpy(input_device_, input_size_, nv21_device, bytes, ACL_MEMCPY_DEVICE_TO_DEVICE));
         ACL_CHECK(aclmdlExecute(model_id_, input_dataset_, output_dataset_));
         host_output.resize(output_size_ / sizeof(float));
         ACL_CHECK(aclrtMemcpy(host_output.data(), output_size_, output_device_, output_size_, ACL_MEMCPY_DEVICE_TO_HOST));
@@ -206,13 +208,15 @@ private:
     bool device_set_ = false;
     bool loaded_ = false;
     bool channels_first_ = true;
+    bool aipp_nv21_ = false;
     int channels_ = 0;
     int candidates_ = 0;
 };
 
 std::vector<Detection> postprocess(const std::vector<float>& output, const AclModel& model,
                                   const std::vector<std::string>& labels, const Options& options,
-                                  const LetterboxInfo& letterbox, const cv::Size& image_size) {
+                                  const LetterboxInfo& letterbox, const cv::Size& source_size,
+                                  const cv::Size& target_size) {
     const int class_offset = model.channels() == static_cast<int>(labels.size()) + 5 ? 5 : 4;
     if (model.channels() != static_cast<int>(labels.size()) + 4 && class_offset != 5) {
         throw std::runtime_error("output channel count does not match labels; verify class order/count");
@@ -237,14 +241,14 @@ std::vector<Detection> postprocess(const std::vector<float>& output, const AclMo
         const float cy = at(1, i);
         const float width = at(2, i);
         const float height = at(3, i);
-        const int x0 = static_cast<int>(std::floor((cx - width * 0.5F - letterbox.left) / letterbox.scale));
-        const int y0 = static_cast<int>(std::floor((cy - height * 0.5F - letterbox.top) / letterbox.scale));
-        const int x1 = static_cast<int>(std::ceil((cx + width * 0.5F - letterbox.left) / letterbox.scale));
-        const int y1 = static_cast<int>(std::ceil((cy + height * 0.5F - letterbox.top) / letterbox.scale));
-        const int left = std::clamp(x0, 0, image_size.width - 1);
-        const int top = std::clamp(y0, 0, image_size.height - 1);
-        const int right = std::clamp(x1, left + 1, image_size.width);
-        const int bottom = std::clamp(y1, top + 1, image_size.height);
+        const int x0 = static_cast<int>(std::floor((cx - width * 0.5F - letterbox.left) / letterbox.scale * target_size.width / source_size.width));
+        const int y0 = static_cast<int>(std::floor((cy - height * 0.5F - letterbox.top) / letterbox.scale * target_size.height / source_size.height));
+        const int x1 = static_cast<int>(std::ceil((cx + width * 0.5F - letterbox.left) / letterbox.scale * target_size.width / source_size.width));
+        const int y1 = static_cast<int>(std::ceil((cy + height * 0.5F - letterbox.top) / letterbox.scale * target_size.height / source_size.height));
+        const int left = std::clamp(x0, 0, target_size.width - 1);
+        const int top = std::clamp(y0, 0, target_size.height - 1);
+        const int right = std::clamp(x1, left + 1, target_size.width);
+        const int bottom = std::clamp(y1, top + 1, target_size.height);
         boxes[best_class].emplace_back(left, top, right - left, bottom - top);
         scores[best_class].push_back(best_score);
     }
@@ -264,71 +268,85 @@ double percentile(std::vector<double> values, double p) {
     return values[static_cast<size_t>(std::ceil(p * values.size()) - 1)];
 }
 
-void draw_detections(cv::Mat& frame, const std::vector<Detection>& detections,
-                     const std::vector<std::string>& labels) {
-    for (const auto& detection : detections) {
-        cv::rectangle(frame, detection.box, cv::Scalar(0, 220, 120), 2);
-        const std::string text = labels[detection.class_id] + " " + cv::format("%.2f", detection.confidence);
-        const int y = std::max(18, detection.box.y - 6);
-        cv::putText(frame, text, cv::Point(detection.box.x, y), cv::FONT_HERSHEY_SIMPLEX,
-                    0.55, cv::Scalar(0, 220, 120), 2, cv::LINE_AA);
-    }
-}
-
 }
 
 int main(int argc, char** argv) {
     try {
         const Options options = parse_options(argc, argv);
         const auto labels = read_labels(options.labels);
-        cv::VideoCapture video(options.video);
-        if (!video.isOpened()) throw std::runtime_error("cannot open video: " + options.video);
-        cv::Mat frame;
-        if (!video.read(frame) || frame.empty()) throw std::runtime_error("video has no decodable frames: " + options.video);
-        const double source_fps = video.get(cv::CAP_PROP_FPS);
-        const double fps = source_fps > 0.0 && std::isfinite(source_fps) ? source_fps : 25.0;
-        const int width = frame.cols;
-        const int height = frame.rows;
-        cv::VideoWriter writer(options.output, cv::VideoWriter::fourcc('m', 'p', '4', 'v'),
-                               fps, cv::Size(width, height));
-        if (!writer.isOpened()) throw std::runtime_error("cannot create output video: " + options.output);
         AclModel model(options);
+        MediaPipeline pipeline(options.video, options.output, 25);
+        const int width = pipeline.width();
+        const int height = pipeline.height();
+        RegionOsd region(pipeline.group(), pipeline.output_channel(), pipeline.output_width(), pipeline.output_height());
         if (model.channels() < static_cast<int>(labels.size()) + 4) throw std::runtime_error("invalid YOLO output shape");
         std::vector<float> output;
-        LetterboxInfo warmup_letterbox{};
-        const cv::Mat warmup_blob = preprocess(frame, warmup_letterbox);
-        for (int i = 0; i < kWarmup; ++i) model.infer(warmup_blob, output);
-        std::vector<double> preprocess_durations, infer_durations, postprocess_durations;
+        std::vector<double> infer_durations, postprocess_durations, region_durations, encode_durations;
         size_t frames = 0;
-        do {
-            LetterboxInfo letterbox{};
-            const auto preprocess_start = std::chrono::steady_clock::now();
-            const cv::Mat blob = preprocess(frame, letterbox);
-            const auto preprocess_end = std::chrono::steady_clock::now();
+        const auto pipeline_start = std::chrono::steady_clock::now();
+        hi_video_frame_info inference_frame{};
+        while (pipeline.next_inference_frame(inference_frame)) {
+            const hi_video_frame& input_frame = inference_frame.v_frame;
+            const hi_u32 input_height_stride = input_frame.height_stride[0] == 0 ? input_frame.height : input_frame.height_stride[0];
+            if (input_frame.virt_addr[0] == nullptr || input_frame.width != kInputWidth || input_frame.height != kInputHeight ||
+                input_frame.width_stride[0] != kInputWidth || input_height_stride != kInputHeight ||
+                input_frame.pixel_format != HI_PIXEL_FORMAT_YVU_SEMIPLANAR_420) {
+                const std::string layout = std::to_string(input_frame.width) + "x" + std::to_string(input_frame.height) +
+                    " stride=" + std::to_string(input_frame.width_stride[0]) + "x" + std::to_string(input_frame.height_stride[0]) +
+                    " format=" + std::to_string(input_frame.pixel_format) +
+                    " addr=" + std::to_string(reinterpret_cast<uintptr_t>(input_frame.virt_addr[0]));
+                pipeline.release_inference_frame(inference_frame);
+                throw std::runtime_error("VPSS inference frame layout is not contiguous NV21 640x640: " + layout);
+            }
+            const size_t nv21_bytes = static_cast<size_t>(input_frame.width_stride[0]) * input_height_stride * 3 / 2;
+            const LetterboxInfo letterbox = letterbox_for(width, height);
             const auto infer_start = std::chrono::steady_clock::now();
-            model.infer(blob, output);
+            model.infer_nv21_device(input_frame.virt_addr[0], nv21_bytes, output);
             const auto infer_end = std::chrono::steady_clock::now();
             const auto post_start = std::chrono::steady_clock::now();
-            const auto detections = postprocess(output, model, labels, options, letterbox, frame.size());
-            draw_detections(frame, detections, labels);
-            writer.write(frame);
+            const auto detections = postprocess(output, model, labels, options, letterbox,
+                                                cv::Size(width, height),
+                                                cv::Size(pipeline.output_width(), pipeline.output_height()));
             const auto post_end = std::chrono::steady_clock::now();
-            preprocess_durations.push_back(std::chrono::duration<double, std::milli>(preprocess_end - preprocess_start).count());
+            const auto region_start = std::chrono::steady_clock::now();
+            region.update(detections, labels);
+            const auto region_end = std::chrono::steady_clock::now();
+            hi_video_frame_info output_frame{};
+            pipeline.get_output_frame(output_frame);
+            const auto encode_start = std::chrono::steady_clock::now();
+            pipeline.encode_frame(output_frame);
+            const auto encode_end = std::chrono::steady_clock::now();
+            pipeline.release_output_frame(output_frame);
+            pipeline.release_inference_frame(inference_frame);
             infer_durations.push_back(std::chrono::duration<double, std::milli>(infer_end - infer_start).count());
             postprocess_durations.push_back(std::chrono::duration<double, std::milli>(post_end - post_start).count());
+            region_durations.push_back(std::chrono::duration<double, std::milli>(region_end - region_start).count());
+            encode_durations.push_back(std::chrono::duration<double, std::milli>(encode_end - encode_start).count());
             ++frames;
-        } while (video.read(frame) && !frame.empty());
+        }
+        if (frames == 0 || pipeline.encoded_frames() != frames) {
+            throw std::runtime_error("no complete decoded/inferred/encoded frames; verify H.264 input and coded dimensions");
+        }
+        const auto pipeline_end = std::chrono::steady_clock::now();
+        const double pipeline_seconds = std::chrono::duration<double>(pipeline_end - pipeline_start).count();
         const auto mean = [](const std::vector<double>& values) {
+            if (values.empty()) return 0.0;
             return std::accumulate(values.begin(), values.end(), 0.0) / values.size();
         };
         std::cout << std::fixed << std::setprecision(3);
-        std::cout << "Input video: " << options.video << " (" << width << 'x' << height << ", " << fps << " FPS)\n";
-        std::cout << "Output video: " << options.output << "\nFrames processed: " << frames << '\n';
-        std::cout << "Timing ms/frame: preprocess=" << mean(preprocess_durations)
-                  << " inference_mean=" << mean(infer_durations)
+        std::cout << "Input video/stream: " << options.video << " (" << width << 'x' << height << ")\n";
+        std::cout << "Output video size: " << pipeline.output_width() << 'x' << pipeline.output_height() << '\n';
+        std::cout << "Encoder FPS: " << pipeline.fps() << '\n';
+        std::cout << "Output H.264: " << options.output << "\nFrames processed: " << frames
+                  << ", encoded: " << pipeline.encoded_frames() << '\n';
+        std::cout << "Pipeline elapsed: " << pipeline_seconds << " s, effective FPS: "
+                  << frames / pipeline_seconds << '\n';
+        std::cout << "Timing ms/frame: inference_mean=" << mean(infer_durations)
                   << " inference_p50=" << percentile(infer_durations, 0.50)
                   << " inference_p95=" << percentile(infer_durations, 0.95)
-                  << " postprocess=" << mean(postprocess_durations) << '\n';
+                  << " nms=" << mean(postprocess_durations)
+                  << " region_update=" << mean(region_durations)
+                  << " hardware_venc=" << mean(encode_durations) << '\n';
         std::cout << "Peak RSS MiB: " << resident_megabytes() << "\n";
         return 0;
     } catch (const std::exception& error) {
