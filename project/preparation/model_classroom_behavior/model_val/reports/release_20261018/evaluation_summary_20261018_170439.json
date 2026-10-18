@@ -1,0 +1,68 @@
+{
+  "created_at": "2026-10-18T17:05:12+08:00",
+  "split": "test",
+  "checkpoint": "best",
+  "reports": [
+    {
+      "dataset": "classroom_behavior",
+      "split": "test",
+      "split_images": 193,
+      "evaluated_images": 193,
+      "data_yaml": "external-data/scb5_audited/classroom_behavior/data.yaml",
+      "checkpoint": "model_train/train_result_experiments/yolo11m_scb3s101_label_enrich_headonly_v2_classroom_behavior_best.pt",
+      "checkpoint_sha256": "9384b965467a088051f40fdb9e8a57a14e583014ca1c0067f6dde1fb167747fb",
+      "imgsz": 960,
+      "batch": 2,
+      "device": "0",
+      "confidence_threshold": null,
+      "iou_threshold": 0.5,
+      "test_time_augmentation": true,
+      "overall_metrics": {
+        "metrics/precision(B)": 0.5705836951409679,
+        "metrics/recall(B)": 0.6791346757517593,
+        "metrics/mAP50(B)": 0.6604010256498408,
+        "metrics/mAP50-95(B)": 0.48548828357821755
+      },
+      "per_class_metrics": [
+        {
+          "Class": "hand-raising",
+          "Images": 57,
+          "Instances": 189,
+          "Box-P": 0.693263,
+          "Box-R": 0.75338,
+          "Box-F1": 0.722073,
+          "mAP50": 0.785359,
+          "mAP50-95": 0.581551
+        },
+        {
+          "Class": "reading",
+          "Images": 136,
+          "Instances": 676,
+          "Box-P": 0.48373,
+          "Box-R": 0.668639,
+          "Box-F1": 0.56135,
+          "mAP50": 0.59107,
+          "mAP50-95": 0.429576
+        },
+        {
+          "Class": "writing",
+          "Images": 70,
+          "Instances": 390,
+          "Box-P": 0.534758,
+          "Box-R": 0.615385,
+          "Box-F1": 0.572245,
+          "mAP50": 0.604774,
+          "mAP50-95": 0.445337
+        }
+      ],
+      "speed_ms_per_image": {
+        "preprocess": 2.2816632128166217,
+        "inference": 57.60005025954319,
+        "loss": 0.0027082884597345955,
+        "postprocess": 1.4967528495146203
+      },
+      "artifacts_dir": "local-run-artifacts/validation/scb3s_enrich_v2_pair_scb5/classroom_behavior_test_20261018_170439"
+    }
+  ],
+  "failures": []
+}

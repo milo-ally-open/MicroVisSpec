@@ -1,0 +1,18 @@
+{
+  "created_utc": "2026-10-18T09:49:13.215946+08:00",
+  "ultralytics_version": "8.4.118",
+  "model_name": "yolo11m_classroom4aux_headonly_v1",
+  "imgsz": 768,
+  "opset": 17,
+  "dynamic": false,
+  "device": "cpu",
+  "models": [
+    {
+      "dataset": "classroom_behavior",
+      "checkpoint": "model_train/train_result_grouped/yolo11m_classroom4aux_headonly_v1_classroom_behavior_best.pt",
+      "checkpoint_sha256": "f528401493ab6d9ff93acb95d79fa3b7b2d8e0f4ed3a774874a8a8d87d6f1149",
+      "onnx": "model_export/artifacts/classroom4aux_headonly_768/yolo11m_classroom4aux_headonly_v1_classroom_behavior_best.onnx",
+      "onnx_sha256": "db8f5ce4c72d178a8d2b4f0435dc101ece9fa6d6b793922cb051e38b77cbd396"
+    }
+  ]
+}
