@@ -16,6 +16,9 @@ int main() {
     assert(config.require_model("model_classroom_behavior_detection").classes.front() == "hand-raising");
     assert(config.require_model("model_room_occupancy_detection").input_width == 416);
     assert(config.require_stream("room-b").model_id == "model_room_occupancy_detection");
+    assert(config.require_stream("room-a").live_source);
+    assert(config.require_stream("room-a").input_timeout_ms == 5000);
+    assert(config.require_stream("room-a").output_bitrate_kbps == 1500);
     assert(config.find_rule("model_classroom_behavior_detection", "hand-raising") != nullptr);
     assert(!config.find_rule("model_classroom_behavior_detection", "hand-raising")->enabled);
 
@@ -57,6 +60,34 @@ int main() {
     rejected = false;
     auto invalid_streams = test_fixture::streams();
     invalid_streams["streams"][0]["model_id"] = "missing_model";
+    try { (void)EdgeAppConfig::parse(test_fixture::models(), invalid_streams, test_fixture::alarm_rules(false)); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    assert(rejected);
+
+    rejected = false;
+    invalid_streams = test_fixture::streams();
+    invalid_streams["streams"][0]["input_timeout_ms"] = 0;
+    try { (void)EdgeAppConfig::parse(test_fixture::models(), invalid_streams, test_fixture::alarm_rules(false)); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    assert(rejected);
+
+    rejected = false;
+    invalid_streams = test_fixture::streams();
+    invalid_streams["streams"][0]["output_bitrate_kbps"] = 0;
+    try { (void)EdgeAppConfig::parse(test_fixture::models(), invalid_streams, test_fixture::alarm_rules(false)); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    assert(rejected);
+
+    rejected = false;
+    invalid_streams = test_fixture::streams();
+    invalid_streams["streams"][0]["rtsp_transport"] = "invalid";
+    try { (void)EdgeAppConfig::parse(test_fixture::models(), invalid_streams, test_fixture::alarm_rules(false)); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    assert(rejected);
+
+    rejected = false;
+    invalid_streams = test_fixture::streams();
+    invalid_streams["streams"][0]["reconnect_max_delay_ms"] = 100;
     try { (void)EdgeAppConfig::parse(test_fixture::models(), invalid_streams, test_fixture::alarm_rules(false)); }
     catch (const std::invalid_argument&) { rejected = true; }
     assert(rejected);

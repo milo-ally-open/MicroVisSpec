@@ -33,7 +33,7 @@ sequenceDiagram
 
 模型包目录按 `models/{model_id}/{version}/` 只读保存模型文件和 `manifest.json`；安装流程在 `staging/` 校验 SHA-256，并按 `models.json` 中对应 profile 比较芯片/格式/输入尺寸/类别，成功后以原子符号链接切换 `active/{model_id}`，至少保留该 model_id 的上一个版本。公共配置/入库逻辑只做通用结构校验，不含 classroom class、类别数和 classroom event type 常量。
 
-配置按参考项目职责拆成三份：`config/models.json` 在 runtime 节包含本机构建所支持的 backend/model family/decoder/pixel format/preprocessing/format/SoC 集合、模型加载上限和 NPU 设备；每个 profile 提供算法键、模型文件名、SoC、插件、输入、类别、置信度/NMS 和最大检测数。`config/streams_config.json` 按摄像头/来源引用配置 stream、model_id、输出尺寸和可选阈值覆盖；`config/alarm_rules.json` 提供允许的等级及 model_id/class 到 event_type/事件类别字段的映射、启用开关与持续/冷却条件。类别清单仍以安装包 manifest 为准，profile 只做一致性校验。Atlas 默认 `max_loaded_models=1`；只有目标 OM 同时加载内存、时延和稳定性实测后才提高。SQLite 队列记录稳定 event_id、发布状态、重试时间与末次错误；应用 ACK 匹配设备和 ID 后完成记录，保留期限另由磁盘配额策略规定，不提前删除未确认事件。
+配置按参考项目职责拆成三份：`config/models.json` 在 runtime 节包含本机构建所支持的 backend/model family/decoder/pixel format/preprocessing/format/SoC 集合、模型加载上限和 NPU 设备；每个 profile 提供算法键、模型文件名、SoC、插件、输入、类别、置信度/NMS 和最大检测数。`config/streams_config.json` 按摄像头/来源引用配置 stream、model_id、输出尺寸/帧率/目标码率、live 来源标记、输入读取超时和可选阈值覆盖；`config/alarm_rules.json` 提供允许的等级及 model_id/class 到 event_type/事件类别字段的映射、启用开关与持续/冷却条件。类别清单仍以安装包 manifest 为准，profile 只做一致性校验。FFmpeg 打开输入、探测流和读取每个 packet 均通过 interrupt callback 使用逐操作的有界 deadline，协议级 timeout 作为补充；live 来源断开时报告不含凭据的来源错误并进入有界退避重连，普通本地文件 EOF 正常结束。Atlas 默认 `max_loaded_models=1`；只有目标 OM 同时加载内存、时延和稳定性实测后才提高。SQLite 队列记录稳定 event_id、发布状态、重试时间与末次错误；应用 ACK 匹配设备和 ID 后完成记录，保留期限另由磁盘配额策略规定，不提前删除未确认事件。
 
 模型和插件统一使用 `model_` 前缀、领域名和任务类型组成的下划线命名；末尾任务段为 `detection`、`segmentation` 或 `classification`。课堂行为检测对应 `model_classroom_behavior_detection`、`plugins/model_classroom_behavior_detection.cpp`、`libmodel_classroom_behavior_detection.so` 和 `ModelClassroomBehaviorDetection`。`IAIModel::name()` 返回该 profile 的 model_id。`algorithm_key`（课堂为 `classroom_behavior_detection`）和 `model_family`（如 `yolo11`）分别表示云端算法语义和网络/输出族，不混入产品模型标识。
 
@@ -77,6 +77,8 @@ The layout mirrors the reference project’s plugin/manager/config responsibilit
 - 两个 systemd 单元均强制加载 `/etc/yunshao/cann.env`。该权限受限文件由运维基于板上 `/usr/local/Ascend/ascend-toolkit/set_env.sh` 准备，至少包含 `LD_LIBRARY_PATH` 及 CANN 算子/运行环境变量；服务不得依赖登录 shell、Conda 或运行时手工 `source`。
 - 两个 systemd 单元以 `yunshao` 非 root 身份运行，并显式加入 `video`、`HwHiAiUser`、`HwBaseUser` 设备组。产品 udev 规则将 `/dev/rgn` 授权给 `HwHiAiUser`，MODE 为 `0660`；不得放宽为任何用户可访问。该节点由设备驱动重建，部署须重新加载 udev 规则并对现有节点触发规则。
 - Atlas 310B4 实测表明 CANN/ACL 初始化依赖进程可见的主机文件系统与共享临时目录：在正式 runtime 的 systemd unit 中启用 `ProtectHome`、`PrivateTmp`、`ProtectSystem=full/strict` 或 `ReadWritePaths` 会导致 `aclInit` 返回 507008；保留 `NoNewPrivileges=true`、非 root 用户及硬件组，同时移除这些文件系统隔离设置后，service 成功处理固定 H.264 视频 75/75 帧。正式 runtime unit 不使用上述未兼容选项；未来若 CANN/驱动版本改变，需先在目标板验证再调整。
+- 2026-10-20 的 30 分钟 Atlas systemd 合成实时 UDP 测试保持 runtime active、0 次重启、RSS 约 375 MiB；来源发送端到时退出后，runtime 仍挂起等待。该结果证明长时进程 RSS 稳定，但暴露实时源读超时/服务恢复缺口；AC-05.2 要求为修复门禁。
+- 修复后在 Atlas systemd runtime 上以 3 秒测试超时验证无源等待、UDP 源恢复、再次断流和第二次恢复；同一 PID 保持 active、NRestarts=0，两次恢复各输出约 1.49 MB。加入 FFmpeg interrupt callback 后，持续合成 UDP 流采样 535 秒，RSS 样本保持 383164 KiB，NPU 样本峰值为 2332/3513 MiB、目标码率约 1.52 Mbps；首次接源时仍发生一次原因未明的自动重启，结束后重开本地输出导致最终帧数不可计。详见 `atlas_runtime_reconnect_sustained.json`。此测试不代替真实 RTSP 或 MediaMTX 发布验收。
 - 部署验收在最小 `PATH` 和 systemd 环境中检查 agent/runtime 的共享库解析；toolkit/driver 路径来自目标板实际安装，不写入模型 JSON 或提交 CANN 机器专属绝对路径。
 - 健康检查分活性与就绪；无模型文件时控制服务可 alive，但算法和整体 NPU readiness 标为 false。
 - 日志带 device_id、request/event/config ID，不带密码、私钥、完整视频 URL 或课堂图片内容。

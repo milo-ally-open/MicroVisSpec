@@ -40,10 +40,16 @@ struct StreamProfile {
     std::string model_id;
     bool enabled = false;
     bool enable_ai = false;
+    bool live_source = false;
     int output_width = 0;
     int output_height = 0;
     int output_fps = 0;
     int ai_fps = 0;
+    int output_bitrate_kbps = 1500;
+    int input_timeout_ms = 5000;
+    int reconnect_initial_delay_ms = 1000;
+    int reconnect_max_delay_ms = 30000;
+    std::string rtsp_transport = "tcp";
     std::optional<double> confidence_threshold;
     std::optional<double> nms_threshold;
 };

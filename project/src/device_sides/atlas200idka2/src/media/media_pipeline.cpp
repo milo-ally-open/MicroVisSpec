@@ -10,10 +10,13 @@ extern "C" {
 #include <libavcodec/bsf.h>
 #include <libavformat/avformat.h>
 #include <libavutil/avutil.h>
+#include <libavutil/dict.h>
 }
 
 #include <array>
 #include <algorithm>
+#include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <fstream>
 #include <memory>
@@ -23,15 +26,21 @@ extern "C" {
 class MediaPipeline::Impl {
 public:
     Impl(const std::string& input, const std::string& output, int output_fps,
-         int infer_width, int infer_height, int output_width, int output_height)
+         int infer_width, int infer_height, int output_width, int output_height,
+         int input_timeout_ms, int output_bitrate_kbps, const std::string& rtsp_transport)
         : infer_width_(infer_width), infer_height_(infer_height),
           output_width_(align16(output_width)), output_height_(align16(output_height)),
-          fps_(output_fps), output_(output, std::ios::binary) {
+          fps_(output_fps), input_timeout_ms_(input_timeout_ms),
+          output_bitrate_kbps_(output_bitrate_kbps), rtsp_transport_(rtsp_transport),
+          output_(output, std::ios::binary) {
         if (infer_width_ < 2 || infer_height_ < 2 || output_width < 2 || output_height < 2 || fps_ < 1) {
             throw std::invalid_argument("configured inference/output dimensions and frame rate must be positive");
         }
         if (!output_) throw std::runtime_error("cannot create H.264 output: " + output);
         try {
+            if (input_timeout_ms_ < 1 || output_bitrate_kbps_ < 1) {
+                throw std::invalid_argument("input timeout and output bitrate must be positive");
+            }
             open_input(input);
             initialize_media();
         } catch (...) {
@@ -61,13 +70,18 @@ public:
             if (input_eof_) return drain_decoder(frame);
             AVPacket* packet = av_packet_alloc();
             if (packet == nullptr) throw std::runtime_error("av_packet_alloc failed");
+            set_input_deadline();
             const int read_result = av_read_frame(format_, packet);
-            if (read_result < 0) {
+            if (read_result == AVERROR_EOF) {
                 av_packet_free(&packet);
                 flush_filter();
                 send_eos();
                 input_eof_ = true;
                 continue;
+            }
+            if (read_result < 0) {
+                av_packet_free(&packet);
+                throw InputSourceError(ffmpeg_error("av_read_frame", read_result).what());
             }
             if (packet->stream_index == video_stream_) filter_packet(packet);
             av_packet_free(&packet);
@@ -122,13 +136,44 @@ private:
 
     static int align16(int value) { return (value + 15) & ~15; }
 
+    static int interrupt_input(void* opaque) {
+        const auto* self = static_cast<const Impl*>(opaque);
+        const auto deadline = self->input_deadline_ns_.load(std::memory_order_relaxed);
+        if (deadline == 0) return 0;
+        const auto now = std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count();
+        return now >= deadline ? 1 : 0;
+    }
+
+    void set_input_deadline() {
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(input_timeout_ms_);
+        input_deadline_ns_.store(std::chrono::duration_cast<std::chrono::nanoseconds>(
+            deadline.time_since_epoch()).count(), std::memory_order_relaxed);
+    }
+
     void open_input(const std::string& input) {
-        int result = avformat_open_input(&format_, input.c_str(), nullptr, nullptr);
-        if (result < 0) throw ffmpeg_error("avformat_open_input", result);
+        format_ = avformat_alloc_context();
+        if (format_ == nullptr) throw std::runtime_error("avformat_alloc_context failed");
+        format_->interrupt_callback.callback = &Impl::interrupt_input;
+        format_->interrupt_callback.opaque = this;
+        AVDictionary* options = nullptr;
+        const std::string timeout_us = std::to_string(static_cast<long long>(input_timeout_ms_) * 1000LL);
+        av_dict_set(&options, "rw_timeout", timeout_us.c_str(), 0);
+        if (input.rfind("rtsp://", 0) == 0 || input.rfind("rtsps://", 0) == 0) {
+            av_dict_set(&options, "rtsp_transport", rtsp_transport_.c_str(), 0);
+            av_dict_set(&options, "stimeout", timeout_us.c_str(), 0);
+        } else if (input.rfind("udp://", 0) == 0) {
+            av_dict_set(&options, "timeout", timeout_us.c_str(), 0);
+        }
+        set_input_deadline();
+        int result = avformat_open_input(&format_, input.c_str(), nullptr, &options);
+        av_dict_free(&options);
+        if (result < 0) throw InputSourceError(ffmpeg_error("avformat_open_input", result).what());
+        set_input_deadline();
         result = avformat_find_stream_info(format_, nullptr);
-        if (result < 0) throw ffmpeg_error("avformat_find_stream_info", result);
+        if (result < 0) throw InputSourceError(ffmpeg_error("avformat_find_stream_info", result).what());
         video_stream_ = av_find_best_stream(format_, AVMEDIA_TYPE_VIDEO, -1, -1, nullptr, 0);
-        if (video_stream_ < 0) throw ffmpeg_error("av_find_best_stream", video_stream_);
+        if (video_stream_ < 0) throw InputSourceError(ffmpeg_error("av_find_best_stream", video_stream_).what());
         AVCodecParameters* parameters = format_->streams[video_stream_]->codecpar;
         if (parameters->codec_id != AV_CODEC_ID_H264) throw std::runtime_error("hardware VDEC currently requires H.264 input");
         width_ = parameters->width & ~1;
@@ -247,7 +292,7 @@ private:
         encoder_attr.rc_attr.h264_cbr.stats_time = 1;
         encoder_attr.rc_attr.h264_cbr.src_frame_rate = static_cast<hi_u32>(fps_);
         encoder_attr.rc_attr.h264_cbr.dst_frame_rate = static_cast<hi_u32>(fps_);
-        encoder_attr.rc_attr.h264_cbr.bit_rate = 4000;
+        encoder_attr.rc_attr.h264_cbr.bit_rate = static_cast<hi_u32>(output_bitrate_kbps_);
         encoder_attr.gop_attr.gop_mode = HI_VENC_GOP_MODE_NORMAL_P;
         encoder_attr.gop_attr.normal_p.ip_qp_delta = 0;
         require(hi_mpi_venc_create_chn(venc_channel_, &encoder_attr), "hi_mpi_venc_create_chn");
@@ -357,6 +402,10 @@ private:
     int output_width_ = 0;
     int output_height_ = 0;
     int fps_ = 25;
+    int input_timeout_ms_ = 5000;
+    int output_bitrate_kbps_ = 1500;
+    std::string rtsp_transport_ = "tcp";
+    std::atomic<std::int64_t> input_deadline_ns_{0};
     std::ofstream output_;
     size_t encoded_frames_ = 0;
     bool sys_initialized_ = false;
@@ -373,9 +422,11 @@ private:
 };
 
 MediaPipeline::MediaPipeline(const std::string& input, const std::string& output, int output_fps,
-                             int infer_width, int infer_height, int output_width, int output_height)
+                             int infer_width, int infer_height, int output_width, int output_height,
+                             int input_timeout_ms, int output_bitrate_kbps, const std::string& rtsp_transport)
     : impl_(std::make_unique<Impl>(input, output, output_fps, infer_width, infer_height,
-                                   output_width, output_height)) {}
+                                   output_width, output_height, input_timeout_ms, output_bitrate_kbps,
+                                   rtsp_transport)) {}
 
 MediaPipeline::~MediaPipeline() = default;
 

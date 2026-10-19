@@ -171,7 +171,13 @@ void print_config(const EdgeAppConfig& config) {
     for (const auto& stream : config.streams) {
         streams.push_back(Json{{"stream_id", stream.stream_id}, {"camera_id", stream.camera_id},
                                {"source_ref", stream.source_ref}, {"model_id", stream.model_id},
-                               {"enabled", stream.enabled}, {"enable_ai", stream.enable_ai}});
+                               {"enabled", stream.enabled}, {"enable_ai", stream.enable_ai},
+                               {"live_source", stream.live_source}, {"input_timeout_ms", stream.input_timeout_ms},
+                               {"output_width", stream.output_width}, {"output_height", stream.output_height},
+                               {"output_fps", stream.output_fps}, {"output_bitrate_kbps", stream.output_bitrate_kbps},
+                               {"reconnect_initial_delay_ms", stream.reconnect_initial_delay_ms},
+                               {"reconnect_max_delay_ms", stream.reconnect_max_delay_ms},
+                               {"rtsp_transport", stream.rtsp_transport}});
     }
     Json alarms = Json::array();
     for (const auto& rule : config.alarm_rules) {

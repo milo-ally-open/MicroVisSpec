@@ -41,7 +41,9 @@
 
 ### 3. 绑定视频流和告警规则
 
-在 `config/streams_config.json` 新增 stream，填 `stream_id`、`camera_id`、环境变量形式的 `source_ref`、profile 的 `model_id`、输出尺寸和 AI 帧率。视频 URL/密码通过 systemd 环境文件注入，不能写入 JSON。示例流默认关闭。
+在 `config/streams_config.json` 新增 stream，填 `stream_id`、`camera_id`、环境变量形式的 `source_ref`、profile 的 `model_id`、`live_source`、输出尺寸/帧率/目标码率、AI 帧率、输入读取超时、重连初始/最大退避和 RTSP 传输方式。视频 URL/密码通过 systemd 环境文件注入，不能写入 JSON。live 输入超时或断开后会记录不含来源凭据的错误并按 profile 退避重连；本地文件 profile 可将 `live_source` 设为 false，EOF 后正常退出。示例流默认关闭。
+
+课堂默认预览参数为 1280×720、15 fps、1500 kbps；runtime 从每路 stream profile 读取目标码率，`MediaPipeline` 不再固化编码码率。`input_timeout_ms` 控制 FFmpeg 网络读取上限；`reconnect_initial_delay_ms` / `reconnect_max_delay_ms` 控制断流重试退避；RTSP 可选择 TCP 或 UDP transport。
 
 在 `config/alarm_rules.json` 为需要告警的 model/class 添加 `event_type`、类别属性名、等级、置信度阈值、最短持续时间和冷却时间。新增规则必须先设为 `enabled: false`；未配置或禁用时仍可推理/OSD，但不写事件 outbox。只有明确启用且满足规则时才生成业务事件。
 

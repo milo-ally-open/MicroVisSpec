@@ -81,11 +81,11 @@ Atlas 媒体公共接口放在 `include/media/`，实现放在 `src/media/`；�
 
 **验收条件**
 
-- **AC-05.1** Given 可用输入流，When runtime 处理视频，Then 输出检测叠加预览并以媒体服务合同登记；推流凭据不发给浏览器。
-- **AC-05.2** Given 输入流断开或输出推流失败，When 健康状态更新，Then 分别报告来源/发布错误且可重连，不把算法 ready 当作视频 ready。
+- **AC-05.1** Given 可用输入流，When runtime 处理视频，Then 按该 stream 配置的输出尺寸、帧率和目标码率生成检测叠加预览并以媒体服务合同登记；推流凭据不发给浏览器。
+- **AC-05.2** Given live 输入流断开、读超时或输出推流失败，When runtime 检测到故障，Then 以不含凭据的独立来源/发布错误状态和日志报告；live 输入读超时必须有界，runtime 不得无限挂起，故障须退出并由 systemd 重启/重连。无故障的本地文件 EOF 可正常结束。
 - **AC-05.3** Given 未启用规则的普通检测，When 运行模型，Then 不截图、不调用证据上传；命中规则的图片使用设备授权 HTTPS 接口并受 event-service 的大小/格式/24 小时合同约束。
 
-**验证方式**：MediaMTX 集成和 Atlas 实机视频/证据测试；编码、推流资源预算记录。
+**验证方式**：MediaMTX 集成和 Atlas 实机视频/证据测试；固定配置的输出尺寸/帧率/码率、断流超时与重连测试；编码、推流和长时资源预算记录。
 
 ### REQ-06：Atlas CANN 运行环境与 systemd 启动
 

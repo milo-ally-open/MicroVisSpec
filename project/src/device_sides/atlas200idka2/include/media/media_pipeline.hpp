@@ -4,12 +4,19 @@
 
 #include <cstddef>
 #include <memory>
+#include <stdexcept>
 #include <string>
+
+class InputSourceError : public std::runtime_error {
+public:
+    using std::runtime_error::runtime_error;
+};
 
 class MediaPipeline {
 public:
     MediaPipeline(const std::string& input, const std::string& output, int output_fps,
-                  int infer_width, int infer_height, int output_width, int output_height);
+                  int infer_width, int infer_height, int output_width, int output_height,
+                  int input_timeout_ms, int output_bitrate_kbps, const std::string& rtsp_transport);
     MediaPipeline(const MediaPipeline&) = delete;
     MediaPipeline& operator=(const MediaPipeline&) = delete;
     ~MediaPipeline();

@@ -230,7 +230,9 @@ EdgeAppConfig EdgeAppConfig::parse(const Json& models_json,
     std::set<std::string> stream_ids;
     for (const auto& value : streams) {
         require_keys(value, {"stream_id", "camera_id", "source_ref", "model_id", "enabled", "enable_ai",
-                             "output_width", "output_height", "ai_fps"}, "stream profile");
+                             "live_source", "output_width", "output_height", "ai_fps", "output_bitrate_kbps",
+                             "input_timeout_ms", "reconnect_initial_delay_ms", "reconnect_max_delay_ms",
+                             "rtsp_transport"}, "stream profile");
         StreamProfile stream;
         stream.stream_id = value.at("stream_id").get<std::string>();
         stream.camera_id = value.at("camera_id").get<std::string>();
@@ -238,10 +240,16 @@ EdgeAppConfig EdgeAppConfig::parse(const Json& models_json,
         stream.model_id = value.at("model_id").get<std::string>();
         stream.enabled = value.at("enabled").get<bool>();
         stream.enable_ai = value.at("enable_ai").get<bool>();
+        stream.live_source = value.at("live_source").get<bool>();
         stream.output_width = value.at("output_width").get<int>();
         stream.output_height = value.at("output_height").get<int>();
         stream.output_fps = value.value("output_fps", default_fps);
         stream.ai_fps = value.at("ai_fps").get<int>();
+        stream.output_bitrate_kbps = value.at("output_bitrate_kbps").get<int>();
+        stream.input_timeout_ms = value.at("input_timeout_ms").get<int>();
+        stream.reconnect_initial_delay_ms = value.at("reconnect_initial_delay_ms").get<int>();
+        stream.reconnect_max_delay_ms = value.at("reconnect_max_delay_ms").get<int>();
+        stream.rtsp_transport = value.at("rtsp_transport").get<std::string>();
         if (!valid_component(stream.stream_id) || !stream_ids.insert(stream.stream_id).second ||
             stream.camera_id.empty() || stream.camera_id.size() > 128) {
             throw std::invalid_argument("stream ID is invalid/duplicated or camera_id is invalid");
@@ -252,8 +260,14 @@ EdgeAppConfig EdgeAppConfig::parse(const Json& models_json,
         }
         if (stream.output_width < 64 || stream.output_width > 7680 || stream.output_width % 2 != 0 ||
             stream.output_height < 64 || stream.output_height > 4320 || stream.output_height % 2 != 0 ||
-            stream.output_fps < 1 || stream.output_fps > 60 || stream.ai_fps < 1 || stream.ai_fps > 60) {
-            throw std::invalid_argument("stream output dimensions or frame rates are out of range");
+            stream.output_fps < 1 || stream.output_fps > 60 || stream.ai_fps < 1 || stream.ai_fps > 60 ||
+            stream.output_bitrate_kbps < 128 || stream.output_bitrate_kbps > 20000 ||
+            stream.input_timeout_ms < 1000 || stream.input_timeout_ms > 120000 ||
+            stream.reconnect_initial_delay_ms < 100 || stream.reconnect_initial_delay_ms > 300000 ||
+            stream.reconnect_max_delay_ms < stream.reconnect_initial_delay_ms ||
+            stream.reconnect_max_delay_ms > 600000 ||
+            (stream.rtsp_transport != "tcp" && stream.rtsp_transport != "udp")) {
+            throw std::invalid_argument("stream output, timeout, retry, or transport settings are out of range");
         }
         if (value.contains("confidence_threshold")) {
             stream.confidence_threshold = value.at("confidence_threshold").get<double>();

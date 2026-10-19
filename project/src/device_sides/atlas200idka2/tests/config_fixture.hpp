@@ -45,12 +45,18 @@ inline Json streams() {
                 {"streams", Json::array({
                     Json{{"stream_id", "room-a"}, {"camera_id", "camera-a"},
                          {"source_ref", "CAMERA_ROOM_A_URL"}, {"model_id", "model_classroom_behavior_detection"},
-                         {"enabled", true}, {"enable_ai", true}, {"output_width", 1280},
-                         {"output_height", 720}, {"ai_fps", 15}},
+                         {"enabled", true}, {"enable_ai", true}, {"live_source", true}, {"output_width", 1280},
+                         {"output_height", 720}, {"output_fps", 15}, {"ai_fps", 15},
+                         {"output_bitrate_kbps", 1500}, {"input_timeout_ms", 5000},
+                         {"reconnect_initial_delay_ms", 1000}, {"reconnect_max_delay_ms", 30000},
+                         {"rtsp_transport", "tcp"}},
                     Json{{"stream_id", "room-b"}, {"camera_id", "camera-b"},
                          {"source_ref", "CAMERA_ROOM_B_URL"}, {"model_id", "model_room_occupancy_detection"},
-                         {"enabled", true}, {"enable_ai", true}, {"output_width", 1280},
-                         {"output_height", 720}, {"ai_fps", 15}}})}};
+                         {"enabled", true}, {"enable_ai", true}, {"live_source", true}, {"output_width", 1280},
+                         {"output_height", 720}, {"output_fps", 15}, {"ai_fps", 15},
+                         {"output_bitrate_kbps", 1500}, {"input_timeout_ms", 5000},
+                         {"reconnect_initial_delay_ms", 1000}, {"reconnect_max_delay_ms", 30000},
+                         {"rtsp_transport", "tcp"}}})}};
 }
 
 inline Json alarm_rules(bool enabled) {

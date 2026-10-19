@@ -11,9 +11,16 @@
       "model_id": "model_classroom_behavior_detection",
       "enabled": false,
       "enable_ai": false,
+      "live_source": true,
       "output_width": 1280,
       "output_height": 720,
-      "ai_fps": 15
+      "output_fps": 15,
+      "ai_fps": 15,
+      "output_bitrate_kbps": 1500,
+      "input_timeout_ms": 5000,
+      "reconnect_initial_delay_ms": 1000,
+      "reconnect_max_delay_ms": 30000,
+      "rtsp_transport": "tcp"
     }
   ]
 }
