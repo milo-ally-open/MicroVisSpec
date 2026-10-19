@@ -1,7 +1,7 @@
 # 教室行为检测行为规格
 
 > 关联提案：[proposal.md](proposal.md)；边缘运行时：[atlas_edge_runtime](../atlas_edge_runtime/spec.md)；云端事件：[event_service](../event_service/spec.md)。<br>
-> 状态：运行时/插件/配置已进入 Atlas 产品树；PT、ONNX、OM 产物已存在于 preparation，模型目录安装和板端推理验收待执行。<br>
+> 状态：运行时/插件/配置已进入 Atlas 产品树；PT、ONNX、OM 已在 preparation，OM 已安装到 Atlas 并完成合成视频推理 smoke；真实课堂流及精度评估仍待验收。<br>
 > 来源：用户决定与仓库现有模型流程。
 
 ## 范围和术语
@@ -86,13 +86,13 @@
 
 | 上游条款 | REQ | 模块/服务 | 任务 ID | AC | 验收证据/状态 |
 |---|---|---|---|---|---|
-| PRD §4：课堂模型和规则默认关闭 | REQ-01、REQ-02、REQ-03 | `src/device_sides/atlas200idka2/` agent/runtime、device-service | T-01/T-02/T-03/T-04/T-06/T-07 | AC-01.1、AC-01.2、AC-01.3、AC-02.1、AC-02.2、AC-02.3、AC-03.1、AC-03.2、AC-03.3、AC-03.4、AC-03.5 | 命名、配置解析和插件 ABI 测试通过；模型安装及板端推理验收待执行 |
+| PRD §4：课堂模型和规则默认关闭 | REQ-01、REQ-02、REQ-03 | `src/device_sides/atlas200idka2/` agent/runtime、device-service | T-01/T-02/T-03/T-04/T-06/T-07 | AC-01.1、AC-01.2、AC-01.3、AC-02.1、AC-02.2、AC-02.3、AC-03.1、AC-03.2、AC-03.3、AC-03.4、AC-03.5 | 插件/配置/ABI、模型安装、Atlas 合成视频推理/OSD/编码和云端心跳已通过；精度/真实课堂流仍待验收 |
 | PRD §5：最小化课堂数据 | REQ-04 | 边缘、event-service、media-service | T-05/T-06 | AC-04.1、AC-04.2 | 待执行 |
 | 总 SPEC §2–§3：设备身份、MQTT 幂等、通知 outbox | REQ-03、REQ-04 | device/event/push services | T-03/T-04/T-05/T-06 | AC-03.1、AC-03.2、AC-03.3、AC-03.4、AC-03.5、AC-04.1、AC-04.2 | 待执行 |
 
 ## 假设与未决问题
 
-- 用户选择 `WORKFLOW.md` 记录的 YOLO11n/640 流程；PT、ONNX 和 Ascend 310B4 OM 已在 preparation 入库并核对 OM SHA-256。未要求完整测试集对比作为实现前置条件；模型安装、AscendCL 加载及板端推理指标仍待验收。
+- 用户选择 `WORKFLOW.md` 记录的 YOLO11n/640 流程；PT、ONNX 和 Ascend 310B4 OM 已在 preparation 入库并核对 OM SHA-256；OM 已在 Atlas 安装并完成合成视频实机推理。未要求完整测试集对比作为运行时集成前置条件；当前未对课堂精度或 ONNX/OM 精度等价作结论。
 - `[待核验]` Atlas 上的实际摄像头编码、模型帧率与推流方案；以实机记录为准，不把桌面 Demo 结果当板端验收。
 
 ## 变更记录

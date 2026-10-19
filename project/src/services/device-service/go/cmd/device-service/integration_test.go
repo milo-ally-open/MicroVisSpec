@@ -156,6 +156,69 @@ func TestDeviceServiceTenantIsolationAndDisableOutbox(t *testing.T) {
 	}
 }
 
+func TestDeviceServiceAcceptsAtlasAgentHeartbeatState(t *testing.T) {
+	db, _ := integrationApp(t)
+	accountID := uuid.New()
+	created := requestAs(NewHandler(db), http.MethodPost, "/api/v1/devices", accountID, map[string]string{
+		"name": "Atlas classroom", "ip": "192.168.0.2", "location": "Room 101",
+	})
+	if created.Code != http.StatusCreated {
+		t.Fatalf("create device: status %d, body %s", created.Code, created.Body.String())
+	}
+	var createdBody struct {
+		DeviceID string `json:"device_id"`
+	}
+	if err := json.Unmarshal(created.Body.Bytes(), &createdBody); err != nil {
+		t.Fatal(err)
+	}
+	deviceID, err := uuid.Parse(createdBody.DeviceID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Model(&Device{}).Where("id = ?", deviceID).Updates(map[string]any{
+		"activation_state": "active", "active": true,
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	payload, err := json.Marshal(map[string]any{
+		"schema_version": 1, "device_id": deviceID.String(), "sent_at": time.Now().UTC().Format(time.RFC3339Nano),
+		"device_online": true, "camera_state": "unknown", "npu_state": "not_ready",
+		"model_catalog": map[string]any{"models": []any{}}, "model_state": "model_missing",
+		"stream_state": "not_configured", "mqtt_state": "connected",
+		"desired_config_version": 0, "applied_config_version": 0, "queue_depth": 0,
+		"outbox": map[string]any{"pending": 0},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	app := NewApp(Config{}, db, nil, nil)
+	topic := "devices/" + deviceID.String() + "/state"
+	if err := app.processDeviceState(topic, payload); err != nil {
+		t.Fatalf("accept Atlas agent heartbeat: %v", err)
+	}
+	var updated Device
+	if err := db.First(&updated, "id = ?", deviceID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if updated.LastSeenAt == nil {
+		t.Fatal("valid Atlas heartbeat did not update last_seen_at")
+	}
+	var stored map[string]any
+	if err := json.Unmarshal(updated.ReportedState, &stored); err != nil {
+		t.Fatal(err)
+	}
+	if stored["applied_config_version"] != float64(0) || stored["mqtt_state"] != "connected" {
+		t.Fatalf("Atlas heartbeat fields were not persisted: %v", stored)
+	}
+
+	invalid := append([]byte(nil), payload[:len(payload)-1]...)
+	invalid = append(invalid, []byte(`,"unknown_field":true}`)...)
+	if err := app.processDeviceState(topic, invalid); err == nil {
+		t.Fatal("unknown heartbeat field was accepted")
+	}
+}
+
 func TestHTTPDeviceCredentialIsValidatedWithoutReturningSecrets(t *testing.T) {
 	db, _ := integrationApp(t)
 	deviceID := uuid.New()
@@ -256,7 +319,7 @@ func TestActivationTicketIsHashedOneTimeAndReissueInvalidatesOldTicket(t *testin
 	db, _ := integrationApp(t)
 	account := uuid.New()
 	broker := &fakeDeviceBroker{}
-	handler := NewHandlerWithDependencies(Config{BrokerURL: "ssl://mqtt.test:8883", ActivationRatePerMin: 30}, db, broker)
+	handler := NewHandlerWithDependencies(Config{BrokerURL: "ssl://mosquitto:8883", AdvertisedBrokerURL: "ssl://edge.example.test:18888", ActivationRatePerMin: 30}, db, broker)
 	defer func() {
 		var deviceIDs []uuid.UUID
 		db.Model(&Device{}).Where("account_id = ?", account).Pluck("id", &deviceIDs)
@@ -315,17 +378,18 @@ func TestActivationTicketIsHashedOneTimeAndReissueInvalidatesOldTicket(t *testin
 	}
 	var firstBody struct {
 		MQTT struct {
-			ClientID string `json:"client_id"`
-			Username string `json:"username"`
-			Password string `json:"password"`
-			Version  string `json:"protocol_version"`
-			TLS      bool   `json:"tls_required"`
+			BrokerURL string `json:"broker_url"`
+			ClientID  string `json:"client_id"`
+			Username  string `json:"username"`
+			Password  string `json:"password"`
+			Version   string `json:"protocol_version"`
+			TLS       bool   `json:"tls_required"`
 		} `json:"mqtt"`
 	}
 	if err := json.Unmarshal(first.Body.Bytes(), &firstBody); err != nil {
 		t.Fatal(err)
 	}
-	if firstBody.MQTT.ClientID != brokerClientID(deviceID) || firstBody.MQTT.Username != brokerUsername(deviceID) || len(firstBody.MQTT.Password) < 40 || firstBody.MQTT.Version != "3.1.1" || !firstBody.MQTT.TLS {
+	if firstBody.MQTT.BrokerURL != "ssl://edge.example.test:18888" || firstBody.MQTT.BrokerURL == "ssl://mosquitto:8883" || firstBody.MQTT.ClientID != brokerClientID(deviceID) || firstBody.MQTT.Username != brokerUsername(deviceID) || len(firstBody.MQTT.Password) < 40 || firstBody.MQTT.Version != "3.1.1" || !firstBody.MQTT.TLS {
 		t.Fatalf("unexpected MQTT activation response: %+v", firstBody.MQTT)
 	}
 	var credential BrokerCredential
@@ -361,7 +425,7 @@ func TestExpiredActivationTicketIsRejected(t *testing.T) {
 	db, _ := integrationApp(t)
 	account := uuid.New()
 	broker := &fakeDeviceBroker{}
-	handler := NewHandlerWithDependencies(Config{BrokerURL: "ssl://mqtt.test:8883"}, db, broker)
+	handler := NewHandlerWithDependencies(Config{BrokerURL: "ssl://mosquitto:8883", AdvertisedBrokerURL: "ssl://edge.example.test:18888"}, db, broker)
 	defer db.Where("account_id = ?", account).Delete(&Device{})
 	created := requestAs(handler, http.MethodPost, "/api/v1/devices", account, map[string]string{"name": "Atlas", "ip": "192.168.0.2", "location": "Room 102"})
 	var body struct {
@@ -384,6 +448,54 @@ func TestExpiredActivationTicketIsRejected(t *testing.T) {
 	response := requestAs(handler, http.MethodPost, "/edge/v1/activate", uuid.Nil, map[string]string{"device_id": deviceID.String(), "ticket": ticketBody.Ticket})
 	if response.Code != http.StatusGone || broker.provisions != 0 {
 		t.Fatalf("expired activation ticket should not provision a broker client: status=%d provisions=%d", response.Code, broker.provisions)
+	}
+}
+
+func TestActivationRequiresAdvertisedBrokerURL(t *testing.T) {
+	db, _ := integrationApp(t)
+	account := uuid.New()
+	broker := &fakeDeviceBroker{}
+	handler := NewHandlerWithDependencies(Config{BrokerURL: "ssl://mosquitto:8883"}, db, broker)
+	defer db.Where("account_id = ?", account).Delete(&Device{})
+
+	created := requestAs(handler, http.MethodPost, "/api/v1/devices", account, map[string]string{
+		"name": "Atlas", "ip": "192.168.0.2", "location": "Room 101",
+	})
+	if created.Code != http.StatusCreated {
+		t.Fatalf("create device: %d", created.Code)
+	}
+	var deviceBody struct {
+		DeviceID string `json:"device_id"`
+	}
+	if err := json.Unmarshal(created.Body.Bytes(), &deviceBody); err != nil {
+		t.Fatal(err)
+	}
+	deviceID, err := uuid.Parse(deviceBody.DeviceID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	issued := requestAs(handler, http.MethodPost, "/api/v1/devices/"+deviceID.String()+"/activation-tickets", account, map[string]string{})
+	if issued.Code != http.StatusCreated {
+		t.Fatalf("issue activation ticket: %d", issued.Code)
+	}
+	var ticketBody struct {
+		Ticket string `json:"activation_ticket"`
+	}
+	if err := json.Unmarshal(issued.Body.Bytes(), &ticketBody); err != nil {
+		t.Fatal(err)
+	}
+	response := requestAs(handler, http.MethodPost, "/edge/v1/activate", uuid.Nil, map[string]string{
+		"device_id": deviceID.String(), "ticket": ticketBody.Ticket,
+	})
+	if response.Code != http.StatusServiceUnavailable || broker.provisions != 0 {
+		t.Fatalf("activation without advertised broker URL must fail before provisioning; status=%d provisions=%d", response.Code, broker.provisions)
+	}
+	var stored ActivationTicket
+	if err := db.Where("device_id = ? AND token_hash = ?", deviceID, hashOpaque(ticketBody.Ticket)).First(&stored).Error; err != nil {
+		t.Fatal(err)
+	}
+	if stored.ConsumedAt != nil {
+		t.Fatal("activation ticket must remain unused when the advertised broker URL is missing")
 	}
 }
 

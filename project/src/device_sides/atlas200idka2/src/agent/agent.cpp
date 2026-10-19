@@ -60,15 +60,16 @@ public:
     void start_mqtt() {
         const std::string host = env("YUNSHAO_MQTT_HOST");
         if (host.empty()) return;
+        const std::string client_id = env("YUNSHAO_MQTT_CLIENT_ID");
         const std::string username = env("YUNSHAO_MQTT_USERNAME");
         const std::string password = env("YUNSHAO_MQTT_PASSWORD");
         const std::string ca = env("YUNSHAO_MQTT_CA");
         const int port = std::stoi(env("YUNSHAO_MQTT_PORT", "8883"));
-        if (username.empty() || password.empty() || ca.empty()) {
+        if (client_id.empty() || username.empty() || password.empty() || ca.empty()) {
             throw std::runtime_error("MQTT TLS identity is incomplete; credentials are required in the environment");
         }
         mosquitto_lib_init();
-        client_ = mosquitto_new(device_id_.c_str(), false, this);
+        client_ = mosquitto_new(client_id.c_str(), false, this);
         if (!client_) throw std::runtime_error("cannot initialize MQTT client");
         mosquitto_connect_callback_set(client_, &Agent::on_connect);
         mosquitto_message_callback_set(client_, &Agent::on_message);

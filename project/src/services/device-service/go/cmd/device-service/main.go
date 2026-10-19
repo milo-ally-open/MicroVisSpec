@@ -35,6 +35,7 @@ type Config struct {
 	DatabaseURL          string
 	ListenAddress        string
 	BrokerURL            string
+	AdvertisedBrokerURL  string
 	BrokerAdminUsername  string
 	BrokerAdminPassword  string
 	BrokerAdminClientID  string
@@ -67,6 +68,7 @@ func LoadConfig() (Config, error) {
 		DatabaseURL:          read("DATABASE_URL"),
 		ListenAddress:        env("DEVICE_LISTEN_ADDRESS", ":8080"),
 		BrokerURL:            env("MQTT_BROKER_URL", "ssl://mosquitto:8883"),
+		AdvertisedBrokerURL:  env("MQTT_ADVERTISED_BROKER_URL", ""),
 		BrokerAdminUsername:  read("MQTT_ADMIN_USERNAME"),
 		BrokerAdminPassword:  read("MQTT_ADMIN_PASSWORD"),
 		BrokerAdminClientID:  env("MQTT_ADMIN_CLIENT_ID", "yunshao-device-service-dynsec"),
@@ -96,8 +98,14 @@ func LoadConfig() (Config, error) {
 	if c.InternalToken == "" {
 		return c, errors.New("DEVICE_INTERNAL_SERVICE_TOKEN is required")
 	}
-	if !strings.HasPrefix(c.BrokerURL, "ssl://") {
-		return c, errors.New("MQTT_BROKER_URL must use ssl:// for TLS")
+	if err := validateMQTTBrokerURL(c.BrokerURL); err != nil {
+		return c, errors.New("MQTT_BROKER_URL must be an absolute ssl:// broker URL without credentials or path")
+	}
+	if c.AdvertisedBrokerURL == "" {
+		return c, errors.New("MQTT_ADVERTISED_BROKER_URL is required")
+	}
+	if err := validateMQTTBrokerURL(c.AdvertisedBrokerURL); err != nil {
+		return c, errors.New("MQTT_ADVERTISED_BROKER_URL must be an absolute ssl:// broker URL without credentials or path")
 	}
 	if (c.MediaServiceURL == "") != (c.MediaServiceToken == "") {
 		return c, errors.New("MEDIA_SERVICE_INTERNAL_URL and MEDIA_SERVICE_INTERNAL_TOKEN must be configured together")

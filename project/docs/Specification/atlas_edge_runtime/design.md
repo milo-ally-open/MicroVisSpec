@@ -29,7 +29,7 @@ sequenceDiagram
   EA->>DB: 标记对应 ID 已确认
 ```
 
-设备首次激活由 device-service 的一次性凭据交换建立设备身份；后续 MQTT 使用每设备凭据和 `devices/{deviceId}/...` topic ACL。凭据定期轮换、停用时撤销。配置是带单调版本的完整快照，runtime ACK 后才报告已生效。期望态与实报态始终分开。
+设备首次激活由 device-service 的一次性凭据交换建立设备身份；运维将响应中的 broker 地址、`client_id`、username、password 和 CA 安全写入 agent 环境文件，agent 必须原样使用返回的 `client_id`，不得自行从 device_id 推导，否则会与 Mosquitto Dynamic Security 登记的固定 client ID 不匹配。后续 MQTT 使用每设备凭据和 `devices/{deviceId}/...` topic ACL。凭据定期轮换、停用时撤销。配置是带单调版本的完整快照，runtime ACK 后才报告已生效。期望态与实报态始终分开。
 
 模型包目录按 `models/{model_id}/{version}/` 只读保存模型文件和 `manifest.json`；安装流程在 `staging/` 校验 SHA-256，并按 `models.json` 中对应 profile 比较芯片/格式/输入尺寸/类别，成功后以原子符号链接切换 `active/{model_id}`，至少保留该 model_id 的上一个版本。公共配置/入库逻辑只做通用结构校验，不含 classroom class、类别数和 classroom event type 常量。
 
@@ -74,6 +74,9 @@ The layout mirrors the reference project’s plugin/manager/config responsibilit
 
 - MQTT aarch64 TLS client library 需由边缘构建打包提供；板端当前未发现 `libmosquitto` pkg-config，因此依赖交付为先决条件，不能用明文 MQTT 替代。
 - TLS 证书/凭据由激活/部署流程安全注入；设备服务重置不重新使用泄露或撤销身份。
+- 两个 systemd 单元均强制加载 `/etc/yunshao/cann.env`。该权限受限文件由运维基于板上 `/usr/local/Ascend/ascend-toolkit/set_env.sh` 准备，至少包含 `LD_LIBRARY_PATH` 及 CANN 算子/运行环境变量；服务不得依赖登录 shell、Conda 或运行时手工 `source`。
+- 两个 systemd 单元以 `yunshao` 非 root 身份运行，并显式加入 `video`、`HwHiAiUser`、`HwBaseUser` 设备组。产品 udev 规则将 `/dev/rgn` 授权给 `HwHiAiUser`，MODE 为 `0660`；不得放宽为任何用户可访问。该节点由设备驱动重建，部署须重新加载 udev 规则并对现有节点触发规则。
+- 部署验收在最小 `PATH` 和 systemd 环境中检查 agent/runtime 的共享库解析；toolkit/driver 路径来自目标板实际安装，不写入模型 JSON 或提交 CANN 机器专属绝对路径。
 - 健康检查分活性与就绪；无模型文件时控制服务可 alive，但算法和整体 NPU readiness 标为 false。
 - 日志带 device_id、request/event/config ID，不带密码、私钥、完整视频 URL 或课堂图片内容。
 - 断网时先持久化，再发布；磁盘满时拒绝“已缓存”成功并报告 degraded，服务不得删除未确认记录以隐藏积压。

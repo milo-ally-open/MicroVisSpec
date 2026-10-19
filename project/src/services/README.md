@@ -5,6 +5,7 @@
 ## 首次启动
 
 1. 复制本目录 `.env.example` 为 `.env`，设置 HTTPS 来源、Atlas 可达的 MQTT 绑定地址和共享网络名 `BACKEND_NETWORK`。
+   `MQTT_ADVERTISED_BROKER_URL` 是激活响应交给 Atlas 的 TLS 地址；它与容器内部使用的 `ssl://mosquitto:8883` 分开配置，并且必须路由到该 broker TLS listener。设备端必须信任 broker 证书 CA。
 2. 准备各 `*-service` 所需的 `.secret-*` 文件，并在 `media-service` 准备含运行凭据的本地 `mediamtx.yml`。可提交的示例为 `media-service/mediamtx.yml.example`。
 3. 下载 MediaMTX 官方单文件程序放入 `media-service`，核对官方 release checksum。在 `media-service` 目录先运行 `./mediamtx --validate-conf=mediamtx.yml`，再直接运行 `./mediamtx mediamtx.yml`；保持该进程运行。
 4. 在 `project/src/services` 校验并启动后端：

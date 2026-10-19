@@ -35,11 +35,22 @@ type algorithmStateReport struct {
 }
 
 type stateReport struct {
-	SchemaVersion int                    `json:"schema_version"`
-	DeviceID      string                 `json:"device_id"`
-	SentAt        string                 `json:"sent_at"`
-	Cameras       []cameraStateReport    `json:"cameras"`
-	Algorithms    []algorithmStateReport `json:"algorithms"`
+	SchemaVersion        int                    `json:"schema_version"`
+	DeviceID             string                 `json:"device_id"`
+	SentAt               string                 `json:"sent_at"`
+	DeviceOnline         *bool                  `json:"device_online,omitempty"`
+	CameraState          string                 `json:"camera_state,omitempty"`
+	NPUState             string                 `json:"npu_state,omitempty"`
+	ModelCatalog         json.RawMessage        `json:"model_catalog,omitempty"`
+	ModelState           string                 `json:"model_state,omitempty"`
+	StreamState          string                 `json:"stream_state,omitempty"`
+	MQTTState            string                 `json:"mqtt_state,omitempty"`
+	DesiredConfigVersion int64                  `json:"desired_config_version,omitempty"`
+	AppliedConfigVersion int64                  `json:"applied_config_version,omitempty"`
+	QueueDepth           int64                  `json:"queue_depth,omitempty"`
+	Outbox               json.RawMessage        `json:"outbox,omitempty"`
+	Cameras              []cameraStateReport    `json:"cameras,omitempty"`
+	Algorithms           []algorithmStateReport `json:"algorithms,omitempty"`
 }
 
 func (a *App) handleMQTTMessage(topic string, payload []byte) {
@@ -76,6 +87,18 @@ func (a *App) processDeviceState(topic string, payload []byte) error {
 	now := time.Now().UTC()
 	if sentAt.After(now.Add(5*time.Minute)) || now.Sub(sentAt) > heartbeatTimeout {
 		return errors.New("stale or future device state report")
+	}
+	for _, value := range []string{report.CameraState, report.NPUState, report.ModelState, report.StreamState, report.MQTTState} {
+		if len(value) > 32 {
+			return errors.New("invalid device runtime state")
+		}
+	}
+	if report.DesiredConfigVersion < 0 || report.AppliedConfigVersion < 0 || report.QueueDepth < 0 {
+		return errors.New("device state versions and queue depth must be non-negative")
+	}
+	if (len(report.ModelCatalog) > 0 && !isJSONObject(report.ModelCatalog)) ||
+		(len(report.Outbox) > 0 && !isJSONObject(report.Outbox)) {
+		return errors.New("device model catalog and outbox state must be JSON objects")
 	}
 	for _, camera := range report.Cameras {
 		if strings.TrimSpace(camera.CameraKey) == "" || len(camera.CameraKey) > 120 || len(camera.CameraState) > 32 || len(camera.StreamState) > 32 {

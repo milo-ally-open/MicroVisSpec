@@ -129,6 +129,7 @@ services:
     environment:
       DATABASE_URL_FILE: /run/secrets/device_database_url
       MQTT_BROKER_URL: ssl://mosquitto:8883
+      MQTT_ADVERTISED_BROKER_URL: ${MQTT_ADVERTISED_BROKER_URL:?set MQTT_ADVERTISED_BROKER_URL in project/src/services/.env}
       MQTT_CA_FILE: /run/secrets/mqtt_ca_certificate
       MQTT_ADMIN_USERNAME: admin
       MQTT_ADMIN_PASSWORD_FILE: /run/secrets/mqtt_admin_password

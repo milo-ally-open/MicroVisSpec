@@ -17,6 +17,7 @@
 - **AC-01.1** Given 有效且未使用的激活凭据，When 设备激活，Then 云端返回与唯一 device_id 绑定的独立凭据并使激活凭据不可重用。
 - **AC-01.2** Given 凭据无效、已撤销或主题 device_id 与凭据身份不符，When MQTT/HTTPS 请求到达，Then 拒绝访问并记录无敏感值的诊断信息。
 - **AC-01.3** Given 任意边缘消息体，When 云端确定账号归属，Then 只使用 device-service 的登记关系，不采信设备自报 `account_id`。
+- **AC-01.4** Given 激活响应包含 MQTT `client_id`、username、password 和 TLS broker 信息，When agent 建立 MQTT 连接，Then 必须逐项使用激活返回的 `client_id` 与设备凭据；client_id 缺失时失败关闭，不按 device_id 自行派生。
 
 **验证方式**：设备激活与主题 ACL 集成测试、凭据撤销测试。
 
@@ -30,6 +31,7 @@
 - **AC-02.2** Given 云端下发配置版本 N，When 推理服务成功应用，Then agent 仅在读取确认 N 后回报 `applied_version=N`；失败则保留前一实报版本并返回错误码。
 - **AC-02.3** Given 重复、过期或乱序配置，When 收到配置命令，Then 重复版本幂等确认，旧版本不覆盖新版本，格式错误配置不替换有效配置。
 - **AC-02.4** Given 多模型 profiles 与多个摄像头/算法绑定，When runtime 上报状态，Then 每个绑定独立报告 model_id、model_version、加载状态和错误码；一个模型加载失败不覆盖其他模型的诊断状态。
+- **AC-02.5** Given agent 向 `devices/{deviceId}/state` 发布状态，When 序列化心跳，Then 报文包含 schema_version/device_id/sent_at 与设备、摄像头、NPU、模型目录、流、MQTT、配置版本及 outbox 状态字段，符合 device-service 状态合同；服务端持久化并刷新 last_seen。
 
 **验证方式**：配置版本状态机集成测试、心跳/API/MQTT 端到端模拟。
 
@@ -85,6 +87,18 @@ Atlas 媒体公共接口放在 `include/media/`，实现放在 `src/media/`；�
 
 **验证方式**：MediaMTX 集成和 Atlas 实机视频/证据测试；编码、推流资源预算记录。
 
+### REQ-06：Atlas CANN 运行环境与 systemd 启动
+
+**需求**：边缘服务必须在 systemd 的干净环境中加载 Atlas CANN/驱动动态库和算子目录；不能依赖交互式 shell、Conda 或手工导出的环境变量。
+
+**验收条件**
+
+- **AC-06.1** Given systemd 启动 agent 和 classroom-runtime，When 两服务加载 CANN，Then 两个单元均读取由运维部署的 `/etc/yunshao/cann.env`；该文件提供与板上 CANN 安装匹配的运行库/算子路径，缺失时 agent/runtime 不得以不完整环境假装就绪。
+- **AC-06.2** Given 服务以非 root 的 `yunshao` 账号读取 CANN 环境文件，When systemd 启动服务，Then 配置文件权限仅允许 root 与 `yunshao` 服务账号读取；干净登录环境下动态依赖可解析，AscendCL 初始化结果进入服务状态/日志。
+- **AC-06.3** Given runtime 使用 Atlas DVPP/VPSS/VENC/OSD 设备节点，When udev 创建设备节点且 systemd 启动服务，Then 仅将所需节点（包括 `/dev/rgn`）授权给 `HwHiAiUser` 设备组，service 单元显式加入 `HwHiAiUser`/`HwBaseUser`/`video`；不将设备节点设为 world-writable，非 root runtime 可创建 Region 并完成媒体帧处理。
+
+**验证方式**：使用最小 `PATH` 的环境检查 agent/runtime 依赖；通过 systemd 启停两项服务并验证 MQTT 连接及 AscendCL 初始化。
+
 ## 不变项与兼容要求
 
 - 设备账号归属由 device-service 管理；设备 ID 与边缘事件 ID 稳定且跨重试不变。
@@ -110,9 +124,10 @@ Atlas 媒体公共接口放在 `include/media/`，实现放在 `src/media/`；�
 
 | 上游条款 | REQ | 模块/服务 | 任务 ID | AC | 验收证据/状态 |
 |---|---|---|---|---|---|
-| 总 SPEC §2：设备身份与配置版本 | REQ-01、REQ-02 | device-service、agent | T-01/T-02/T-06/T-07/T-08 | AC-01.1、AC-01.2、AC-01.3、AC-02.1、AC-02.2、AC-02.3 | 待执行 |
+| 总 SPEC §2：设备身份与配置版本 | REQ-01、REQ-02 | device-service、agent | T-01/T-02/T-06/T-07/T-08 | AC-01.1、AC-01.2、AC-01.3、AC-02.1、AC-02.2、AC-02.3、AC-02.5 | Atlas TLS/MQTT 持续连接；device-service 已接受 agent 心跳并更新 `last_seen_at`，配置 ACK 仍待实测 |
 | 总 SPEC §3：事件幂等与 ACK | REQ-04 | agent、event-service | T-04/T-07/T-08 | AC-04.1、AC-04.2、AC-04.3、AC-04.4、AC-04.5、AC-04.6 | 待执行 |
-| PRD §4：Atlas、教室视频与模型 | REQ-03、REQ-05 | Atlas plugin/manager runtime、model catalog、media-service | T-03/T-05/T-06/T-07/T-08 | AC-03.1–03.10、AC-05.1、AC-05.2、AC-05.3 | 完整 Atlas 源码已在 310B4 构建，CTest 3/3，OM 插件 AscendCL 初始化探针通过；云边、视频和性能验收待执行 |
+| PRD §4：Atlas、教室视频与模型 | REQ-03、REQ-05 | Atlas plugin/manager runtime、model catalog、media-service | T-03/T-05/T-06/T-07/T-08 | AC-03.1–03.10、AC-05.1、AC-05.2、AC-05.3 | Atlas CMake/CTest 通过；OM SHA 与清单一致并在板端安装；非 root C++ runtime 对合成 H.264 完成 75/75 帧推理/OSD/编码，RTSP/课堂源和持续性能待验收 |
+| 运维部署：systemd 运行时依赖 | REQ-06 | Atlas agent、classroom-runtime、systemd、udev | T-01/T-06/T-08 | AC-06.1、AC-06.2、AC-06.3 | systemd 干净环境依赖解析通过，agent active；受限 `/dev/rgn` udev 权限下 `yunshao` runtime 完成合成视频处理 |
 
 ## 假设与未决问题
 
@@ -131,3 +146,4 @@ Atlas 媒体公共接口放在 `include/media/`，实现放在 `src/media/`；�
 | 2026-10-19 | 统一模型插件、模型 ID 和任务类型的命名；课堂模型标识为 `model_classroom_behavior_detection`，算法键继续为 `classroom_behavior_detection`。 | 用户要求插件遵循 detection/segmentation/classification 命名规范 |
 | 2026-10-19 | 媒体接口与实现目录统一为 `include/media/` 和 `src/media/`，头源文件按相同基名配对。 | 用户要求将 Atlas `common/media/` 并入 include 且不增加 common 层 |
 | 2026-10-19 | 将 Atlas `include/common/` 头文件改为与 `src/common/` 实现同基名：`core.hpp`/`core.cpp`、`config.hpp`/`config.cpp`。 | 用户指出公共头文件遵循头源文件基名一致规范 |
+| 2026-10-20 | 要求 agent 与 classroom-runtime 显式读取受限权限的 CANN 运行环境文件，避免 systemd 无法解析 AscendCL 动态库或依赖交互式 shell 环境。 | Atlas 实机 systemd 启动以 127 失败，干净环境检查发现 AscendCL/媒体动态库缺失 |

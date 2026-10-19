@@ -4,7 +4,7 @@
 
 ## 当前实现与目标
 
-- 模型准备目录 `project/preparation/model_classroom_behavior/` 有 YOLO11n/640 训练/导出资料和 PT、ONNX、Ascend 310B4 OM；OM SHA-256 已与模型清单核对，Atlas 板端安装和实机推理验收尚未完成。
+- 模型准备目录 `project/preparation/model_classroom_behavior/` 有 YOLO11n/640 训练/导出资料和 PT、ONNX、Ascend 310B4 OM；OM SHA-256 已与模型清单核对并安装到 Atlas，非 root 产品 runtime 已对合成 H.264 完成 75/75 帧推理/OSD/编码；真实课堂流仍未接入。
 - 正式边缘代码 `project/src/device_sides/atlas200idka2/` 已包含 agent、模型包校验/outbox、课堂推理 runtime、`ModelClassroomBehaviorDetection` 插件及媒体 pipeline；Atlas 交叉编译和现有配置/插件身份 CTest 已通过。
 - 目标为同一 Atlas 工程树内包含可构建的 `agent`、`classroom-runtime`、共享 model catalog 和持久事件缓存。组织方式借鉴 [device_side_ax650](https://gitee.com/milo-ally-intern/manhole-cover-detection/tree/master/model_deployment/device_side_ax650)：稳定模型插件 ABI、manager/pipeline、逐流模型绑定和独立告警 JSON；AX650 的 AX Engine/AX SYS/视频接口不得复制，Atlas 插件和媒体 pipeline 使用 AscendCL/DVPP。模型包目录、校验、按 model_id 独立激活和回滚沿用 [Atlas 边缘运行时设计](../atlas_edge_runtime/design.md)。
 
@@ -57,7 +57,7 @@ flowchart LR
 
 - MQTT C/C++ 库可用性及加密配置方式：Atlas 上核验。
 - Atlas 的实时输入/叠加视频 RTSP 发布目标与性能：实机原型确认。
-- `[待验收]` 将已入库 OM 安装到设备活动模型目录，记录 AscendCL 加载结果、内存、推理延迟/帧率及授权视频链路状态。完整测试集精度对比不作为当前运行时集成的前置要求。
+- `[待验收]` 获取真实授权课堂视频/RTSP 并验证摄像头重连、MediaMTX 发布和持续资源；现有 model-only 与 synthetic media pipeline 基准见 `model_val/reports/release_20261019/` 和 `release_20261020/atlas_runtime_smoke.json`。完整测试集精度对比不作为当前运行时集成的前置要求。
 
 ## 变更记录
 

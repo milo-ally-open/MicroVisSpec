@@ -122,6 +122,10 @@ func (a *App) activateDevice(c *gin.Context) {
 		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "MQTT management is not ready")
 		return
 	}
+	if validateMQTTBrokerURL(a.config.AdvertisedBrokerURL) != nil {
+		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "edge MQTT endpoint is not configured")
+		return
+	}
 	var input struct {
 		DeviceID string `json:"device_id"`
 		Ticket   string `json:"ticket"`
@@ -211,16 +215,10 @@ func (a *App) activateDevice(c *gin.Context) {
 		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "device activation could not be committed")
 		return
 	}
-	brokerURL := a.config.BrokerURL
-	if brokerURL == "" {
-		// Tests inject a fake broker and can set the URL explicitly when
-		// verifying the response contract.
-		brokerURL = "ssl://mqtt.invalid:8883"
-	}
 	c.JSON(http.StatusOK, gin.H{
 		"device_id": device.ID,
 		"mqtt": gin.H{
-			"broker_url":         brokerURL,
+			"broker_url":         a.config.AdvertisedBrokerURL,
 			"protocol_version":   "3.1.1",
 			"client_id":          clientID,
 			"username":           username,

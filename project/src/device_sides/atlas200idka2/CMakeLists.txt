@@ -68,6 +68,7 @@ install(TARGETS yunshao-agent yunshao-classroom-runtime RUNTIME DESTINATION bin)
 install(TARGETS model_classroom_behavior_detection LIBRARY DESTINATION lib/yunshao/plugins)
 install(DIRECTORY config/ DESTINATION etc/yunshao)
 install(FILES systemd/yunshao-agent.service systemd/yunshao-classroom-runtime.service DESTINATION lib/systemd/system)
+install(FILES udev/99-yunshao-rgn.rules DESTINATION /etc/udev/rules.d)
 
 include(CTest)
 if(BUILD_TESTING)

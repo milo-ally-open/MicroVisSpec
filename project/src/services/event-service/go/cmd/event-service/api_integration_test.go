@@ -191,7 +191,9 @@ func TestEventStatsUseShanghaiDaysAndSeparateAllTimeOpenCount(t *testing.T) {
 	account := uuid.New()
 	location, _ := time.LoadLocation("Asia/Shanghai")
 	now := time.Now().In(location)
-	today := time.Date(now.Year(), now.Month(), now.Day(), 10, 0, 0, 0, location).UTC()
+	// Use the captured current instant so the fixture is inside today's Shanghai
+	// interval even when the suite runs before 10:00 local time.
+	today := now.UTC()
 	insertAPIEvent(t, db, account, uuid.New(), today, "resolved", "high")
 	insertAPIEvent(t, db, account, uuid.New(), time.Now().UTC().Add(-10*24*time.Hour), "pending", "low")
 	response := eventRequest(handler, http.MethodGet, "/api/v1/events/stats?range=today", account, nil)

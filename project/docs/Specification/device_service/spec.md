@@ -23,6 +23,8 @@
 
 - **AC-02.1**：激活票据有时效且只能消费一次。
 - **AC-02.2**：设备凭据不能访问其他设备主题。
+- **AC-02.3**：激活响应中的 MQTT broker 地址来自独立的边缘可达配置；不得返回服务容器内部的 broker DNS 地址；设备使用该地址通过 TLS 接入。
+- **AC-02.4**：激活响应中的 MQTT `client_id` 与 Mosquitto Dynamic Security 为该设备登记的固定 client ID 完全一致；端侧连接合同使用该原值。
 
 ### REQ-03 状态与配置
 
@@ -30,6 +32,7 @@
 
 - **AC-03.1**：心跳过期可判离线，各状态不互相替代。
 - **AC-03.2**：匹配期望版本的设备 ACK 才表示配置已应用。
+- **AC-03.3**：消费 Atlas agent 的 `schema_version`、`device_id`、`sent_at` 及设备/摄像头/NPU/模型/流/MQTT、配置版本、队列状态字段；这些字段经严格类型与范围校验后与摄像头/算法数组一起原子保存，未知字段拒绝，只有有效状态才刷新 `last_seen_at`。
 
 ### REQ-04 内部查询与恢复
 
@@ -100,19 +103,22 @@
 | 方法与路径 | 任务与返回 |
 | --- | --- |
 | `POST /api/v1/devices/{deviceId}/activation-tickets` | 当前账号签发一次性票据，返回只显示一次的凭据及 10 分钟到期时间；重签使旧票据失效。 |
-| `POST /edge/v1/activate` | 边缘设备提交 `device_id` 和票据；成功后取得独立 MQTT `client_id`、设备密码与 broker 接入信息。 |
+| `POST /edge/v1/activate` | 边缘设备提交 `device_id` 和票据；成功后取得独立 MQTT `client_id`、设备密码与 broker 接入信息。端侧必须原样使用返回的 `client_id`。`mqtt.broker_url` 必须取自 `MQTT_ADVERTISED_BROKER_URL`，不能泄露/复用服务容器内部的 `MQTT_BROKER_URL`。 |
 
 ### 4.2 实现任务
 
 1. 票据用足够随机的值，数据库只存哈希；按设备绑定、10 分钟有效、一次消费，并对签发和兑换限流。无效、过期、重复兑换或已停用设备不能取得 broker 身份。
 2. 为每台 Atlas 200I DK A2 分配独立 MQTT client_id 和密码，使用 Mosquitto 2.x Dynamic Security 管理身份与 ACL；设备密码仅首次激活返回。轮换/停用设备身份时同步撤销 broker 权限，不依靠设备 IP 做可信判断。
-3. MQTT 使用 TLS、3.1.1、固定 client_id 的持久会话。设备仅可发布自己的 `devices/{deviceId}/state`、`events`、`command-acks`，并仅可订阅自己的 `event-acks`、`commands`；后台服务使用独立的最小权限身份。
-4. 对 broker 开启持久化并限制连接、报文和离线队列大小。设备断网时本地保留未收到业务 ACK 的事件，重连仍用同一 event_id 重发；本服务只负责设备接入合同，不代替 event-service 的事件去重与 ACK。
+3. `MQTT_BROKER_URL` 是服务容器访问 broker 的 TLS URL；`MQTT_ADVERTISED_BROKER_URL` 是激活响应下发给边缘设备的 TLS URL。两项分别配置且均须为 `ssl://` URL；advertised 地址应解析/路由到运行 broker TLS listener 的部署端点。配置缺失或不合法时 device-service 启动失败，不得回退到内部地址或静默使用示例地址。
+4. MQTT 使用 TLS、3.1.1、固定 client_id 的持久会话。设备仅可发布自己的 `devices/{deviceId}/state`、`events`、`command-acks`，并仅可订阅自己的 `event-acks`、`commands`；后台服务使用独立的最小权限身份。
+5. 对 broker 开启持久化并限制连接、报文和离线队列大小。设备断网时本地保留未收到业务 ACK 的事件，重连仍用同一 event_id 重发；本服务只负责设备接入合同，不代替 event-service 的事件去重与 ACK。
 
 ### 4.3 交付物与阶段验收
 
 - 交付激活 API、票据状态模型、broker Dynamic Security 配置/恢复步骤及 Atlas 200I DK A2 接入说明。
 - 有效票据只能兑换一次；重新签发使旧票据失效；设备 A 无法读写设备 B 的主题。
+- 激活响应返回 configured advertised broker URL；检查该值与 `MQTT_BROKER_URL` 解耦，并由边缘设备经 TLS 实际连通 advertised 地址。
+- 激活响应的 `client_id` 与 Dynamic Security 固定 client ID 相同，Atlas 使用该值完成 MQTT CONNECT 并成功通过 broker ACL。
 - 停用后旧 MQTT 身份无法继续发布状态/事件或接收命令；重复停用和激活请求不会产生多个有效身份。
 
 ---
@@ -127,7 +133,7 @@
 | `devices/{deviceId}/commands` | 发布带 `command_id` 和期望配置版本的参数命令。 |
 | `devices/{deviceId}/command-acks` | 消费命令执行结果、实报版本与失败原因。 |
 
-所有消息遵守总 SPEC 的 `schema_version=1`、`device_id`、`sent_at` 和主题/凭据归属校验；不信任 payload 中自报的 `account_id`。
+所有消息遵守总 SPEC 的 `schema_version=1`、`device_id`、`sent_at` 和主题/凭据归属校验；不信任 payload 中自报的 `account_id`。Atlas agent 状态可在 `cameras`/`algorithms` 数组外提供 `device_online`、`camera_state`、`npu_state`、`model_catalog`、`model_state`、`stream_state`、`mqtt_state`、`desired_config_version`、`applied_config_version`、`queue_depth` 和 `outbox`。device-service 必须识别这些字段并将完整有效报告写入 `reported_state`；不能因为端侧提供上述额外合同字段而把整条心跳拒绝。字段缺失的旧版设备仍可只发送数组，但未知字段、错误类型、负版本或负队列深度必须拒绝。
 
 ### 5.2 浏览器 API 与实现任务
 
