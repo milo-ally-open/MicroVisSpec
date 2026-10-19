@@ -18,11 +18,11 @@
 |---|---|---|---|
 | REQ-01/AC-01.3 | JSON model_id/manifest/插件库引用检查、Atlas 插件动态加载身份测试 | `model_config_test` 和 `model_plugin_identity_test` 通过；配置 dry-run 通过 | 通过 |
 | REQ-01/AC-01.1–01.2 | 活动模型类别映射与缺失/加载失败状态集成测试 | OM v1.0.0 SHA 与 manifest 一致，板端 catalog 报告 `installed`；runtime 已加载该模型并完成合成视频推理 | 部分通过：无真实课堂视频/精度验证 |
-| REQ-02/AC-02.1–02.3 | 多 profile 隔离、活动模型状态、授权固定视频推理与故障恢复测试 | Atlas 310B4 非 root C++ runtime 对 640×480 H.264 合成源完成 75/75 帧推理、OSD 和 1280×720 H.264 编码；单次吞吐 14.55 FPS、峰值 RSS 368.82 MiB，见 [runtime smoke 报告](../../../preparation/model_classroom_behavior/model_val/reports/release_20261020/atlas_runtime_smoke.json) | 部分通过：缺少真实授权课堂视频和 RTSP 重连验收 |
+| REQ-02/AC-02.1–02.3 | 多 profile 隔离、活动模型状态、授权固定视频推理与故障恢复测试 | Atlas 310B4 非 root C++ runtime 对 640×480 H.264 合成源完成 75/75 帧短 smoke；另以 15 FPS 本机 UDP 合成输入运行 694 秒，输出 8997/9000 帧、采样 RSS 峰值 459.27 MiB、NPU 峰值 3017/3513 MiB；见[短 smoke 报告](../../../preparation/model_classroom_behavior/model_val/reports/release_20261020/atlas_runtime_smoke.json)和[持续测试报告](../../../preparation/model_classroom_behavior/model_val/reports/release_20261020/atlas_runtime_sustained.json) | 部分通过：非真实 RTSP；3 帧缺失原因未定，需授权课堂视频与重连验收 |
 | REQ-03/AC-03.1–03.5 | 规则状态机、设备 ACK 与服务端规则校验集成测试 | 实现未开始 | 未执行 |
 | REQ-04/AC-04.1–04.2 | 消息 schema、日志字段和证据访问/保留测试 | 实现未开始 | 未执行 |
 
 ## 完成摘要
 
 - 边缘运行时代码已进入正式 Atlas 工程；插件命名、配置交叉引用、插件 ABI、agent/runtime 和三项边缘 CTest 已在 Atlas ARM64 构建验证。系统服务的 CANN、MQTT/TLS 和云端心跳已实机通过。
-- 用户已确认初始规则全关闭，并选择 YOLO11n/640 工作流；PT/ONNX/OM 已入库。OM 已装入板端模型目录，模型推理/媒体链路合成视频 smoke 已完成；真实课堂流、RTSP 重连、精度评估仍待授权视频源/测试集。
+- 用户已确认初始规则全关闭，并选择 YOLO11n/640 工作流；PT/ONNX/OM 已入库。OM 已装入板端模型目录，非 root runtime 完成 10 分钟实时合成流推理/OSD/编码；真实课堂 RTSP、重连、精度评估仍待授权视频源/测试集。

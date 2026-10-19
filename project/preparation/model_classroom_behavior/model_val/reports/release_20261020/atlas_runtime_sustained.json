@@ -1,0 +1,80 @@
+{
+  "created_at": "2026-10-20",
+  "device": "Atlas 200I DK A2 / Ascend 310B4",
+  "cann_version": "7.0.RC1",
+  "runtime": "yunshao-classroom-runtime",
+  "runtime_user": "yunshao",
+  "model_id": "model_classroom_behavior_detection",
+  "model_version": "1.0.0",
+  "model_sha256": "e91d9f26cf5342228fd33de18c894686d91c6e1d385634e76abc381dd5ce9564",
+  "test_type": "synthetic_realtime_sustained_pipeline",
+  "alarms_enabled": false,
+  "input": {
+    "generator": "FFmpeg testsrc2, encoded as H.264 and looped at real time",
+    "transport": "MPEG-TS over loopback UDP; not a camera or RTSP source",
+    "width": 640,
+    "height": 480,
+    "fps": 15,
+    "duration_seconds": 600,
+    "expected_frames": 9000
+  },
+  "output": {
+    "codec": "H.264",
+    "width": 1280,
+    "height": 720,
+    "encoded_frames": 8997,
+    "frame_retention_ratio": 0.9996667
+  },
+  "runtime_measurement": {
+    "runtime_active_elapsed_seconds_last_observed": 694,
+    "input_duration_seconds": 600,
+    "sampled_process_rss_peak_kib": 470288,
+    "sampled_process_rss_peak_mib": 459.27,
+    "sampled_process_rss_first_kib": 370064,
+    "sampled_process_rss_last_kib": 470288,
+    "sampled_process_rss_growth_last_62_seconds_kib": 1848,
+    "npu_memory_peak_sample_mib": "3017 / 3513",
+    "npu_memory_before_run_mib": "2354 / 3513",
+    "npu_memory_after_stop_mib": "2636 / 3513",
+    "temperature_peak_sample_celsius": 42,
+    "rss_samples": [
+      {"elapsed_seconds": 13, "rss_kib": 370064},
+      {"elapsed_seconds": 56, "rss_kib": 379760},
+      {"elapsed_seconds": 123, "rss_kib": 390320},
+      {"elapsed_seconds": 186, "rss_kib": 399824},
+      {"elapsed_seconds": 251, "rss_kib": 409856},
+      {"elapsed_seconds": 315, "rss_kib": 419624},
+      {"elapsed_seconds": 378, "rss_kib": 429392},
+      {"elapsed_seconds": 439, "rss_kib": 438896},
+      {"elapsed_seconds": 498, "rss_kib": 447872},
+      {"elapsed_seconds": 546, "rss_kib": 455240},
+      {"elapsed_seconds": 594, "rss_kib": 462632},
+      {"elapsed_seconds": 632, "rss_kib": 468440},
+      {"elapsed_seconds": 694, "rss_kib": 470288}
+    ],
+    "npu_memory_samples_mib": [
+      {"elapsed_seconds": 123, "used_total": "2705 / 3513"},
+      {"elapsed_seconds": 186, "used_total": "2746 / 3513"},
+      {"elapsed_seconds": 251, "used_total": "2789 / 3513"},
+      {"elapsed_seconds": 315, "used_total": "2830 / 3513"},
+      {"elapsed_seconds": 378, "used_total": "2871 / 3513"},
+      {"elapsed_seconds": 439, "used_total": "2911 / 3513"},
+      {"elapsed_seconds": 498, "used_total": "2950 / 3513"},
+      {"elapsed_seconds": 546, "used_total": "2959 / 3513"},
+      {"elapsed_seconds": 594, "used_total": "2989 / 3513"},
+      {"elapsed_seconds": 632, "used_total": "3017 / 3513"}
+    ]
+  },
+  "outcome": {
+    "runtime_exit_code": 0,
+    "runtime_stop_reason": "The 600-second UDP sender ended, but the UDP receiver does not receive an end-of-stream signal; the transient systemd unit was then stopped.",
+    "npu_process_memory_query_supported": false
+  },
+  "limitations": [
+    "This test validates a sustained synthetic H.264 decode, inference, OSD, and encode path; it does not validate real camera or RTSP reconnect behavior.",
+    "Three of 9000 expected frames were absent from the encoded output. The loss occurred around startup; its cause was not established.",
+    "Process RSS rose during warm-up and reached 459.27 MiB at the last sample; the last 62-second interval grew 1.81 MiB. This is not a long-duration memory-stability guarantee.",
+    "NPU memory remained 2636 MiB after the process stopped, compared with 2354 MiB before the run. The board's npu-smi process and proc-mem queries are unsupported, so this residual cannot be attributed to a process.",
+    "The run does not evaluate classroom behavior accuracy or ONNX-to-OM parity."
+  ]
+}
