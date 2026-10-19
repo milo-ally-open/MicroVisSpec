@@ -14,10 +14,8 @@ ExecStart=/usr/local/bin/yunshao-classroom-runtime
 Restart=on-failure
 RestartSec=5
 NoNewPrivileges=true
-ProtectSystem=strict
-ProtectHome=true
-PrivateTmp=true
-ReadWritePaths=/var/lib/yunshao /run/yunshao
+# Atlas CANN/ACL requires the host filesystem and shared temporary namespace.
+# Validate CANN/driver IPC compatibility on-device before adding filesystem isolation.
 TimeoutStopSec=30
 
 [Install]

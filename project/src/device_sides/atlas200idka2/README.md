@@ -88,7 +88,7 @@ ctest --test-dir build --output-on-failure
 
 ## 部署与配置边界
 
-- systemd 单元在 `systemd/`；CANN 运行库与算子路径由必需的 `/etc/yunshao/cann.env` 提供，主机身份、MQTT TLS 参数和视频源 URL 分别由 `/etc/yunshao/agent.env`、`/etc/yunshao/classroom-runtime.env` 注入。`cann.env` 必须从目标板已安装的 CANN 环境生成，权限设为 `root:yunshao 0640`；不要依赖登录 shell、Conda 或服务启动前手工 `source`。安装包提供 `udev/99-yunshao-rgn.rules`，将 `/dev/rgn` 设为 `root:HwHiAiUser 0660`；agent/runtime 单元以 `yunshao` 运行并加入 `video`、`HwHiAiUser`、`HwBaseUser` 组。安装后重载 udev 规则并触发现有 `rgn` 节点，然后重启服务。`agent.env` 中的 `YUNSHAO_MQTT_CLIENT_ID` 必须使用 device-service 激活响应的原值，不能从 device_id 本地派生；MQTT 用户名、密码和 CA 同样来自激活/部署流程。
+- systemd 单元在 `systemd/`；CANN 运行库与算子路径由必需的 `/etc/yunshao/cann.env` 提供，主机身份、MQTT TLS 参数和视频源 URL 分别由 `/etc/yunshao/agent.env`、`/etc/yunshao/classroom-runtime.env` 注入。`cann.env` 必须从目标板已安装的 CANN 环境生成，权限设为 `root:yunshao 0640`；不要依赖登录 shell、Conda 或服务启动前手工 `source`。Atlas CANN/ACL 当前不能与 runtime unit 的 `ProtectHome`、`PrivateTmp`、`ProtectSystem`、`ReadWritePaths` 文件系统隔离选项共同工作；这些选项须先在目标板通过 CANN 初始化及固定视频处理验收。unit 仍以非 root `yunshao` 运行，保留 `NoNewPrivileges=true` 并加入 `video`、`HwHiAiUser`、`HwBaseUser` 组。安装包提供 `udev/99-yunshao-rgn.rules`，将 `/dev/rgn` 设为 `root:HwHiAiUser 0660`；安装后重载 udev 规则并触发现有 `rgn` 节点，然后重启服务。`agent.env` 中的 `YUNSHAO_MQTT_CLIENT_ID` 必须使用 device-service 激活响应的原值，不能从 device_id 本地派生；MQTT 用户名、密码和 CA 同样来自激活/部署流程。
 - 模型 profile、流绑定、告警规则分别维护在 `config/models.json`、`config/streams_config.json`、`config/alarm_rules.json`。secret 不写入这些 JSON。
 - `max_loaded_models` 默认 1。只有目标板多模型驻留、内存、延迟和稳定性验证通过后，才提高上限。
 - 关键验证见 [Atlas 边缘运行时 Spec](../../docs/Specification/atlas_edge_runtime/spec.md) 与 [课堂行为检测 Spec](../../docs/Specification/classroom_behavior_detection/spec.md)。

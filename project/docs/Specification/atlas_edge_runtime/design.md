@@ -4,7 +4,7 @@
 
 ## 当前实现与目标
 
-- 当前 `project/src/device_sides/atlas200idka2/` 已有 C++ agent、模型包/事件队列基础能力，以及正并入正式构建的 classroom-runtime、AscendCL 模型插件和媒体 pipeline。工程组织参考用户给出的 AX650 项目，但 AX 芯片 API 不兼容 Atlas。PT、ONNX 和 Ascend 310B4 OM 已存在于 `project/preparation/model_classroom_behavior/`；入库清单和板端加载仍待验证。
+- `project/src/device_sides/atlas200idka2/` 已包含并构建 C++ agent、模型目录/事件队列、classroom-runtime、AscendCL 模型插件和 Atlas 媒体 pipeline。完整源码树已覆盖部署至 Atlas，并在板端重新构建、安装；3 项 CTest 通过，正式持久化 systemd runtime unit 加载 classroom OM 并对合成 H.264 完成 75/75 帧推理、OSD 与编码。工程组织参考用户给出的 AX650 项目，但 AX 芯片 API 不兼容 Atlas。PT、ONNX 和 Ascend 310B4 OM 及其清单均在 `project/preparation/model_classroom_behavior/`。
 - Atlas 已核验为 Ubuntu 22.04/aarch64、CANN 7.0.RC1；有 GCC 11.3、CMake 3.22.1、SQLite 3.37.2、OpenCV 4.5.4、libavformat 58.76.100；没有 Go。板上 MQTT 客户端开发包尚未发现。
 
 ## 方案
@@ -76,6 +76,7 @@ The layout mirrors the reference project’s plugin/manager/config responsibilit
 - TLS 证书/凭据由激活/部署流程安全注入；设备服务重置不重新使用泄露或撤销身份。
 - 两个 systemd 单元均强制加载 `/etc/yunshao/cann.env`。该权限受限文件由运维基于板上 `/usr/local/Ascend/ascend-toolkit/set_env.sh` 准备，至少包含 `LD_LIBRARY_PATH` 及 CANN 算子/运行环境变量；服务不得依赖登录 shell、Conda 或运行时手工 `source`。
 - 两个 systemd 单元以 `yunshao` 非 root 身份运行，并显式加入 `video`、`HwHiAiUser`、`HwBaseUser` 设备组。产品 udev 规则将 `/dev/rgn` 授权给 `HwHiAiUser`，MODE 为 `0660`；不得放宽为任何用户可访问。该节点由设备驱动重建，部署须重新加载 udev 规则并对现有节点触发规则。
+- Atlas 310B4 实测表明 CANN/ACL 初始化依赖进程可见的主机文件系统与共享临时目录：在正式 runtime 的 systemd unit 中启用 `ProtectHome`、`PrivateTmp`、`ProtectSystem=full/strict` 或 `ReadWritePaths` 会导致 `aclInit` 返回 507008；保留 `NoNewPrivileges=true`、非 root 用户及硬件组，同时移除这些文件系统隔离设置后，service 成功处理固定 H.264 视频 75/75 帧。正式 runtime unit 不使用上述未兼容选项；未来若 CANN/驱动版本改变，需先在目标板验证再调整。
 - 部署验收在最小 `PATH` 和 systemd 环境中检查 agent/runtime 的共享库解析；toolkit/driver 路径来自目标板实际安装，不写入模型 JSON 或提交 CANN 机器专属绝对路径。
 - 健康检查分活性与就绪；无模型文件时控制服务可 alive，但算法和整体 NPU readiness 标为 false。
 - 日志带 device_id、request/event/config ID，不带密码、私钥、完整视频 URL 或课堂图片内容。

@@ -16,3 +16,5 @@
 /model_val/reports/*
 !/model_val/reports/release_20261018/
 !/model_val/reports/release_20261018/**
+!/model_val/reports/release_20261020/
+!/model_val/reports/release_20261020/**

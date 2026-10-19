@@ -96,8 +96,9 @@ Atlas 媒体公共接口放在 `include/media/`，实现放在 `src/media/`；�
 - **AC-06.1** Given systemd 启动 agent 和 classroom-runtime，When 两服务加载 CANN，Then 两个单元均读取由运维部署的 `/etc/yunshao/cann.env`；该文件提供与板上 CANN 安装匹配的运行库/算子路径，缺失时 agent/runtime 不得以不完整环境假装就绪。
 - **AC-06.2** Given 服务以非 root 的 `yunshao` 账号读取 CANN 环境文件，When systemd 启动服务，Then 配置文件权限仅允许 root 与 `yunshao` 服务账号读取；干净登录环境下动态依赖可解析，AscendCL 初始化结果进入服务状态/日志。
 - **AC-06.3** Given runtime 使用 Atlas DVPP/VPSS/VENC/OSD 设备节点，When udev 创建设备节点且 systemd 启动服务，Then 仅将所需节点（包括 `/dev/rgn`）授权给 `HwHiAiUser` 设备组，service 单元显式加入 `HwHiAiUser`/`HwBaseUser`/`video`；不将设备节点设为 world-writable，非 root runtime 可创建 Region 并完成媒体帧处理。
+- **AC-06.4** Given Atlas CANN/ACL 在 systemd 下初始化，When 服务单元应用文件系统隔离选项，Then 仅启用已在目标板验证兼容 CANN/驱动 IPC 的选项；未经实机验证不得启用 `ProtectSystem`、`ProtectHome`、`PrivateTmp` 或 `ReadWritePaths`，并保留非 root 用户、`NoNewPrivileges` 和最小硬件设备组约束。
 
-**验证方式**：使用最小 `PATH` 的环境检查 agent/runtime 依赖；通过 systemd 启停两项服务并验证 MQTT 连接及 AscendCL 初始化。
+**验证方式**：使用最小 `PATH` 的环境检查 agent/runtime 依赖；通过 systemd 启停两项服务并验证 MQTT 连接及 AscendCL 初始化。runtime 的 systemd 验证须处理固定视频并检查退出/帧数；任何新增隔离选项须在 Atlas 实机完成相同验证后才可纳入正式 unit。
 
 ## 不变项与兼容要求
 
@@ -126,8 +127,8 @@ Atlas 媒体公共接口放在 `include/media/`，实现放在 `src/media/`；�
 |---|---|---|---|---|---|
 | 总 SPEC §2：设备身份与配置版本 | REQ-01、REQ-02 | device-service、agent | T-01/T-02/T-06/T-07/T-08 | AC-01.1、AC-01.2、AC-01.3、AC-02.1、AC-02.2、AC-02.3、AC-02.5 | Atlas TLS/MQTT 持续连接；device-service 已接受 agent 心跳并更新 `last_seen_at`，配置 ACK 仍待实测 |
 | 总 SPEC §3：事件幂等与 ACK | REQ-04 | agent、event-service | T-04/T-07/T-08 | AC-04.1、AC-04.2、AC-04.3、AC-04.4、AC-04.5、AC-04.6 | 待执行 |
-| PRD §4：Atlas、教室视频与模型 | REQ-03、REQ-05 | Atlas plugin/manager runtime、model catalog、media-service | T-03/T-05/T-06/T-07/T-08 | AC-03.1–03.10、AC-05.1、AC-05.2、AC-05.3 | Atlas CMake/CTest 通过；OM SHA 与清单一致并在板端安装；非 root C++ runtime 对合成 H.264 完成 75/75 帧推理/OSD/编码，RTSP/课堂源和持续性能待验收 |
-| 运维部署：systemd 运行时依赖 | REQ-06 | Atlas agent、classroom-runtime、systemd、udev | T-01/T-06/T-08 | AC-06.1、AC-06.2、AC-06.3 | systemd 干净环境依赖解析通过，agent active；受限 `/dev/rgn` udev 权限下 `yunshao` runtime 完成合成视频处理 |
+| PRD §4：Atlas、教室视频与模型 | REQ-03、REQ-05 | Atlas plugin/manager runtime、model catalog、media-service | T-03/T-05/T-06/T-07/T-08 | AC-03.1–03.10、AC-05.1、AC-05.2、AC-05.3 | 完整工程覆盖部署并在板端 CMake build/CTest 3/3 通过；OM SHA 与清单一致；非 root systemd runtime 对合成 H.264 完成 75/75 帧推理/OSD/编码；真实 RTSP/课堂源、发布和持续性能待验收 |
+| 运维部署：systemd 运行时依赖 | REQ-06 | Atlas agent、classroom-runtime、systemd、udev | T-01/T-06/T-08 | AC-06.1、AC-06.2、AC-06.3、AC-06.4 | 最小环境依赖解析、权限受限 `/dev/rgn`、CANN 环境文件通过；agent active/enabled 且云端心跳新鲜；正式 runtime unit 保留非 root、硬件组和 `NoNewPrivileges`，未使用未经验证的文件系统隔离选项，合成 H.264 75/75 帧通过 |
 
 ## 假设与未决问题
 
