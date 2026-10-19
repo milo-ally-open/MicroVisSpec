@@ -1,0 +1,28 @@
+# 教室行为检测实施任务
+
+> 关联合同：[spec.md](spec.md)；设计：[design.md](design.md)。T 编号仅在本规格组内唯一。
+
+## 任务清单
+
+- [ ] **T-01 活动模型语义接入** — classroom-runtime；读取 Atlas runtime 已激活模型的 ID、版本、输入尺寸、有序类别和加载状态，报告课堂侧模型状态并拒绝不匹配的类别语义；覆盖 REQ-01 / AC-01.1、AC-01.2、AC-01.3；依赖 Atlas 边缘运行时 T-03，不重复实现清单、哈希或激活逻辑。
+- [ ] **T-02 AscendCL 插件与多流推理管理器** — `plugins/` + `src/manager/`；迁入并模块化正式 Demo 的 AscendCL YOLO 推理、类别映射、边框/置信度叠加与 Atlas 媒体通道；实现稳定 `IAIModel` 插件接口、严格校验 `config/models.json`、按 `streams_config.json` 的 model_id 选插件/阈值并按 Atlas 限额加载，分别报告摄像头/NPU/模型/云状态；插件文件、库、实现类和 JSON model_id 使用 `model_` 前缀、领域名和任务后缀，课堂身份为 `model_classroom_behavior_detection` / `ModelClassroomBehaviorDetection`；覆盖 REQ-02 / AC-02.1、AC-02.2、AC-02.3、AC-02.4；依赖本组 T-01 和 Atlas 边缘运行时 T-03。
+- [ ] **T-03 规则配置解析与事件状态机** — agent/runtime；三类禁用默认、参数完整性、阈值/持续/冷却判定、版本 ACK、稳定 event_id、重复帧抑制；覆盖 REQ-03 / AC-03.1、AC-03.2、AC-03.3、AC-03.4、AC-03.6；依赖 T-02、device-service。
+- [ ] **T-04 云端课堂事件准入校验** — device-service 历史规则版本校验 API + event-service 调用；核验 applied 时间、类别、阈值、持续时长和 severity；对明确永久拒绝返回 reason_code，对依赖故障保持重试；覆盖 REQ-03 / AC-03.5；依赖 T-03。
+- [ ] **T-05 课堂数据最小化与证据边界** — 边缘消息 schema、日志、event-service 证据；检查不含身份/跟踪/成绩/专注度字段，普通检测不存储、不截图、不上传，规则命中截图鉴权和 24 小时到期；覆盖 REQ-04 / AC-04.1、AC-04.2；依赖 T-03/T-04。
+- [ ] **T-06 课堂推理/多模型配置/规则自动化集成测试** — 确定性推理输出 fixture + 两个独立 profile 测试配置，覆盖 profile 解析与 model_id 隔离、插件身份命名、类别映射、缺失/失败模型状态、默认关闭、规则参数缺失/越界、未达阈值、持续命中只生成一个事件、规则版本乱序/失效、云端准入和事件负 ACK quarantine；模型包篡改/兼容/独立激活由 Atlas 边缘运行时测试覆盖；覆盖 REQ-01、REQ-02、REQ-03、REQ-04 / AC-01.1、AC-01.2、AC-01.3、AC-02.1、AC-02.2、AC-02.3、AC-03.1、AC-03.2、AC-03.3、AC-03.4、AC-03.5、AC-03.6、AC-04.1、AC-04.2；依赖 T-01–T-05 和 Atlas T-03/T-04。
+- [ ] **T-07 Atlas 实机模型验收与规格回写** — 对已入库 YOLO11n/640 OM 记录 SHA-256、CANN 转换参数，并实测板端加载、内存、推理延迟/帧率/NPU、授权视频输入/输出和断网恢复；固定测试集精度对比不作为本阶段使用前置条件，按需另行运行；覆盖 REQ-01、REQ-02、REQ-03 / AC-01.1、AC-01.2、AC-02.1、AC-02.2、AC-03.1；依赖 T-06 与设备模型包。
+
+## 验收记录
+
+| REQ/AC | 检查方法 | 当前证据 | 状态 |
+|---|---|---|---|
+| REQ-01/AC-01.3 | JSON model_id/manifest/插件库引用检查、Atlas 插件动态加载身份测试 | `model_config_test` 和 `model_plugin_identity_test` 通过；配置 dry-run 通过 | 通过 |
+| REQ-01/AC-01.1–01.2 | 活动模型类别映射与缺失/加载失败状态集成测试 | 基础 catalog 与 runtime 已并入产品树；活动模型服务状态联调待完成 | 未执行 |
+| REQ-02/AC-02.1–02.3 | 多 profile 隔离、活动模型状态、授权固定视频推理与故障恢复测试 | runtime/插件已在 Atlas ARM64 上编译；实际模型安装和视频推理待验收 | 未执行 |
+| REQ-03/AC-03.1–03.5 | 规则状态机、设备 ACK 与服务端规则校验集成测试 | 实现未开始 | 未执行 |
+| REQ-04/AC-04.1–04.2 | 消息 schema、日志字段和证据访问/保留测试 | 实现未开始 | 未执行 |
+
+## 完成摘要
+
+- 边缘运行时代码已进入正式 Atlas 工程；插件命名、配置交叉引用、插件 ABI、agent/runtime 和三项边缘 CTest 已在 Atlas ARM64 构建验证。
+- 用户已确认初始规则全关闭，并选择 YOLO11n/640 工作流；PT/ONNX/OM 已入库。模型活动安装、真实视频推理、云边事件链路和性能/内存数据仍待完成。

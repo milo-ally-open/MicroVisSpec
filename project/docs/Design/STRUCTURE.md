@@ -8,14 +8,14 @@
 
 ## 1. 目标、范围与原则
 
-云哨连接摄像头和运行视觉算法的边缘设备，在平台侧汇聚设备状态、处理后的视频、通用异常事件及处置记录，并在 Web/PWA 中完成查看、告警响应和基础统计。消防通道占用检测用于首发验证，平台数据模型不能依赖某一种算法或场景。[PRD §1、§4](../Analysis/PRD.md)
+云哨连接摄像头和运行视觉算法的边缘设备，在平台侧汇聚设备状态、处理后的视频、通用异常事件及处置记录，并在 Web/PWA 中完成查看、告警响应和基础统计。教室行为检测用于首发验证，平台数据模型不能依赖某一种算法或场景。[PRD §1、§4](../Analysis/PRD.md)
 
 首发以完整业务闭环验收：注册登录 → 登记设备 → 查看状态和画面 → 接收事件与截图 → PWA 通知 → 处置反馈 → 查看基础统计。首发采用个人账号数据边界，不包含成员邀请和共享。首发移动端为 PWA，监控大屏只在桌面 Web 展示；原生应用与 MCP 工具在后续阶段定义。[PRD §4、§6](../Analysis/PRD.md)
 
 | 设计约束 | 架构落点 |
 | --- | --- |
 | 六个业务服务边界 | auth、device、event、media、push 在首发运行；mcp-service 保留边界，系统稳定后启用。 |
-| Go + Gin + GORM，每个业务服务独立容器 | 业务服务分别构建和部署；MediaMTX、Mosquitto、PostgreSQL、Nginx 是独立基础设施容器，不算业务服务。 |
+| Go + Gin + GORM，每个业务服务独立容器 | 业务服务分别构建和部署；Mosquitto、PostgreSQL 是后端 Compose 中的基础设施容器，Nginx 由 Web 客户端的独立 Compose 部署，MediaMTX 是由 media-service 管理文件的宿主机原生进程。 |
 | 最多 12 路并发视频通道 | 首发每台 Atlas 200I DK A2 默认处理并输出 1 路视频；平台最多同时拉取 12 路，支持 2 个桌面端同时观看完整 12 分屏。边缘输出 720p/15 fps/H.264 Baseline，目标 1.5 Mb/s；WebRTC 优先，HLS 回退。 |
 | 设备通信使用 MQTT | Mosquitto 2.x、MQTT 3.1.1、设备独立身份、TLS、最小主题权限、QoS 1；业务事件按事件 ID 去重。[调研决策](../Research/RESEARCH.md) |
 | 截图暂存后端服务器 | 私有文件卷保存图片，上传成功起保留 24 小时，过期删除；事件元数据与处置记录另行保留。 |
@@ -25,34 +25,65 @@
 
 ## 2. 系统边界与整体结构
 
-外部参与者包括平台用户、摄像头、运行边缘代理及视觉算法的设备、浏览器推送服务，以及后续的 AI Agent。首发边缘硬件确定为 Atlas 200I DK A2；上报协议和事件模型保持通用，不绑定某个视觉模型或消防通道场景。[README 首发场景](../../../README.md)
+外部参与者包括平台用户、摄像头、运行边缘代理及视觉算法的设备、浏览器推送服务，以及后续的 AI Agent。首发边缘硬件确定为 Atlas 200I DK A2；上报协议和事件模型保持通用，不绑定某个视觉模型或教室场景。[README 首发场景](../../../README.md)
 
 ```mermaid
 flowchart LR
-    C[摄像头] --> E[边缘设备：采集、推理、事件队列、处理后 RTSP]
-    U[桌面 Web / 手机 PWA] --> N[Nginx：HTTPS、静态资源、API 与媒体入口]
-    E -- MQTT/TLS：状态、事件、命令回执 --> Q[Mosquitto]
-    E -- HTTPS：证据截图、激活 --> N
-    Q --> D[device-service]
-    Q --> V[event-service]
-    N --> A[auth-service]
+    subgraph Client[浏览器端]
+        UI[Vue 3 + TypeScript Web / PWA<br/>Node.js 用于开发与构建]
+        SW[Service Worker：应用壳缓存、Push 展示与点击路由]
+    end
+
+    subgraph Edge[Atlas 200I DK A2 / Ascend 310B4]
+        CAM[授权摄像头 / H.264]
+        RT[C++ classroom-runtime<br/>AscendCL：YOLO11n / 640]
+        AG[C++ agent<br/>systemd 管理]
+        EQ[(SQLite 持久事件 outbox)]
+        CAM --> RT
+        RT <-->|Unix socket：状态、规则配置、命中事件| AG
+        AG --> EQ
+    end
+
+    subgraph Cloud[园区后端：容器化部署]
+        N[Nginx：Web Compose 管理；HTTPS、静态资源、API 与媒体入口]
+        A[auth-service<br/>Go / Gin / GORM]
+        D[device-service<br/>Go / Gin / GORM]
+        V[event-service<br/>Go / Gin / GORM]
+        M[media-service<br/>Go / Gin / GORM]
+        P[push-service<br/>Go / Gin / GORM]
+        Q[Mosquitto 2.x<br/>MQTT 3.1.1 / TLS / QoS 1]
+        X[MediaMTX 原生进程：media-service/mediamtx + mediamtx.yml]
+        DB[(PostgreSQL：服务独立 schema)]
+        FS[(私有截图文件卷：24 小时)]
+        WP[浏览器 Push 服务]
+    end
+
+    UI -->|同源 HTTPS API| N
+    N --> A
     N --> D
     N --> V
-    N --> M[media-service]
-    N --> P[push-service]
-    N -- 受保护的 HLS / WebRTC 信令 --> X[MediaMTX]
-    M -- 流路径配置与状态 --> X
-    X -- 经园区内网拉取处理后 RTSP --> E
-    V -- 可靠的 event.created --> P
-    P --> W[浏览器 Push 服务]
-    W --> U
-    A --> DB[(PostgreSQL：按服务分 schema)]
+    N --> M
+    N --> P
+    AG -->|MQTT/TLS：心跳、事件、回执| Q
+    Q --> D
+    Q --> V
+    D -->|MQTT 命令、期望配置| Q
+    AG -->|HTTPS：激活、规则命中截图| N
+    V -->|事件 + outbox| DB
+    V --> FS
+    V -->|可靠 event.created| P
+    A --> DB
     D --> DB
-    V --> DB
     M --> DB
     P --> DB
-    V --> FS[(私有截图文件卷)]
-    F[后续：AI Agent] -. MCP .-> T[mcp-service：后续启用]
+    RT -->|处理后 RTSP 预览流| X
+    M -->|流路径配置、播放授权| X
+    N -->|受保护的 HLS / WebRTC 信令| X
+    X -->|园区内 WebRTC 媒体| UI
+    P -->|VAPID / Web Push| WP
+    WP --> SW
+    SW --> UI
+    F[后续 AI Agent] -. MCP .-> T[mcp-service：后续启用]
 ```
 
 首发部署固定在单个园区：后端服务器、Atlas 200I DK A2 边缘设备和桌面监控终端处于同一内网或可路由 VLAN。MediaMTX 在内网拉取边缘 RTSP，浏览器 WebRTC 通过内网 UDP 连接 MediaMTX；PWA 从外部通过公开的 Nginx HTTPS 入口查看告警详情和接收推送，手机端没有监控大屏。首发不部署 STUN/TURN，也不开放公网 WebRTC 媒体端口；不在内网的桌面浏览器可通过 HTTPS 尝试 HLS。Mosquitto 仅向内网设备开放 MQTT/TLS；数据库、MediaMTX 控制 API、各 Go 服务内部端口和截图文件卷均不直接暴露。手工登记 IP 只完成资产登记，不能替代 RTSP 网络连通检查。跨园区设备接入需另行增加 VPN 或受认证推流方案，不属于这次单园区 MVP 拓扑。[PRD §5](../Analysis/PRD.md)
@@ -75,19 +106,81 @@ flowchart LR
 | --- | --- | --- |
 | Nginx | 提供 Vue 构建产物、TLS、同源 API 路由、媒体 HTTP 入口和请求鉴权子请求。 | 是 |
 | auth-service、device-service、event-service、media-service、push-service | 各自独立的 Go/Gin 应用容器，使用 GORM 访问自身数据。 | 是 |
-| MediaMTX | 首发拉取边缘处理后的 RTSP 视频，向浏览器提供 WebRTC/HLS；由 media-service 管理流配置和访问。 | 是 |
+| MediaMTX 原生进程 | 官方 `mediamtx` 可执行文件与 `mediamtx.yml` 位于 media-service 目录；拉取 RTSP 并提供 WebRTC/HLS，由 media-service 管理流配置和访问；不进入 Compose。 | 是 |
 | Mosquitto 2.x | 设备 MQTT 消息交换、会话及待传消息的持久化。 | 是 |
 | PostgreSQL | 单实例部署，服务分 schema、账号和迁移；业务服务不能直接读写别人的 schema。 | 是 |
 | mcp-service | 面向 AI Agent 的受控业务能力入口；具体工具、授权与审计以后确定。 | 否 |
 
 首发在园区一台后端服务器上以容器编排部署，截图落在私有文件卷。边缘代理、算法进程和 RTSP 输出运行在 Atlas 200I DK A2 设备，不属于后端容器。单机部署降低首发运维复杂度；服务器仍是单点，数据库与配置通过备份恢复，24 小时截图不做长期备份。
 
+### 2.3 源码与部署文件布局
+
+部署入口与构建文件属于源码树，开发者从源码检出即可准备本地配置并构建完整服务。后端和 Web 分别由 `src/services/docker-compose.yaml` 与 `src/clients/web/docker-compose.yaml` 管理；各 Compose 使用其源码目录作为项目目录，内部路径均相对该目录解析。Atlas 的 agent、模型入库代码和课堂 AI 推理代码均属于 `src/device_sides/atlas200idka2/` 产品工程。
+
+```mermaid
+flowchart TB
+    subgraph WebSource[project/src/clients/web]
+        WebCompose[docker-compose.yaml：独立部署 Web/Nginx]
+        WebDocker[Dockerfile：Node 构建 Vue/PWA，再封装 Nginx 镜像]
+        WebNginx[nginx/：Nginx 主配置与片段]
+        WebApp[src/、public/、package.json、lockfile]
+        WebSecrets[.secret-*：本地 TLS 与敏感 header 文件；Git/Docker 忽略]
+        WebDocker --> WebApp
+        WebCompose --> WebDocker
+        WebDocker --> WebNginx
+    end
+
+    subgraph EdgeSource[project/src/device_sides/atlas200idka2]
+        EdgeConfig[config：models、streams、alarm_rules JSON]
+        EdgeAgent[src/agent：C++ 云边代理与 SQLite outbox]
+        EdgeCommon[include/common + src/common：core.hpp/core.cpp、config.hpp/config.cpp]
+        EdgeManagers[src/manager：配置、流、推理、告警管理器]
+        EdgePlugins[plugins/model_classroom_behavior_detection.cpp：ModelClassroomBehaviorDetection / libmodel_classroom_behavior_detection.so]
+        EdgeMedia[include/media 与 src/media：Atlas DVPP/FFmpeg pipeline 接口与同名实现]
+        EdgeApp[src/main.cpp：classroom-runtime 组装入口]
+        EdgeSystemd[systemd：agent 与 runtime 服务单元]
+        EdgeTests[tests：配置、模型、规则与集成测试]
+        EdgeAgent --> EdgeManagers
+        EdgeAgent --> EdgeCommon
+        EdgeApp --> EdgeManagers
+        EdgeManagers --> EdgePlugins
+        EdgeManagers --> EdgeMedia
+        EdgeManagers --> EdgeConfig
+        EdgeSystemd --> EdgeAgent
+        EdgeSystemd --> EdgeApp
+        EdgeTests --> EdgeManagers
+        EdgeTests --> EdgeApp
+    end
+
+    subgraph ServiceSource[project/src/services]
+        Compose[docker-compose.yaml：后端服务、依赖、端口与卷]
+        EnvTemplate[.env.example：非敏感部署参数]
+        Ops[README：运维命令、机密文件准备、smoke、备份与恢复说明]
+        AuthFiles[auth-service：DB 初始化与账号服务凭据]
+        DeviceFiles[device-service：Mosquitto 配置/初始化和 broker 凭据]
+        MediaFiles[media-service：Go 服务、mediamtx 可执行文件、mediamtx.yml 和媒体凭据]
+        EventPush[event-service、push-service：各自源码和凭据]
+        OpsFiles[备份存放在仓库外；smoke 命令写在 README]
+        LocalOnly[.env、各 *-service 根下 .secret-* 文件：Git/Docker 忽略]
+    end
+
+    Compose --> AuthFiles
+    Compose --> DeviceFiles
+    Compose --> MediaFiles
+    Compose --> EventPush
+    WebCompose --> WebSecrets
+    Ops --> OpsFiles
+    EnvTemplate -.复制后配置.-> LocalOnly
+```
+
+`project/src/services/docker-compose.yaml` 只部署五个 Go 服务、PostgreSQL、Mosquitto 和初始化任务；`project/src/clients/web/docker-compose.yaml` 单独部署 Web/Nginx。后端 Compose 创建默认名为 `yunshao_backend` 的 backend 网络，Web Compose 以 external network 加入；先启动并确认后端健康，再启动 Web。两个 Compose 可分别构建、升级和停止，Web 操作不改变后端容器。`project/src/services` 下的目录清一色为 `*-service`；不建立独立 `postgres/`、`mosquitto/`、`mediamtx/`、`scripts/`、`secrets/` 或 `web-service/` 目录。Postgres 初始化文件归 `auth-service`，备份与恢复按本目录 README 中的运维命令执行；Mosquitto 配置归 `device-service`，MediaMTX 可执行文件与 YAML 归 `media-service`。Web Dockerfile、Nginx 配置、Compose 与运行时 TLS/敏感 header 文件都归 Web 客户端源码目录；机密以 `.secret-*` 命名并由 Git 与 Docker build context 忽略。Atlas 边缘工程内的 `config/models.json` 只存非机密模型 profiles，已校验 OM 包装入设备状态目录，不提交到源码或镜像；推理实现留在 Atlas 工程，`preparation/` 只保留转换/评估和验证工具。其余 service 机密放在各自 `*-service` 根目录。Compose、service 初始化文件与操作文档均使用源码相对路径；运维说明用简洁命令文档，不提供 PowerShell 脚本。
+
 ## 3. 业务服务职责与数据所有权
 
 | 服务 | 负责 | 自有数据 | 不负责 |
 | --- | --- | --- | --- |
 | **auth-service** | 用户名密码注册、登录、登出、旧密码校验后的改密、会话校验。 | 账号、密码哈希、会话。 | 成员邀请、组织权限、设备与事件业务数据。 |
-| **device-service** | 手动登记边缘设备；设备激活与身份关联；设备、摄像头、位置、算法和参数目录；心跳、在线状态、受支持参数的期望/实报版本。 | 设备、摄像头、算法绑定、设备凭据映射和状态。 | 视频转发、告警处置、截图文件。 |
+| **device-service** | 手动登记边缘设备；设备激活与身份关联；设备、摄像头、位置、算法和参数目录；心跳、在线状态、受支持参数及课堂告警规则的期望/实报版本。 | 设备、摄像头、算法绑定、设备凭据映射和状态、不可变配置版本。 | 视频转发、告警处置、截图文件。 |
 | **event-service** | 接收通用事件、核对设备归属、幂等去重、截图关联、按账号查询、详情、状态流转、处置历史、事件统计。 | 事件、证据元数据、处置记录、可靠通知事件。 | 直接发送 Web Push、跨账号全局看板。 |
 | **media-service** | 管理摄像头与媒体路径映射、RTSP 来源和凭据、MediaMTX 配置协调、播放授权与播放状态。 | 流配置、来源凭据、路径映射、配置版本。 | 自行转码或承载媒体包；媒体数据由 MediaMTX 传输。 |
 | **push-service** | PWA 订阅管理、VAPID 密钥、事件通知投递、重试与失效订阅清理。 | 浏览器订阅、投递任务与结果。 | 事件真相、账号登录、原生 App 推送。 |
@@ -99,6 +192,7 @@ flowchart LR
 
 - 浏览器通过同源路径访问各服务：/api/v1/auth、/api/v1/devices、/api/v1/events、/api/v1/media、/api/v1/push。注册和登录是匿名入口；其余浏览器请求由 Nginx 校验会话，服务查询必须再次按账号 ID 限定对象，不能接受前端自行声明的账号 ID。设备激活与截图上传走独立的设备认证入口，不使用浏览器会话。
 - device-service 是设备和摄像头归属的唯一来源。event-service 接收事件时通过受保护的内部查询核对设备、摄像头和账号，并记录当时的元数据快照；media-service 配置流时同样核对摄像头归属。
+- 首发算法为 YOLO11n/640 教室行为检测；device-service 将 `hand-raising`、`reading`、`writing` 三类规则默认全部关闭。event-service 还须通过 device-service 校验命中事件使用的规则版本已在设备生效且数值/等级符合配置；配置验证服务不可用时不 ACK。
 - event-service 保存事件与 outbox 记录于同一数据库事务。后台投递器把 event.created 交给 push-service；push-service 以事件 ID 做收件去重并独立重试推送。首发不增设 Kafka、NATS 或另一个业务消息总线。
 - auth-service 将显式登出或改密导致的会话撤销与 session.revoked outbox 记录同事务保存，再可靠通知 push-service 停用对应订阅、media-service 终止对应播放会话。普通登录会话自然过期时，已同意的 Push 订阅仍可继续接收该账号告警；点击通知后必须重新登录。浏览器换账号时将同一个订阅 endpoint 重新绑定到新账号，避免继续推送旧账号内容。
 - 服务间请求使用独立的服务身份和内网路由，不接受客户端伪造的内部身份头；失败采用超时、重试及补偿。设备控制和事件上报使用 MQTT，业务服务之间不以设备主题充当通用集成接口。
@@ -132,6 +226,7 @@ PWA 与 Web 共用页面和路由。生产环境使用 HTTPS、manifest、可从
 2. 平台生成一次性激活凭据，现场人员把它配置到边缘代理。边缘代理主动通过 HTTPS 向 device-service 完成激活并领取独立的 MQTT 身份；凭据只显示一次，过期或遗失需重新签发。此流程不要求平台先通过 SSH 连入设备。
 3. 边缘代理以 MQTT/TLS 发送心跳、运行状态、摄像头与算法实报配置。device-service 根据最后心跳时间计算在线状态，并把“设备在线”“算法运行”和“视频可播放”分别展示，不用一个布尔值混淆三种状态。心跳周期及离线阈值是可配置运维参数。
 4. 对设备支持的算法参数，device-service 保存期望配置版本，通过 MQTT 下发命令；边缘代理返回应用结果与实报版本。超时或失败显示未生效，不把“命令已发出”等同于“算法已更新”。参数可编辑的范围由设备上报的能力和算法参数约束决定；首发优先实现查看和已有能力支持的配置。
+5. 首发课堂规则配置按类别独立启用；新设备默认全部关闭。启用时必须设置置信度阈值、持续时间、冷却时间及事件等级；只有收到设备对相应版本的 applied ACK 后，该版本规则才能触发业务事件。
 
 MQTT 使用独立设备身份和最小发布/订阅权限。QoS 1 只保证至少一次交付，服务端消费和设备命令均需幂等；设备离线时边缘代理须有有界本地队列与重试机制。Mosquitto 持久化和持久会话要显式配置并监控积压，不能把 broker 的 PUBACK 当作业务事件已落库。[MQTT 3.1.1](https://docs.oasis-open.org/mqtt/mqtt/v3.1.1/mqtt-v3.1.1.html)、[Mosquitto 配置](https://mosquitto.org/man/mosquitto-conf-5.html)
 
@@ -199,7 +294,7 @@ sequenceDiagram
     Browser->>Event: 登录后打开事件详情
 ```
 
-边缘上报的通用事件至少包含稳定 event_id、设备/摄像头标识、事件类型、发生时间、危险等级、位置线索和证据状态。event-service 以设备 ID + event_id 建唯一约束；重复到达返回相同业务结果。针对同一持续异常反复触发的情况，可在事件类型、摄像头和目标/区域维度设置抑制窗口，但不能把相邻的独立事件误并为一条。事件同时记录边缘发生时间和平台接收时间，并保留算法版本与原始事件类型，便于排查时钟偏移及算法变化。
+边缘上报的通用事件至少包含稳定 event_id、设备/摄像头标识、事件类型、发生时间、危险等级、位置线索和证据状态。首发课堂事件还包含行为类别、置信度、观测持续时间与已应用规则配置版本。普通帧检测只绘制在实时预览上，不持久化、不上报；规则默认关闭。event-service 先核验设备身份和配置版本，再以设备 ID + event_id 建唯一约束；重复到达返回相同业务结果。一次持续规则触发只生成一个事件 ID，不把相邻独立触发模糊合并。事件同时记录边缘发生时间和平台接收时间，并保留算法、规则版本与原始事件类型，便于排查时钟偏移及配置变化。
 
 截图通过设备认证的 HTTPS 单独上传，按 event_id 与事件关联；列表与详情可先显示“证据上传中”，失败后可重试或明确显示缺失。event-service 限制图片大小、格式与访问路径，文件写入私有卷，数据库保存相对路径、校验信息、上传时间与过期时间。截图从成功上传起保存 24 小时；过期后即使清理任务尚未删掉文件，鉴权接口也不再返回图片，详情页显示“截图已过期”，但事件和处置记录仍可查看。文件写入与数据库事务无法原子提交，定时任务清理孤儿文件和过期截图。
 
@@ -249,7 +344,7 @@ event-service 维护待处置 → 处理中 → 已解除/误报的状态流转�
 
 ## 8. 运行、故障与交付顺序
 
-首发部署由 Nginx、五个 Go 服务、MediaMTX、Mosquitto 和 PostgreSQL 构成。容器使用固定版本镜像和独立持久化卷；各服务提供存活与就绪探针。园区内网须允许 Atlas 200I DK A2 访问 MQTT/TLS、后端拉取边缘 RTSP、桌面终端连接 MediaMTX UDP 8189；Nginx HTTPS 面向手机 PWA，push-service 可出站连接浏览器推送服务。数据库迁移由对应服务负责，发布顺序先兼容旧字段、再切换调用方、最后清理旧字段。单机首发定期备份 PostgreSQL 及 MediaMTX/Mosquitto 必要配置，并实际演练恢复；截图按 24 小时过期规则管理，不做长期备份。[PRD 风险](../Analysis/PRD.md)
+首发部署由两个独立 Compose 项目和一个原生媒体进程组成：Web Compose 位于 `src/clients/web/docker-compose.yaml`，运行 Nginx 与 Vue/PWA；后端 Compose 位于 `src/services/docker-compose.yaml`，运行五个 Go 服务、Mosquitto 和 PostgreSQL；MediaMTX 由 media-service 目录的二进制和 YAML 原生运行。Web Compose 加入后端 Compose 创建的稳定命名 backend network，两个 Compose 分别构建、启停和升级；部署顺序先准备并启动 MediaMTX、启动后端并确认健康，再启动 Web。容器使用独立持久化卷；Go 服务提供存活与就绪探针。园区内网须允许 Atlas 200I DK A2 访问 MQTT/TLS、后端拉取边缘 RTSP、桌面终端连接 MediaMTX UDP 8189；Nginx HTTPS 面向手机 PWA，push-service 可出站连接浏览器推送服务。数据库迁移由对应服务负责，发布顺序先兼容旧字段、再切换调用方、最后清理旧字段。单机首发定期备份 PostgreSQL 及 Mosquitto 必要配置，并实际演练恢复；截图按 24 小时过期规则管理，不做长期备份。[PRD 风险](../Analysis/PRD.md)
 
 | 故障 | 用户可见表现与恢复策略 |
 | --- | --- |
@@ -269,6 +364,7 @@ event-service 维护待处置 → 处理中 → 已解除/误报的状态流转�
 | --- | --- | --- |
 | 个人账号及隔离 | auth-service 会话；每个业务服务按 account_id 授权。 | [PRD §3–§5](../Analysis/PRD.md) |
 | 设备登记、状态、算法参数 | device-service + MQTT 边缘代理；参数期望/实报版本。 | [PRD §3–§4](../Analysis/PRD.md) |
+| 首发教室行为与异常规则 | YOLO11n/640 Atlas runtime；三类规则初始禁用；event-service 校验已应用的规则配置版本后接收事件。 | [PRD §4](../Analysis/PRD.md)、[课堂检测规格](../Specification/classroom_behavior_detection/spec.md) |
 | Atlas 200I DK A2 与 12 路实时视频 | 每台设备默认 1 路 720p/15 fps H.264 预览；media-service 控制面 + MediaMTX 媒体面，WebRTC/HLS 播放。 | [PRD §4](../Analysis/PRD.md)、[调研决策 §3](../Research/RESEARCH.md) |
 | 通用事件、处置和截图 | event-service + 私有文件卷；event_id 幂等、24 小时截图和独立的处置历史。 | [PRD §3–§5](../Analysis/PRD.md) |
 | 手机后台告警 | push-service + PWA service worker；event outbox 可靠投递。 | [PRD §4](../Analysis/PRD.md) |
@@ -282,6 +378,7 @@ event-service 维护待处置 → 处理中 → 已解除/误报的状态流转�
 | 决策 | 首发定案 |
 | --- | --- |
 | 边缘硬件与视频 | 华为 Atlas 200I DK A2（Ascend 310B4）；模型以 CANN ATC 转换为 OM，端侧由 AscendCL 推理，视频编码使用套件提供的 VENC 接口。单路 720p/15 fps/H.264 Baseline、目标 1.5 Mb/s 和多路容量均为首发实机验收目标。 |
+| 首发视觉场景 | YOLO11n/640 教室行为检测，类别为举手/阅读/书写；告警规则均默认关闭，显式配置并由设备确认应用后才产生异常事件；权重与 OM 后续提供。 |
 | 试点网络 | 单园区可路由内网，MediaMTX 拉取 RTSP，内网 WebRTC UDP 8189；园区外桌面回退 HTTPS HLS；不部署 STUN/TURN。 |
 | 截图与事件记录 | 截图上传后保存 24 小时；已闭环事件及处置记录保留 90 天，未闭环事件持续保留。 |
 | 分析大屏 | 今天/近 7 天/近 30 天；设备与事件概览、事件趋势、危险等级、类型、高发位置和处置状态，按账号聚合。 |
@@ -290,3 +387,4 @@ event-service 维护待处置 → 处理中 → 已解除/误报的状态流转�
 | --- | --- |
 | 2026-10-04 | 基于 PRD、调研决策和已确认的六服务方向，建立首发 Web/PWA、边缘代理、媒体、事件、通知、数据所有权、部署与故障处理设计；MCP 标记为后续。 |
 | 2026-10-15 | 将首发边缘平台更新为华为 Atlas 200I DK A2（Ascend 310B4）；视频编码、多路吞吐及观看容量保留为实机验收目标。 |
+| 2026-10-18 | 首发场景切换为教室行为检测，采用 YOLO11n/640 规格；告警规则默认关闭，增加设备配置版本与事件准入校验；消防通道移出首发。 |

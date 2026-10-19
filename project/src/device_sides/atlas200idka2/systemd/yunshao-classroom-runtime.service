@@ -1,0 +1,22 @@
+[Unit]
+Description=Yunshao Atlas classroom behavior runtime
+After=network-online.target yunshao-agent.service
+Wants=network-online.target yunshao-agent.service
+
+[Service]
+Type=simple
+User=yunshao
+Group=yunshao
+EnvironmentFile=-/etc/yunshao/classroom-runtime.env
+ExecStart=/usr/local/bin/yunshao-classroom-runtime
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/yunshao /run/yunshao
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

@@ -38,7 +38,7 @@
 
 ## 一、任务目标
 
-在 `project/src/services/media-service/` 实现独立的 Go/Gin/GORM 控制面，使 Atlas 200I DK A2 处理后的 RTSP 流经 MediaMTX 向桌面浏览器提供 WebRTC，失败时回退 HTTPS HLS。完整链路为：
+在 `project/src/services/media-service/` 实现独立的 Go/Gin/GORM 控制面，并将 MediaMTX 原生可执行文件与 `mediamtx.yml` 配置保存在同一目录；不将 MediaMTX 打包为自定义 Docker 镜像或 Compose 容器，也不增加包装启动器。运维直接使用该二进制和配置文件启动；本地含凭据配置文件由 Git 忽略，仓库只提供无敏感值的示例配置。Atlas 200I DK A2 处理后的 RTSP 流经 MediaMTX 向桌面浏览器提供 WebRTC，失败时回退 HTTPS HLS。完整链路为：
 
 **摄像头归属 → 流来源登记 → MediaMTX 配置/拉流 → 账号授权与观看配额 → WebRTC/HLS 播放 → 状态与故障反馈**。
 
@@ -97,10 +97,11 @@
 | `POST /api/v1/media/viewer-leases/{leaseId}/renew` | 播放期间每 15 秒续租，服务端租约有效期 30 秒。 |
 | `DELETE /api/v1/media/viewer-leases/{leaseId}` | 页面关闭、切换流或主动停止播放时释放观看连接；重复释放成功。 |
 | `/media/{streamId}/whep`、`/media/{streamId}/index.m3u8` | Nginx 代理到 MediaMTX；WHEP 信令、HLS 播放列表及每个分片都经过账号与摄像头归属鉴权。 |
+| `GET /internal/v1/media/authorize-playback` | 仅 Nginx 的内部授权子请求可调用；读取经 auth-service 校验后覆写的 `X-Account-ID`、`X-Session-ID` 和原始 `X-Original-URI`，不接收请求体。URI 必须是 `/media/{streamId}/...`，可带 `lease_id` 查询参数；每个 HLS 子资源仍按当前会话、流和有效租约检查。 |
 
 ### 4.2 实现任务
 
-1. Nginx 对媒体请求调用 media-service 内部鉴权入口；该入口验证登录会话、账号、摄像头、流状态和观看租约。Nginx 清除客户端伪造的身份头；MediaMTX 直接 HTTP 读入口仅允许经受控代理访问，并使用内部身份，不能保留默认匿名可读配置。[MediaMTX 鉴权](https://mediamtx.org/docs/features/authentication)
+1. Nginx 对媒体请求先调用 auth-service 会话/Origin/CSRF 授权子请求，再将已验证会话身份及原始媒体 URI 交给 media-service 的 `GET /internal/v1/media/authorize-playback`；该入口验证账号、stream_id、会话和有效观看租约。Nginx 清除客户端伪造的身份头；MediaMTX 直接 HTTP 读入口仅允许经受控代理访问，并使用内部身份，不能保留默认匿名可读配置。[MediaMTX 鉴权](https://mediamtx.org/docs/features/authentication)
 2. 全平台最多同时活动 12 路来源、24 个观看连接；一个完整 12 分屏桌面会话占 12 个连接。并发申请以数据库事务或等效原子操作限制，不能两个请求同时越过额度；租约超时、页面关闭和 MediaMTX 会话对账均可回收连接。
 3. 已建立的 WebRTC 媒体连接不会因之后一次 HTTP 鉴权失败而自动结束。经受限 `/internal/v1/inbox` 幂等接收 auth-service 的 `session.revoked` 后，media-service 结束关联的播放会话；租约到期也停止播放。HLS 每次新请求仍需鉴权。
 4. 前端 HLS 播放器使用同源受保护地址，并让分片请求携带会话 Cookie；不要用无法附带受控鉴权信息的公开 iframe。WHEP 信令由同源 HTTPS 发起，媒体 UDP 连接单独处理。
@@ -130,7 +131,7 @@
 
 ### 5.2 实现任务
 
-1. 在园区内网配置 MediaMTX ICE 地址与 UDP 8189，容器网络正确映射；首发不部署 STUN/TURN，也不向公网开放 WebRTC UDP。Nginx 以 HTTPS 提供信令和 HLS。[MediaMTX WebRTC 网络配置](https://mediamtx.org/docs/features/webrtc-specific-features)
+1. MediaMTX 原生进程直接监听宿主机 UDP 8189；仅向配置的园区网段开放该端口。MediaMTX API、RTSP、HLS 与 WHEP 端口通过宿主机网关供本机 Compose 容器调用，宿主机防火墙拒绝其他来源。首发不部署 STUN/TURN，也不向公网开放 WebRTC UDP。Nginx 以 HTTPS 提供信令和 HLS。[MediaMTX WebRTC 网络配置](https://mediamtx.org/docs/features/webrtc-specific-features)
 2. `/monitor` 页面每格先尝试 WebRTC，连接失败再用 HLS；UI 区分连接中、设备离线、RTSP 拉流失败、编码不兼容、UDP 不通、HLS 回退和额度已满。
 3. 两个完整 12 分屏在园区内网观看时，12 路约为 18 Mb/s 入站净载荷、36 Mb/s 服务端下行净载荷；后端使用千兆内网接口。若两个大屏经公网 HLS，园区公网可用上行至少 100 Mb/s。实际联调检查 CPU、内存、带宽和浏览器解码负载，不把参数表当作已测性能结果。
 4. 手机 PWA 不呈现监控大屏；历史告警依靠 event-service 的事件和 24 小时截图，不在本服务提供录像回放。
@@ -162,4 +163,5 @@
 
 | 日期 | 变更 |
 | --- | --- |
+| 2026-10-19 | 明确 Nginx 无请求体授权子请求通过 `X-Original-URI` 调用内部 GET 播放校验，并要求先由 auth-service 验证会话及写请求 CSRF。 |
 | 2026-10-04 | 从总技术规格拆分 media-service 实现任务，明确流配置、MediaMTX 对账、观看授权与配额、Atlas 200I DK A2 视频参数及阶段验收。 |

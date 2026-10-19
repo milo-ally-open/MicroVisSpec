@@ -1,0 +1,27 @@
+[Unit]
+Description=Yunshao Atlas 200I DK A2 agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=yunshao
+Group=yunshao
+EnvironmentFile=/etc/yunshao/agent.env
+ExecStart=/usr/local/bin/yunshao-agent
+Restart=on-failure
+RestartSec=3
+RuntimeDirectory=yunshao
+RuntimeDirectoryMode=0750
+StateDirectory=yunshao
+StateDirectoryMode=0750
+UMask=0027
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/yunshao /run/yunshao
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

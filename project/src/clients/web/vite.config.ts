@@ -6,6 +6,9 @@ export default defineConfig({
   plugins: [
     vue(),
     VitePWA({
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
       registerType: 'prompt',
       includeAssets: ['apple-touch-icon.png'],
       manifest: {
@@ -39,10 +42,8 @@ export default defineConfig({
           },
         ],
       },
-      workbox: {
+      injectManifest: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}'],
-        // Keep API, media streams, and MCP traffic network-only.
-        navigateFallbackDenylist: [/^\/api\//, /^\/media\//, /^\/mcp\//],
       },
     }),
   ],

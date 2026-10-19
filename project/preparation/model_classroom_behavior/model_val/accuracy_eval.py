@@ -146,6 +146,38 @@ def preprocess(image: np.ndarray, size: int) -> tuple[np.ndarray, tuple[float, i
     return np.ascontiguousarray(tensor[None]), (scale, left, top)
 
 
+def preprocess_nv21(image: np.ndarray, size: int) -> tuple[np.ndarray, tuple[float, int, int]]:
+    """Build the static-AIPP input contract: packed Y followed by interleaved VU."""
+    if size <= 0 or size % 2:
+        raise ValueError("NV21 input size must be a positive even number")
+    height, width = image.shape[:2]
+    scale = min(size / width, size / height)
+    resized_w = int(np.floor(width * scale + 0.5))
+    resized_h = int(np.floor(height * scale + 0.5))
+    left = round((size - resized_w) / 2 - 0.1)
+    top = round((size - resized_h) / 2 - 0.1)
+    right, bottom = size - resized_w - left, size - resized_h - top
+    resized = cv2.resize(image, (resized_w, resized_h), interpolation=cv2.INTER_LINEAR)
+    canvas = cv2.copyMakeBorder(resized, top, bottom, left, right, cv2.BORDER_CONSTANT, value=(114, 114, 114))
+    i420 = cv2.cvtColor(canvas, cv2.COLOR_BGR2YUV_I420).reshape(-1)
+    y_bytes = size * size
+    chroma_bytes = y_bytes // 4
+    y_plane = i420[:y_bytes]
+    u_plane = i420[y_bytes:y_bytes + chroma_bytes].reshape(size // 2, size // 2)
+    v_plane = i420[y_bytes + chroma_bytes:y_bytes + 2 * chroma_bytes].reshape(size // 2, size // 2)
+    vu_plane = np.empty((size // 2, size), dtype=np.uint8)
+    vu_plane[:, 0::2] = v_plane
+    vu_plane[:, 1::2] = u_plane
+    nv21 = np.concatenate((y_plane, vu_plane.reshape(-1)))
+    return np.ascontiguousarray(nv21.reshape(1, -1)), (scale, left, top)
+
+
+def preprocess_for_backend(image: np.ndarray, size: int, backend: str) -> tuple[np.ndarray, tuple[float, int, int]]:
+    if backend == "om":
+        return preprocess_nv21(image, size)
+    return preprocess(image, size)
+
+
 def decode(output: np.ndarray, classes: int, size: int, original: tuple[int, int], pad: tuple[float, int, int], conf: float, iou: float) -> np.ndarray:
     values = np.asarray(output)
     while values.ndim > 2:
@@ -411,7 +443,7 @@ def main() -> None:
         image = read_image(image_path)
         if image is None:
             raise ValueError(f"Cannot decode image: {image_path}")
-        batch, pad = preprocess(image, args.imgsz)
+        batch, pad = preprocess_for_backend(image, args.imgsz, args.backend)
         if not records:
             for _ in range(args.warmup):
                 infer(batch)
@@ -429,7 +461,11 @@ def main() -> None:
         "split": args.split, "images": len(images), "image_size": args.imgsz,
         "confidence_threshold": args.conf, "nms_iou_threshold": args.iou,
         "metric_implementation": "Ultralytics ap_per_class / box_iou" if ap_per_class is not None else "local fallback",
-        "preprocess": "BGR decode; RGB CHW float32 /255; 114 letterbox; fixed square input",
+        "preprocess": (
+            "BGR decode; 114 letterbox; NV21 YUV420SP_U8 (Y then interleaved VU); static AIPP converts to normalized RGB"
+            if args.backend == "om"
+            else "BGR decode; RGB CHW float32 /255; 114 letterbox; fixed square input"
+        ),
         "metrics": evaluate_metrics(records, class_names),
     }
     args.output.mkdir(parents=True, exist_ok=True)

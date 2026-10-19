@@ -20,9 +20,17 @@ project/docs/Specification/
 ├── event_service/
 ├── media_service/
 ├── push_service/
-├── fire_access_obstruction_detection/
+├── platform_deployment/
+├── atlas_edge_runtime/
+├── classroom_behavior_detection/
+├── web_pwa_client/
+├── fire_access_obstruction_detection/  # 后续场景/历史规格，非首发
 └── project_spec_workflow/
 ```
+
+当前首发产品范围为教室行为检测，详见 [课堂行为检测](classroom_behavior_detection/)。Atlas 云边代理与模型运行时见 [Atlas 边缘运行时](atlas_edge_runtime/)，Web/PWA 交付见 [web_pwa_client](web_pwa_client/)。[消防通道规格](fire_access_obstruction_detection/) 保留为后续场景历史，不属于当前验收或实现顺序。
+
+首发多服务 Compose、Nginx、PostgreSQL、Mosquitto 与 MediaMTX 整合部署见 [平台部署与整合运行](platform_deployment/)。
 
 各组按需维护四份文档。轻量工作可以只改 `proposal.md`；没有新增技术选择时，`design.md` 写明沿用哪份合同即可。新服务/领域组可运行 Skill 的 `init_spec_group.py`，从仓库模板建立初始结构；脚本拒绝覆盖已有目录。
 

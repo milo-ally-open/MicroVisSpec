@@ -139,6 +139,14 @@
 4. 收到对应 ACK 与实报版本后才标记 `applied`；失败、超时、设备离线或版本不符保留 `pending`/`failed` 状态和可解释原因，UI 不宣称配置已生效。迟到 ACK 必须核对命令与期望版本，不能覆盖更新版本的结果。
 5. 发布失败通过持久命令记录重试或对账，服务恢复后继续处理；不因 MQTT QoS 1 投递成功就认定边缘执行成功。
 
+### 5.2.1 首发课堂告警规则配置
+
+`classroom_behavior_detection` 的 `parameters.classroom_rules` 包含固定类别 `hand-raising`、`reading`、`writing`。新 assignment 和完整配置快照必须将三类的 `enabled` 初始化为 `false`。每类启用需显式传入 `confidence_threshold`（0–1）、`minimum_duration_ms`（正整数）、`cooldown_ms`（非负整数）和 `severity`（`low|medium|high|critical`）；缺失字段、类别未知或值越界时整个配置拒绝，不改变已生效版本。保存成功只代表产生新的期望版本，设备 ACK 前状态仍为 `pending`。
+
+配置版本须保留不可变快照及设备实际应用状态/时间，以供 event-service 校验延迟上报的规则事件。新增仅内网接口 `POST /internal/v1/devices/{deviceId}/classroom-events/validate`：服务凭据验证后接收 `camera_id`、`algorithm_version`、`rule_config_version`、`behavior_class`、`confidence`、`observed_duration_ms`、`severity`、`occurred_at`。有效请求返回 `200`、`allowed=true`、可信 `account_id`、设备/摄像头名称与地点快照及校验的配置版本。设备/摄像头不存在或已停用返回 `404`；规则禁用、未应用、越阈/时长/等级不符返回 `422` 与稳定 reason_code；服务凭据错误返回 `401/403`；数据库或历史版本暂时不可用返回 `503`。event-service 仅对 `allowed=true` 继续入库；422 生成终结 `rejected` 应用 ACK，503 不终结 ACK 并允许边缘重试。边缘不自报可信 `account_id`。
+
+设备通过 HTTPS 向 event-service 上传截图时，以激活时签发的 MQTT username/password 作为 HTTP Basic 设备凭据。event-service 不持有设备密码库，而是以内网服务凭据调用 `POST /internal/v1/devices/{deviceId}/http-authenticate`，请求只含 Basic username/password；device-service 校验设备仍启用、credential 未撤销及密码哈希，返回最小的 `allowed`、可信 `device_id` 结果。停用设备立即使该验证失败。内部接口不得返回凭据、哈希或 MQTT 其他字段；认证失败与数据库暂不可用分别返回 401 和 503。日志不得记录 Basic Authorization 或请求体。
+
 ### 5.3 交付物与阶段验收
 
 - 交付 MQTT 消息 schema、参数能力和命令状态 API、边缘代理交互示例。

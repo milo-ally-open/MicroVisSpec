@@ -1,0 +1,1 @@
+<template><main class="not-found"><span class="eyebrow">404 · 页面不存在</span><h1>找不到这个页面</h1><p>地址可能已失效，返回工作台继续查看。</p><RouterLink class="button button--primary" to="/">返回总览</RouterLink></main></template>

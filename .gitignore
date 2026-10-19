@@ -53,5 +53,14 @@ venv/
 /project/preparation/model_vehicle_detection/model_val/reports/
 /project/preparation/model_vehicle_detection/model_convert/artifacts/
 
+# Local source-tree deployment configuration, secrets, and database backups
+/project/src/services/.env
+/project/src/services/*-service/.secret-*
+/project/src/services/media-service/mediamtx
+/project/src/services/media-service/mediamtx.exe
+/project/src/services/media-service/mediamtx.yml
+/project/src/services/auth-service/*.dump
+/project/src/clients/web/.secret-*
+
 # Local vendor SDK archives
 readme/assets/Ascend-hdk-310b-sdk-soc_23.0.rc3.zip

@@ -99,7 +99,7 @@ push-service 在内网 `/internal/v1/inbox` 接收经服务凭据认证的 `even
 ### 4.2 实现任务
 
 1. 校验生产者身份、消息版本和必需字段，在同一数据库事务中写 inbox 和待投递记录。重复 `(producer,event_id,event_type)` 返回成功，但不重复创建投递任务。
-2. `event.created` 负载仅接受由 event-service 提供的 `account_id`、事件 ID、地点、危险等级、发生时间和站内详情路径；只为该账号当前有效订阅创建 delivery。不得直接读取 event-service 数据库或相信来自浏览器的事件归属。
+2. `event.created` 负载仅接受由 event-service 提供的 `account_id`、事件 ID、地点、危险等级、发生时间和站内详情路径；只为该账号当前有效订阅创建 delivery。首发仅对 device-service 校验通过的已启用课堂异常规则事件创建通知；不得直接读取 event-service 数据库或相信来自浏览器的事件归属。
 3. `session.revoked` 根据 `account_id` 与 `session_id` 停用来源会话对应订阅，并取消尚未发出的投递。重复撤销幂等；会话自然到期不由本服务自动解释为撤销事件。
 4. 为乱序到达的撤销/新订阅和并发投递定义数据库事务顺序：发送前重新检查订阅是否仍有效，停用后不再领取新的任务；账号切换需同时处理旧绑定与待发送任务。
 5. inbox 和 delivery 记录保留必要状态，便于生产者重投、服务重启恢复和查明失败原因；内部接口只在服务网络开放。

@@ -3,3 +3,10 @@
 .env.*
 *.local
 *.log
+.secret-*
+.env
+.env.*
+*.dump
+mediamtx
+mediamtx.exe
+mediamtx.yml

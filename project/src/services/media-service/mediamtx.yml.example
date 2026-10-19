@@ -1,0 +1,45 @@
+logLevel: info
+logDestinations: [stdout]
+
+api: yes
+apiAddress: :9997
+metrics: no
+pprof: no
+
+authMethod: internal
+authInternalUsers:
+  - user: media-service
+    pass: __MEDIAMTX_API_PASSWORD__
+    ips: []
+    permissions:
+      - action: api
+  - user: nginx-media-reader
+    pass: __MEDIAMTX_READER_PASSWORD__
+    ips: []
+    permissions:
+      - action: read
+      - action: playback
+  - user: any
+    pass:
+    ips: [127.0.0.1, ::1]
+    permissions:
+      - action: api
+
+rtsp: yes
+rtspAddress: :8554
+rtmp: no
+hls: yes
+hlsAddress: :8888
+hlsEncryption: no
+hlsAllowOrigins: ["__PUBLIC_ORIGIN__"]
+hlsVariant: fmp4
+hlsSegmentCount: 7
+webrtc: yes
+webrtcAddress: :8889
+webrtcEncryption: no
+webrtcAllowOrigins: ["__PUBLIC_ORIGIN__"]
+webrtcLocalUDPAddress: :8189
+webrtcLocalTCPAddress: ""
+webrtcAdditionalHosts: [__WEBRTC_ADDITIONAL_HOSTS__]
+srt: no
+moq: no

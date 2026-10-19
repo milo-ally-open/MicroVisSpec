@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "runtime": {
+    "npu_device_id": 0,
+    "max_loaded_models": 1,
+    "outbox_max_bytes": 104857600,
+    "max_event_payload_bytes": 65536,
+    "event_retry_base_seconds": 2,
+    "event_retry_max_seconds": 300,
+    "capabilities": {
+      "formats": ["om"],
+      "backends": ["ascendcl"],
+      "model_families": ["yolo11"],
+      "decoders": ["yolo_v11"],
+      "pixel_formats": ["nv21"],
+      "preprocessing": ["static_aipp"],
+      "soc_versions": ["Ascend310B4"],
+      "input_shapes": [{"width": 640, "height": 640}]
+    }
+  },
+  "models": [
+    {
+      "model_id": "model_classroom_behavior_detection",
+      "algorithm_key": "classroom_behavior_detection",
+      "format": "om",
+      "model_file": "model.om",
+      "soc_version": "Ascend310B4",
+      "model_family": "yolo11",
+      "backend": "ascendcl",
+      "decoder": "yolo_v11",
+      "plugin_library": "libmodel_classroom_behavior_detection.so",
+      "enabled": true,
+      "input": {
+        "width": 640,
+        "height": 640,
+        "pixel_format": "nv21",
+        "preprocessing": "static_aipp"
+      },
+      "classes": [
+        "hand-raising",
+        "reading",
+        "writing"
+      ],
+      "confidence_threshold": 0.25,
+      "nms_threshold": 0.45,
+      "max_detections": 300
+    }
+  ]
+}

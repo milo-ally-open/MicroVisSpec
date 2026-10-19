@@ -1,6 +1,6 @@
 # 云哨边缘智枢首发技术规格（SPEC）
 
-> 状态：首发技术规格草案，可用于拆分实现任务；尚未表示代码已实现或已通过验收。
+> 状态：首发技术规格与验收合同；可拆分实施任务，尚未表示代码已实现或已通过验收。
 >
 > 日期：2026-10-04。
 >
@@ -8,17 +8,20 @@
 
 ## 1. 范围与需求追踪
 
-首发运行 auth、device、event、media、push 五个 Go 业务服务，以及 Nginx、PostgreSQL、Mosquitto 和 MediaMTX。mcp-service 仅保留目录和边界，不构建或部署。六个服务目录目前只有 Go 源码目录占位、Dockerfile 占位和 `.dockerignore`；没有可运行的后端实现。[架构设计 §1–§3](../Design/STRUCTURE.md)
+首发运行 auth、device、event、media、push 五个 Go 业务服务，以及 Nginx、PostgreSQL、Mosquitto 和 MediaMTX。mcp-service 仅保留目录和边界，不构建或部署。五个首发 Go 服务现有模块、HTTP handler、数据库迁移、健康接口、单测/集成测试和多阶段 Dockerfile；各服务完整验收状态以对应 `tasks.md` 和平台部署任务记录为准。[架构设计 §1–§3](../Design/STRUCTURE.md)
 
-本文件是跨服务的共同合同。各服务按以下阶段任务书逐项实施与验收；mcp-service 尚待设计，本期不编写实现任务书。
+本文件是跨服务的共同合同。各服务按对应规格组 `proposal → spec → design → tasks` 逐项实施与验收；五个 Go 服务的服务内集成测试均单独列入各自 `tasks.md`。边缘、课堂场景和 Web/PWA 的实现与验收任务见同目录领域组；mcp-service 尚待设计，本期不编写实现任务书。
 
 | 服务 | 实现任务书 |
 | --- | --- |
-| auth-service | [auth_service_spec.md](../Specification/auth_service_spec.md) |
-| device-service | [device_service_spec.md](../Specification/device_service_spec.md) |
-| event-service | [event_service_spec.md](../Specification/event_service_spec.md) |
-| media-service | [media_service_spec.md](../Specification/media_service_spec.md) |
-| push-service | [push_service_spec.md](../Specification/push_service_spec.md) |
+| auth-service | [auth_service/tasks.md](../Specification/auth_service/tasks.md) |
+| device-service | [device_service/tasks.md](../Specification/device_service/tasks.md) |
+| event-service | [event_service/tasks.md](../Specification/event_service/tasks.md) |
+| media-service | [media_service/tasks.md](../Specification/media_service/tasks.md) |
+| push-service | [push_service/tasks.md](../Specification/push_service/tasks.md) |
+| Atlas 边缘运行时 | [atlas_edge_runtime/tasks.md](../Specification/atlas_edge_runtime/tasks.md) |
+| 首发教室行为规则 | [classroom_behavior_detection/tasks.md](../Specification/classroom_behavior_detection/tasks.md) |
+| Web 与 PWA | [web_pwa_client/tasks.md](../Specification/web_pwa_client/tasks.md) |
 
 | PRD 能力或用户故事 | 首发技术落点 | 验收观察点 |
 | --- | --- | --- |
@@ -27,13 +30,13 @@
 | 手动登记 IP、名称、位置 | device-service 设备登记与一次性激活。 | 用户能登记设备，现场 Atlas 200I DK A2 激活后状态可见。 |
 | 查看状态、摄像头、算法、参数并配置受支持参数 | device-service 资产、心跳、算法期望/实报配置及 MQTT 命令回执。 | 在线、算法与视频状态分开显示；配置失败不会显示为已生效。 |
 | 桌面实时监控 | media-service 管理路径和观看配额，MediaMTX 拉 RTSP，WebRTC 优先、HLS 回退。 | 最多 12 路活动源流、两个完整 12 分屏桌面会话；手机 PWA 无监控大屏。 |
-| 通用事件、查询、详情和截图 | event-service 消费 MQTT、校验设备归属、唯一约束去重；证据经 HTTPS 上传。 | 重复上报只生成一条事件；可筛选并在 24 小时内查看截图，过期后显示原因。 |
+| 教室检测、异常事件、查询、详情和截图 | Atlas 运行 YOLO11n/640；device-service 管理三类告警规则（默认关闭）；event-service 校验设备与配置版本、幂等落库；证据经 HTTPS 上传。 | 普通检测不创建事件；只有显式启用且满足规则的行为可入库、统计或推送；截图 24 小时过期。 |
 | 待处置、处理中、已解除/误报及反馈 | event-service 状态机、版本并发控制、处置历史。 | 每次流转留人员、时间、处理结果；非法或并发过期流转被拒绝。 |
-| 手机 PWA 实时通知并跳转详情 | event outbox → push-service → Web Push → service worker。 | 仅当前账号订阅收到通知；点击后登录并打开对应详情。 |
+| 手机 PWA 实时通知并跳转详情 | 只有规则校验通过的 event outbox → push-service → Web Push → service worker。 | 仅当前账号订阅收到通知；点击后登录并打开对应详情；默认无规则时不产生课堂告警推送。 |
 | 账号范围的基础统计 | device/event 账号级聚合 API + Vue /analytics。 | 今天、近 7 天、近 30 天及约定卡片、图表可展示。 |
 | 后续 MCP、原生客户端和更多设备/算法 | mcp-service 占位；原生 App 不在首发交付。 | 首发部署无 MCP 工具接口和原生推送依赖。 |
 
-消防通道占用是首发试点事件类型，不进入通用表或 API 路径名称。账号共享、成员邀请、对象存储桶、视频录像回放、SSH 业务通信和独立 analysis-service 均不在首发范围。首发以 PRD 的完整业务闭环验收，不另造产品量化指标。[PRD §4–§7](PRD.md)
+教室行为检测是首发试点场景，不进入通用表或 API 路径名称。`hand-raising`、`reading`、`writing` 三类检测的异常规则初始全部关闭；只有已显式启用并配置的类别规则才产生异常事件、通知和告警统计。检测行为类别不代表危险等级；类别到等级、置信度阈值与持续条件由规则配置提供。课堂模型不识别或跟踪学生身份，不推断成绩或专注度。消防通道占用检测不属于首发范围。账号共享、成员邀请、对象存储桶、视频录像回放、SSH 业务通信和独立 analysis-service 均不在首发范围。首发以 PRD 的完整业务闭环验收，不另造产品量化指标。[PRD §4–§7](PRD.md)
 
 ## 2. 全局技术约定
 
@@ -91,6 +94,10 @@ Nginx 对受保护 /api/v1 请求调用 auth-service 的内部会话校验，清
 
 算法参数遵循“期望版本 → MQTT 命令 → 设备 ACK/实报版本”的异步过程。UI 不将请求成功解释成边缘已生效；失败、超时和设备不支持都保留原因。没有能力描述的参数仅可查看，不可编辑。
 
+首发课堂算法键为 `classroom_behavior_detection`，模型流程固定为 YOLO11n/640，类别 allowlist 为 `hand-raising`、`reading`、`writing`。device-service 保存每个不可变配置版本及设备 ACK 生效时间；新设备/新配置中三类 `enabled` 均为 `false`。启用某类规则时必须配置 `[0,1]` 置信度阈值、正值持续时间、非负冷却时间和 `low|medium|high|critical` 事件等级。没有配置值时不得启用；规则版本仅在设备回报已应用后可产生事件。
+
+event-service 在 MQTT 入站后通过服务凭据调用 device-service 的 `POST /internal/v1/devices/{deviceId}/classroom-events/validate`，请求含 `camera_id`、`algorithm_version`、`rule_config_version`、`behavior_class`、`confidence`、`observed_duration_ms`、`severity`、`occurred_at`。允许结果返回可信账号、设备/摄像头名称和位置快照以及被校验配置版本；设备/摄像头不存在或已停用返回永久拒绝，规则未启用/阈值不符返回规则拒绝，归属/历史版本依赖暂时不可用返回可重试服务错误。边缘不传可信 `account_id`，event-service 不对拒绝或暂时错误生成 `event.created`。
+
 ### 3.3 event-service
 
 | 方法与路径 | 输入和结果 | 规则 |
@@ -144,13 +151,15 @@ push-service 接收 event.created 后对 event_id + subscription_id 建唯一投
 | --- | --- | --- |
 | devices/{deviceId}/state | 设备发布，device-service 订阅 | 心跳、运行状态、摄像头/算法实报；设备只可发布自己的主题。 |
 | devices/{deviceId}/events | 设备发布，event-service 订阅 | 通用异常事件元数据；不带截图二进制。 |
-| devices/{deviceId}/event-acks | event-service 发布，设备订阅 | 业务落库 ACK，包含 event_id 和结果。 |
+| devices/{deviceId}/event-acks | event-service 发布，设备订阅 | 应用结果包含 `event_id`、`result=accepted|duplicate|rejected` 及稳定 reason_code；仅 accepted/duplicate 表示服务端事务已提交。 |
 | devices/{deviceId}/commands | device-service 发布，设备订阅 | 有 command_id、期望配置版本的受支持参数命令。 |
 | devices/{deviceId}/command-acks | 设备发布，device-service 订阅 | command_id、执行结果、实报版本及失败原因。 |
 
-所有消息含 schema_version=1、device_id、sent_at；event 消息还含 event_id、camera_id、event_type、severity、occurred_at、algorithm_key、algorithm_version、可选 region_key 和受限的 attributes。device_id 必须与 MQTT 身份和主题一致；account_id 即使由设备携带也不作为可信归属。单条 MQTT JSON 元数据上限 64 KiB；图片只走 HTTPS 证据接口。
+所有消息含 schema_version=1、device_id、sent_at；event 消息还含 event_id、camera_id、event_type、severity、occurred_at、algorithm_key、algorithm_version、可选 region_key 和受限的 attributes。教室事件的 `event_type` 只允许 `classroom.behavior.hand-raising`、`classroom.behavior.reading`、`classroom.behavior.writing`；attributes 需提供 `behavior_class`、`confidence`、`observed_duration_ms` 和 `rule_config_version`；device_id 必须与 MQTT 身份和主题一致；account_id 即使由设备携带也不作为可信归属。单条 MQTT JSON 元数据上限 64 KiB；图片只走 HTTPS 证据接口。
 
-边缘算法对一次持续异常只生成一个 event_id，同一事件的重试沿用该 ID。event-service 以 (device_id,event_id) 唯一约束做确定性去重，不在 MVP 里跨不同 ID 做模糊合并，以免吞掉相邻独立事件。QoS 1 的 broker PUBACK 只代表 broker 接收；设备本地持久化未得到 event-acks 的事件，断线后重发，直到 event-service 完成数据库事务并发送应用级 ACK。重复事件返回同一结果，不重复产生 event.created。[MQTT 3.1.1](https://docs.oasis-open.org/mqtt/mqtt/v3.1.1/mqtt-v3.1.1.html)
+边缘算法对一次规则触发只生成一个 event_id，同一事件的重试沿用该 ID。event-service 以 (device_id,event_id) 唯一约束做确定性去重；接收教室事件前还须向 device-service 校验该规则配置版本已经在该设备生效、对应类别已启用、置信度/持续时间达到阈值且上报等级与规则一致。未知、未生效、已禁用或字段不符的规则事件拒绝入库；device-service 对配置版本保留只读快照，至少覆盖引用它的事件留存周期。QoS 1 的 broker PUBACK 只代表 broker 接收；设备本地持久化未得到 event-acks 的事件，断线后重发，直到 event-service 完成数据库事务并发送应用级 ACK。重复事件返回同一结果，不重复产生 event.created。[MQTT 3.1.1](https://docs.oasis-open.org/mqtt/mqtt/v3.1.1/mqtt-v3.1.1.html)
+
+`accepted` 和 `duplicate` 是正向应用 ACK；永久 schema/规则拒绝返回 `rejected` 与稳定 reason_code，边缘转入本地 quarantine 状态并保留记录，不再无限重发，待设备状态/配置修复后由受控操作决定是否重新提交。数据库、device-service 或 broker 依赖暂时不可用时不发送终结 ACK，边缘保留并退避重试。event-service 不得把 broker PUBACK 当作业务确认。
 
 命令使用 command_id 和 expected_version 幂等执行；设备报告 applied、rejected 或 failed，device-service 保存期望与实报版本。设备离线时仅保留仍有意义的待执行命令；过期命令不能在设备恢复后悄悄应用。边缘本地未确认事件和待上传截图放入有界持久队列，容量不足时上报降级状态并告警，不能把消息成功发送到 broker 等同于处置完成。
 
@@ -218,7 +227,7 @@ event.events 建 (account_id,occurred_at DESC,id DESC) 主列表索引，以及�
 
 ### 7.3 部署、健康与恢复
 
-首发在一个园区后端服务器运行 Nginx、五个 Go 业务容器、MediaMTX、Mosquitto 和 PostgreSQL；mcp-service 不构建。每个业务容器使用自己的 Dockerfile，当前 Dockerfile 只是占位；实现 Go 模块和入口后再补多阶段构建。各服务提供内部 /health/live 与 /health/ready；ready 检查其必需的数据库或基础设施依赖，不能因为可选统计接口暂时失败而误判所有服务不可用。部署以固定镜像版本、独立持久化卷、受控机密和相互隔离的网络运行。
+首发在一个园区后端服务器运行 Nginx、五个 Go 业务容器、MediaMTX、Mosquitto 和 PostgreSQL；mcp-service 不构建。每个业务容器使用自己的多阶段 Dockerfile；五个服务镜像及独立 Web 镜像已完成构建验证，但 Compose 全栈健康、机密注入、媒体浏览器链路和备份恢复仍按平台部署任务验收。各服务提供内部 /health/live 与 /health/ready；ready 检查其必需的数据库或基础设施依赖，不能因为可选统计接口暂时失败而误判所有服务不可用。部署以固定镜像版本、独立持久化卷、受控机密和相互隔离的网络运行。
 
 PostgreSQL 做定期备份并验证恢复；Mosquitto 持久化与安全配置、MediaMTX 路径配置也需备份。截图卷仅保留 24 小时内容，不做长期备份；恢复后 event-service 对数据库证据记录和文件实际存在性对账。数据库迁移由所属服务执行，采用先兼容、后切换、再清理的顺序，禁止多个服务同时修改同一表。
 
@@ -245,20 +254,23 @@ PostgreSQL 做定期备份并验证恢复；Mosquitto 持久化与安全配置�
 | 链路 | 必须观察到的结果 |
 | --- | --- |
 | 账号与隔离 | A/B 两个账号可独立注册登录；改密需旧密码并撤销旧会话；跨账号设备、事件、截图、媒体和订阅请求被拒绝。 |
-| 设备接入 | Atlas 200I DK A2 由一次性凭据激活并连入 MQTT；心跳状态、摄像头、算法及参数可查看；离线后状态更新，命令以实报结果为准。 |
+| 设备接入 | Atlas 200I DK A2 由一次性凭据激活并连入 MQTT；心跳状态、摄像头、YOLO11n/640 模型和课堂规则版本可查看；离线后状态更新，命令以实报结果为准。 |
+| 告警默认行为 | 三类告警规则初始均关闭；无有效配置时实时检测只用于预览，不产生事件、截图、统计或推送。 |
 | 视频 | MediaMTX 从边缘拉取处理后 RTSP；桌面 WebRTC 可看画面及状态；WebRTC 不通时 HLS 可播放；12 路活动源、两屏观看和超额提示按配置执行。 |
-| 事件与截图 | 一次边缘事件被保存并通知；重复 QoS 1 上报不产生第二条；截图在 24 小时内可看，过期后返回 410，事件详情仍存在。 |
+| 教室规则与事件 | 初始规则全关闭时普通检测不产生事件；用户配置并由设备应用的规则命中后，event-service 校验类别、阈值、持续条件、规则版本和等级；重复 QoS 1 上报不产生第二条。 |
+| 事件与截图 | 通过规则校验的事件可查询和处置；截图在 24 小时内可看，过期后返回 410，事件详情仍存在。 |
 | 处置 | 待处置 → 处理中 → 已解除或误报；记录处理账号、时间与结果；非法和并发冲突请求被拒绝。 |
-| PWA 推送 | 用户手势订阅后，手机后台收到本账号告警摘要；点击进入详情，必要时先登录；显式退出后该订阅不继续接收。 |
+| PWA 推送 | 仅已启用课堂规则产生的事件可以创建通知；用户手势订阅后，手机后台收到本账号告警摘要；点击进入详情，必要时先登录；显式退出后该订阅不继续接收。 |
 | 统计 | 今天、近 7 天、近 30 天可切换；设备卡片、事件趋势/等级/类型/位置/状态图只含当前账号数据。 |
-| 延后边界 | MCP 工具、原生客户端推送、成员邀请、对象存储与录像回放在首发部署中不存在。 |
+| 延后边界 | 消防通道检测、MCP 工具、原生客户端推送、成员邀请、对象存储与录像回放在首发部署中不存在。 |
 
 ## 10. 状态与变更记录
 
-本规格覆盖 PRD 首发用户故事、服务边界、接口、消息、数据模型、运行质量与验收。没有阻塞当前实现拆分的待确认产品事项；具体字段长度、错误码枚举、数据库迁移脚本及 OpenAPI 文件由实现任务按本规格生成并评审。文档为草案，尚未代表用户批准上线。
+本规格覆盖 PRD 首发用户故事、服务边界、接口、消息、数据模型、运行质量与验收。首发场景、模型流程和规则默认行为已由用户确认；YOLO11n/640 权重与 Atlas OM 产物尚未提供，阻塞真实模型装载、精度和性能验收，但不阻塞服务框架与界面规格。具体字段长度、错误码枚举、数据库迁移脚本及 OpenAPI 文件由实现任务按本规格生成并评审。
 
 | 日期 | 变更 |
 | --- | --- |
 | 2026-10-04 | 依据 PRD、调研与架构设计建立首发 SPEC，明确五个运行服务和 MCP 占位、Web/PWA、Atlas 200I DK A2/MQTT/媒体、事件/证据、Push、统计、留存、部署及验收合同。 |
 | 2026-10-04 | 增加五份服务实现任务书索引；mcp-service 继续保持待设计状态。 |
 | 2026-10-15 | 首发边缘设备改为华为 Atlas 200I DK A2（Ascend 310B4），模型链路改为 CANN ATC/OM/AscendCL。 |
+| 2026-10-18 | 首发场景改为教室行为检测，采用 YOLO11n/640；三类告警规则默认关闭，只有设备已应用且命中显式配置的规则才能产生事件。新增 Atlas、课堂场景和 Web/PWA 规格组，五个服务均细分服务内集成测试任务；模型产物后续提供。 |

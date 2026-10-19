@@ -1,0 +1,15 @@
+{
+  "model_id": "model_classroom_behavior_detection",
+  "version": "1.0.0",
+  "format": "om",
+  "model_file": "model.om",
+  "sha256": "e91d9f26cf5342228fd33de18c894686d91c6e1d385634e76abc381dd5ce9564",
+  "soc_version": "Ascend310B4",
+  "input_width": 640,
+  "input_height": 640,
+  "classes": [
+    "hand-raising",
+    "reading",
+    "writing"
+  ]
+}

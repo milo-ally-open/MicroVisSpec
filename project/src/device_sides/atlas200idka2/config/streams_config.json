@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "global_settings": {
+    "output_fps": 15
+  },
+  "streams": [
+    {
+      "stream_id": "classroom-demo",
+      "camera_id": "classroom-demo-camera",
+      "source_ref": "YUNSHAO_CAMERA_CLASSROOM_DEMO_URL",
+      "model_id": "model_classroom_behavior_detection",
+      "enabled": false,
+      "enable_ai": false,
+      "output_width": 1280,
+      "output_height": 720,
+      "ai_fps": 15
+    }
+  ]
+}

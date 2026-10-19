@@ -1,5 +1,4 @@
-.git
+.secret-*
 .env
 .env.*
-*.local
-*.log
+*.dump

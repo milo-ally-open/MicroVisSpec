@@ -1,21 +1,27 @@
-# media-service 核验与实施清单
+# media-service 实施与验收任务
 
-> 关联合同：[spec.md](spec.md)；设计摘要：[design.md](design.md)。
-> 未勾选表示本清单没有记录完成证据，不等于断言代码尚未实现。
+> 关联合同：[spec.md](spec.md)；设计：[design.md](design.md)。
 
-## 任务
+## 任务清单
 
-- [ ] **T-01 核对来源凭据和 MediaMTX 对账** — 覆盖：REQ-01 / AC-01.1、AC-01.2；状态：待核验。
-- [ ] **T-02 核对播放授权及容量实测** — 覆盖：REQ-02 / AC-02.1、AC-02.2；状态：待核验。
-- [ ] **T-03 核对协议回退和错误状态** — 覆盖：REQ-03 / AC-03.1、AC-03.2；状态：待核验。
-- [ ] **T-04 核对租约回收和故障恢复** — 覆盖：REQ-04 / AC-04.1、AC-04.2；状态：待核验。
+- [ ] **T-01 服务骨架、media schema 与来源机密** — 迁移、健康检查、来源凭据加密、camera_id 所有权校验；覆盖 REQ-01 / AC-01.1。
+- [ ] **T-02 MediaMTX 期望配置与对账** — stream path、sourceOnDemand、版本化配置、重启恢复及 device.disabled 清理；覆盖 REQ-01 / AC-01.2。
+- [ ] **T-03 播放鉴权、租约和并发配额** — Nginx auth 子请求、设备/账号授权、原子 12 源/24 连接配额、续租/释放；覆盖 REQ-02 / AC-02.1、AC-02.2；REQ-04 / AC-04.1。
+- [ ] **T-04 WebRTC/HLS 播放和错误分类** — WHEP/HLS 受保护入口、回退 URL、媒体/设备状态区分和容量错误；覆盖 REQ-03 / AC-03.1、AC-03.2。
+- [ ] **T-05 撤销、过期租约与 MediaMTX 恢复** — session.revoked/device.disabled inbox 幂等消费、崩溃后租约清理、实际配置对账；覆盖 REQ-04 / AC-04.1、AC-04.2。
+- [ ] **T-06 media-service 服务内集成测试** — PostgreSQL + MediaMTX 控制面 + 测试 RTSP 源 + auth/device stub，覆盖跨账号拒绝、摄像头删除/停用、来源密码不泄漏、配置漂移修复、配额并发竞态、WebRTC 失败/HLS 回退、登出结束播放、租约过期/重启释放；覆盖 REQ-01、REQ-02、REQ-03、REQ-04 / AC-01.1、AC-01.2、AC-02.1、AC-02.2、AC-03.1、AC-03.2、AC-04.1、AC-04.2；依赖 T-01–T-05。
+- [ ] **T-07 Atlas/园区媒体容量验收** — 单路教室处理后 RTSP 接入、协议与浏览器验证、12 路源与 24 个连接负载实测；记录 CPU、内存、带宽和失败状态；覆盖 REQ-02 / AC-02.2；依赖边缘视频输出。
 
 ## 验收证据
 
-| 需求范围 | 证据要求 | 当前记录 |
-|---|---|---|
-| 各 REQ/AC | 关联实现位置、执行步骤、实际结果及必要日志或截图；计划不能代替结果 | 待核验 |
+| REQ/AC | 检查方法 | 当前证据 | 状态 |
+|---|---|---|---|
+| REQ-01/AC-01.1–01.2 | 来源授权/凭据加密/MediaMTX 对账集成测试 | `go test ./...` 与隔离 PostgreSQL integration suite 通过，覆盖来源密钥与配置逻辑；真实 MediaMTX API 对账待部署验证 | 部分通过 |
+| REQ-02/AC-02.1–02.2 | 越权播放、并发配额竞态和容量记录 | handler/数据库集成测试覆盖跨账号授权与租约配额；园区多路容量实测仍待执行 | 部分通过 |
+| REQ-03/AC-03.1–03.2 | WebRTC/HLS 浏览器与协议回退测试 | WHEP/HLS lease 授权单测/集成 stub 通过；原生 MediaMTX 和浏览器实际播放/回退待验证 | 部分通过 |
+| REQ-04/AC-04.1–04.2 | 撤销、租约超时、重启恢复测试 | 隔离 PostgreSQL + MediaMTX stub 覆盖 session.revoked 和租约释放；进程崩溃重启及真实 MediaMTX kick 待验收 | 部分通过 |
 
-## 进度更新规则
+## 环境与执行入口
 
-核验后更新对应任务并链接证据；实现偏离规格时记录事实与影响，再同步更新 `spec.md` 或 `design.md`。规划目标、代码存在和运行验证分别记录，不互相代替。
+- `go test ./...`；服务内集成测试 `go test -tags=integration ./...`，需隔离 PostgreSQL、MediaMTX、RTSP fixture 和 auth/device stub。
+- Atlas 实机和园区容量是单独系统验收，不能由模拟 RTSP fixture 替代。

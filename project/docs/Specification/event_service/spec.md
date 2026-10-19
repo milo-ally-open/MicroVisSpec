@@ -2,7 +2,7 @@
 
 > 状态：首发实现任务书；以 [产品需求](../../Analysis/PRD.md)、[架构设计](../../Design/STRUCTURE.md)和[总技术规格](../../Analysis/SPEC.md)为准。
 > 责任边界：event-service 负责通用事件、截图、处置、事件统计和 `event.created` 可靠投递；device-service 提供设备与摄像头归属，push-service 负责浏览器推送。
-> 首发边界：消防通道占用是第一种接入事件，不写死在通用表结构、API 路径和状态机中。
+> 首发边界：教室行为检测为首发场景。仅边缘端显式启用规则命中的行为生成通用异常事件；未启用规则的模型检测不生成事件或推送。场景类别不写死在通用表结构、API 路径和状态机中。
 
 ## 稳定需求与验收索引
 
@@ -10,10 +10,11 @@
 
 ### REQ-01 事件接入与确认
 
-边缘事件可安全重试，ACK 代表持久化接收。
+边缘端按启用的告警规则上报事件，可安全重试；普通模型检测不等于事件。正向 ACK 代表事件已持久化接收；永久拒绝须用明确的负向应用 ACK 终止无效重试。
 
 - **AC-01.1**：重复上报只形成一条事件和 outbox。
 - **AC-01.2**：数据库或归属校验不可用时不返回成功 ACK。
+- **AC-01.3**：永久无效的 schema/课堂规则返回带稳定 reason_code 的 `rejected` ACK；边缘隔离保留该记录而不无限重发。
 
 ### REQ-02 证据访问与保留
 
@@ -40,7 +41,7 @@
 
 在 `project/src/services/event-service/` 实现可独立部署的 Go/Gin/GORM 服务，使 Atlas 200I DK A2 边缘代理产生的事件完成以下闭环：
 
-**MQTT 上报 → 设备归属校验 → 幂等落库与 outbox → 应用级 ACK → 截图上传 → 账号内查询与处置 → 账号内统计 → push-service 接收通知任务**。
+**符合已启用规则的边缘行为 → MQTT 上报 → 设备归属校验 → 幂等落库与 outbox → 应用级 ACK → 截图上传 → 账号内查询与处置 → 账号内统计 → push-service 接收通知任务**。
 
 实现分为五个阶段；每个阶段都要留下可复现的交付结果。服务使用独立的 PostgreSQL `event` schema 和私有截图卷，不访问其他服务的数据库表。浏览器 API 经 Nginx 鉴权后转发，边缘截图入口使用设备凭据。服务内存中的消息或队列均不能替代持久化记录。
 
@@ -79,15 +80,16 @@
 | 元数据限制 | 单条 JSON 最大 64 KiB；截图字节不进入 MQTT。`severity` 取 `low`、`medium`、`high`、`critical`。 |
 | 身份与归属 | Mosquitto 的设备凭据和主题 ACL 限制设备只能发布自己的主题；event-service 校验主题中的设备 ID 与消息 `device_id` 一致，再向 device-service 核对设备、摄像头和当前账号归属。消息自带 `account_id` 不作为可信归属。 |
 | 幂等键 | `(device_id, event_id)`。一次持续异常的重试必须沿用同一个边缘 `event_id`；不同 ID 的相邻事件不做模糊合并。 |
+| 首发课堂字段 | `event_type` 只允许 `classroom.behavior.hand-raising`、`classroom.behavior.reading`、`classroom.behavior.writing`；受限 `attributes` 含行为类别、置信度、规则配置版本、观测持续时间及可选区域标识，不包含学生身份或追踪 ID。告警规则初始全部关闭，未命中的普通检测不发 MQTT 业务事件。 |
 | 时间 | 原样记录边缘 `occurred_at`，另存服务端 `received_at`；时钟明显偏差要记录可观察告警，不静默改写发生时间。 |
 
 ### 3.2 实现任务
 
 1. 建立 MQTT 持久订阅、断线重连和消费异常恢复；消息解析按 `schema_version` 分支，未知版本不当成版本 1 解析。
-2. 校验消息字段、危险等级、元数据大小、主题与设备身份。调用 device-service 的内部查询确认设备与摄像头仍有效，并读取可信的 `account_id`、名称和地点快照；无法确认归属时暂不写入和不发送成功 ACK。
+2. 校验消息字段、危险等级、元数据大小、主题与设备身份。调用 device-service 的内部查询确认设备与摄像头仍有效，并读取可信的 `account_id`、名称和地点快照；教室事件还需调用其课堂规则校验接口验证 `rule_config_version` 曾在设备生效、类别已启用、置信度/持续条件满足且等级匹配。无法确认归属/规则时暂不写入和不发送正向 ACK；明确不符合规则的事件发布 `rejected` 和稳定 reason_code，不落事件、不写 outbox。
 3. 在单个 PostgreSQL 事务内插入新事件及一条 `event.created` outbox。仅事务提交成功才发送应用级成功 ACK。MQTT broker 的 PUBACK 不是业务落库 ACK。
 4. 对唯一键冲突读取已存事件，返回对应原事件的成功 ACK，不新增事件、处置历史或 outbox。ACK 发布失败时，边缘保留事件并重发，服务端仍返回同一结果。
-5. 对验证失败的上报给出可诊断的拒绝结果；对数据库/归属服务暂时不可用的上报保持可重试语义。不得在尚未可靠落库时确认成功。
+5. 对永久验证失败的上报发布可诊断负向应用 ACK；对数据库/归属服务暂时不可用的上报不发送终结 ACK，保持可重试语义。不得在尚未可靠落库时发送 accepted。
 
 ### 3.3 交付物与阶段验收
 
@@ -103,10 +105,10 @@
 
 | 接口 | 要求 |
 | --- | --- |
-| `PUT /edge/v1/devices/{deviceId}/events/{eventId}/evidence` | 此处 `eventId` 是边缘生成的 `event_id`，服务以 `(device_id,edge_event_id)` 定位平台内部事件；设备认证后上传 JPEG/PNG，返回证据状态与 `expires_at`。 |
+| `PUT /edge/v1/devices/{deviceId}/events/{eventId}/evidence` | 此处 `eventId` 是边缘生成的 `event_id`，服务以 `(device_id,edge_event_id)` 定位平台内部事件；通过 HTTPS 使用激活时发放的 MQTT username/password 做 HTTP Basic 设备认证后上传 JPEG/PNG，返回证据状态与 `expires_at`。event-service 必须调用 device-service 的内网凭据校验接口，不自行维护设备密码。 |
 | `GET /api/v1/events/{eventId}/evidence` | 账号鉴权后返回图片字节；未上传给出明确状态，过期返回 410，文件缺失给出“截图不可用”。 |
 
-1. 允许事件元数据先入库、截图后到达。上传时验证设备身份、事件归属、文件大小不超过 4 MiB、MIME、文件签名及合理尺寸；文件名由服务生成，阻止路径穿越。
+1. 允许事件元数据先入库、截图后到达。上传时验证设备 Basic 凭据仍有效、设备未停用、设备与事件归属一致；文件大小不超过 4 MiB，校验 MIME、文件签名及合理尺寸；文件名由服务生成，阻止路径穿越。设备凭据只在 event-service 到 device-service 的内网校验请求中传递，任何日志均不得记录凭据或请求体。
 2. 截图先写私有卷临时文件，校验 SHA-256 后原子重命名，再写数据库元数据。数据库只存相对路径、MIME、哈希、`uploaded_at`、`expires_at` 和清理状态。
 3. 对同一事件、同一哈希的重传返回原 `expires_at`；同一事件上传不同内容返回 409，不覆盖原证据或重置 24 小时计时。
 4. 从上传成功起精确保留 24 小时。达到 `expires_at` 时，读取接口立即返回 410，即使定时任务尚未删除物理文件。每小时批量清理过期图片，并清理文件已写入但事务失败产生的孤儿文件。
@@ -134,7 +136,7 @@
 
 ### 5.2 查询和处置规则
 
-1. 游标包含末条排序键、筛选摘要和有效期，使用签名保护；改变筛选条件时不能复用旧游标。查询按账号与时间索引执行，稳定处理同一发生时间的多条事件。
+1. 游标包含末条排序键、筛选摘要和 15 分钟有效期，使用部署机密 `EVENT_CURSOR_SIGNING_KEY`（至少 32 字节）做 HMAC-SHA-256 签名；改变任何筛选条件时不能复用旧游标。查询按账号与时间索引执行，稳定处理同一发生时间的多条事件。
 2. 状态为 `pending`（待处置）、`processing`（处理中）、`resolved`（已解除）、`false_positive`（误报）。只允许 `pending → processing`、`pending → false_positive`、`processing → resolved`、`processing → false_positive`；终态不再流转。
 3. 进入终态必须提交处理结果。每次流转记录当前账号作为处理人、服务端操作时间、前后状态和结果；版本冲突返回 409，不覆盖其他页面刚刚完成的处置。
 4. 已闭环事件与处置记录从进入终态起保留 90 天，未闭环事件持续保留。按时间索引批量清理；截图始终按自己的 24 小时规则清理。
@@ -157,7 +159,7 @@
 ### 6.1 实现任务
 
 1. `event.created` 与新事件在同一事务写入，负载仅含 `account_id`、内部事件 ID、地点、危险等级、发生时间及站内详情路径；不含截图、设备凭据或完整事件载荷。
-2. worker 使用 PostgreSQL 行锁领取待投递记录，通过内网 `/internal/v1/inbox` 投递给 push-service，并附服务凭据、事件类型、事件 ID、`schema_version` 与发生时间。
+2. worker 使用 PostgreSQL 行锁领取待投递记录，通过 `PUSH_SERVICE_INTERNAL_URL` 指向的内网 `/internal/v1/inbox` 投递给 push-service，并附由 `PUSH_SERVICE_INTERNAL_TOKEN` 提供的服务凭据、事件类型、事件 ID、`schema_version` 与发生时间。缺少推送服务配置时服务不得就绪，但事件 MQTT 消费与 outbox 持久化仍须按恢复策略运行。
 3. 投递成功标记完成；暂时失败退避重试；worker 中断后租约到期可重新领取；长期失败保留记录并告警。重复投递由 push-service 的 inbox 幂等处理，event-service 不把 HTTP 请求成功解释为用户已阅读通知。
 4. 与边缘代理、device-service、push-service 和 Web/PWA 联调：真实事件上报后可以查询和处置；截图独立到达；PWA 接收账号内通知并经登录打开详情。
 5. 观测入库失败、重复事件、ACK 积压、截图上传/清理失败、outbox 积压与投递失败，使用请求 ID 和事件 ID 贯穿日志。数据库或文件卷故障要暴露为就绪失败及业务错误。

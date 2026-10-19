@@ -1,0 +1,15 @@
+.git
+.assistant
+**/node_modules
+**/dist
+**/coverage
+**/test-results
+**/.env
+src/services/**/.secret-*
+src/services/media-service/mediamtx
+src/services/media-service/mediamtx.exe
+src/services/media-service/mediamtx.yml
+src/services/auth-service/*.dump
+src/clients/web/.secret-*
+preparation/**/model_train/datasets
+preparation/**/model_train/runs

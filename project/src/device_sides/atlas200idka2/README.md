@@ -1,0 +1,94 @@
+# Atlas 200I DK A2 边缘运行时
+
+本目录是 Atlas 200I DK A2（Ascend 310B4）的可部署工程。产品运行时由两个 systemd 进程组成：`yunshao-agent` 管理设备身份、MQTT、模型目录和 SQLite 事件队列；`yunshao-classroom-runtime` 管理视频解码、模型插件、逐帧推理、OSD 和告警规则。两者共享本机配置及模型目录，通过 `/run/yunshao/agent.sock` 传递命中事件。模型后端通过 `IAIModel` 插件接口装载，Atlas 实现使用 AscendCL/DVPP，不依赖 AX650 SDK。
+
+## 从 Demo 到产品运行时
+
+课堂检测 Demo 的职责是证明一条固定链路可运行：读取 H.264 视频、加载 YOLO11n/640 OM、执行 NPU 推理、按 `classes.txt` 映射类别并输出带框 H.264。它把视频源、单一模型、阈值、类别和结果输出都放在一个入口中，适合单场景验证，不适合作为长期运行的设备服务。
+
+产品集成保留了模型推理与 Atlas 媒体能力，把 Demo 的入口拆成可复用模块：
+
+| 产品位置 | 职责 | Demo 到产品的变化 |
+|---|---|---|
+| `include/ai_interface.hpp` | 通用 `IAIModel`、输入帧和检测结果插件 ABI | 把模型装载/推理从视频循环中解耦 |
+| `plugins/model_classroom_behavior_detection.cpp` | `ModelClassroomBehaviorDetection`：YOLO11 AscendCL OM 装载、NV21 输入、张量解码、NMS | 类别顺序、输入尺寸、阈值和最大检测数从 profile 读取；插件名与 model_id 一致 |
+| `include/manager/`、`src/manager/` | AI processor、推理/流/config/alarm managers | 按 stream 选 model_id，分开推理、媒体和业务规则 |
+| `include/media/*.hpp`、`src/media/*.cpp` | 同名媒体接口与实现；Atlas VDEC/VPSS/VENC、FFmpeg 输入和 OSD | 按相同基名配对，媒体实现不放在 `include/` |
+| `include/common/core.hpp`、`src/common/core.cpp` | 模型清单、SHA-256、Atlas SoC 校验、按 model_id 安装/激活/回滚、事件 outbox | 头源同名配对；不包含课堂类别、课堂事件类型或具体 SoC 常量；与 profile 对照验证 |
+| `include/common/config.hpp`、`src/common/config.cpp` | 三份 JSON 的结构、能力集合和跨引用校验 | 头源同名配对；运行参数从配置读取；非法快照启动失败，不带入半份配置 |
+| `src/agent/agent.cpp`、`src/main.cpp` | 云边 agent 与 classroom-runtime 组合入口 | 仅告警规则命中后，经本机 socket 将事件交给 agent 持久化 |
+
+## 集成一个新模型
+
+### 1. 准备模型产物
+
+按 `project/preparation/model_classroom_behavior/WORKFLOW.md` 训练/取得权重并导出 ONNX；Atlas 推理使用面向 Ascend 310B4 的 OM。课堂模型转换入口为 `project/preparation/model_classroom_behavior/model_convert/convert_atc.sh`，输入 640×640 ONNX 并应用 `aipp_nv21.cfg`。转换后的 ONNX、OM、评估报告和数据集留在 `preparation/`，不放进产品源码或 Docker 镜像。
+
+课堂示例使用已有文件：
+
+- PT：`project/preparation/model_classroom_behavior/model_train/train_result/yolo11n_classroom_behavior_best.pt`
+- ONNX：`project/preparation/model_classroom_behavior/model_export/artifacts/yolo11n_classroom_behavior_best.onnx`
+- OM：`project/preparation/model_classroom_behavior/model_deployment/yolo11n_classroom_behavior_best.om`
+- 当前 OM 清单：`project/preparation/model_classroom_behavior/model_deployment/model_classroom_behavior_detection.manifest.json`
+
+课堂模型 ID 为 `model_classroom_behavior_detection`，类别顺序必须与训练/导出数据一致：`hand-raising`、`reading`、`writing`。新模型先确认 OM 输入布局、输出 decoder 与类别顺序；不匹配的模型不能复用课堂插件。
+
+### 2. 登记模型 profile
+
+在 `config/models.json` 的 `models` 数组增加 profile，至少填写唯一 `model_id`、云端算法键、模型格式/文件名/SoC、plugin library、backend、family、decoder、输入宽高/像素格式/预处理、有序 `classes`、置信度阈值、NMS 阈值和最大检测数。模型及插件统一按 `model_<domain>_<task>` 命名，task 使用 `detection`、`segmentation` 或 `classification`；例如本模型为 `model_classroom_behavior_detection`，库名为 `libmodel_classroom_behavior_detection.so`。profile 引用的插件库必须与 model_id 匹配。相关值必须属于同文件 `runtime.capabilities` 声明的支持集合。当前 Atlas 产品构建声明支持 `om`、`ascendcl`、`yolo11/yolo_v11`、NV21 `static_aipp` 和 310B4；输入尺寸为 640×640。
+
+`algorithm_key` 表示云端算法语义（本模型为 `classroom_behavior_detection`），`model_family` 表示网络/输出族（本模型为 `yolo11`）；两者不代替 model_id。新增领域或任务时，使用相应命名的插件源文件、共享库和 `Model<Domain><Task>` 类；内部通用 YOLO 解码逻辑可以抽取复用，但不能用架构名作为产品插件名。新增插件须实现 `IAIModel`、导出 `CreateAIModel`/`DestroyAIModel`，并在 CMake 构建和 `runtime.capabilities` 中登记。禁止只改配置来宣称代码不支持的能力。
+
+### 3. 绑定视频流和告警规则
+
+在 `config/streams_config.json` 新增 stream，填 `stream_id`、`camera_id`、环境变量形式的 `source_ref`、profile 的 `model_id`、输出尺寸和 AI 帧率。视频 URL/密码通过 systemd 环境文件注入，不能写入 JSON。示例流默认关闭。
+
+在 `config/alarm_rules.json` 为需要告警的 model/class 添加 `event_type`、类别属性名、等级、置信度阈值、最短持续时间和冷却时间。新增规则必须先设为 `enabled: false`；未配置或禁用时仍可推理/OSD，但不写事件 outbox。只有明确启用且满足规则时才生成业务事件。
+
+### 4. 生成清单、校验和入库
+
+清单把模型文件和 profile 绑定起来：
+
+```json
+{
+  "model_id": "model_classroom_behavior_detection",
+  "version": "1.0.0",
+  "format": "om",
+  "model_file": "model.om",
+  "sha256": "与 OM 文件一致的 SHA-256",
+  "soc_version": "Ascend310B4",
+  "input_width": 640,
+  "input_height": 640,
+  "classes": ["hand-raising", "reading", "writing"]
+}
+```
+
+将清单和对应 OM 复制到 Atlas 后，以 `yunshao` 服务账号执行：
+
+```bash
+sudo -u yunshao /usr/local/bin/yunshao-agent model install --manifest /path/to/model_classroom_behavior_detection.manifest.json --model /path/to/yolo11n_classroom_behavior_best.om
+sudo -u yunshao /usr/local/bin/yunshao-agent model status model_classroom_behavior_detection
+```
+
+安装器核对 JSON、SHA-256、profile 类别顺序、输入尺寸、OM 格式和 SoC；再用 AscendCL 在目标设备试加载。通过后写入 `/var/lib/yunshao/models/models/{model_id}/{version}/`，最后原子切换 `active/{model_id}`。失败时保留原活动版本。回滚使用 `yunshao-agent model rollback <model_id>`。
+
+### 5. 构建和验证
+
+在已安装 Atlas CANN、OpenCV、FFmpeg、SQLite、OpenSSL、Mosquitto 开发依赖的 Atlas/Linux 构建环境执行：
+
+```bash
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
+cd atlas200idka2
+cmake -S . -B build
+cmake --build build -j2
+ctest --test-dir build --output-on-failure
+```
+
+先用 `yunshao-classroom-runtime --check-config` 验证三份配置，再以授权 H.264 样例源运行指定 `--stream-id`。当前 pipeline 产出本地 H.264 文件；MediaMTX 实时发布尚未由此 runtime 验收，不能据此宣称云端预览链路已经完成。模型文件大小/哈希和 Atlas 是否能加载可以由安装结果确认；完整 ONNX/OM 测试集精度对比按需运行 `model_val/`，不作为模型注册的前置步骤。
+
+## 部署与配置边界
+
+- systemd 单元在 `systemd/`；主机身份、MQTT TLS 参数和视频源 URL 由 `/etc/yunshao/agent.env`、`/etc/yunshao/classroom-runtime.env` 注入。
+- 模型 profile、流绑定、告警规则分别维护在 `config/models.json`、`config/streams_config.json`、`config/alarm_rules.json`。secret 不写入这些 JSON。
+- `max_loaded_models` 默认 1。只有目标板多模型驻留、内存、延迟和稳定性验证通过后，才提高上限。
+- 关键验证见 [Atlas 边缘运行时 Spec](../../docs/Specification/atlas_edge_runtime/spec.md) 与 [课堂行为检测 Spec](../../docs/Specification/classroom_behavior_detection/spec.md)。

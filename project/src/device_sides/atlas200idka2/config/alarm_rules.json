@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "config_version": 1,
+  "allowed_severities": ["low", "medium", "high", "critical"],
+  "alarm_rules": [
+    {
+      "model_id": "model_classroom_behavior_detection",
+      "class_name": "hand-raising",
+      "event_type": "classroom.behavior.hand-raising",
+      "class_attribute": "behavior_class",
+      "enabled": false,
+      "severity": "medium",
+      "confidence_threshold": 0.5,
+      "min_duration_ms": 1000,
+      "cooldown_ms": 5000
+    },
+    {
+      "model_id": "model_classroom_behavior_detection",
+      "class_name": "reading",
+      "event_type": "classroom.behavior.reading",
+      "class_attribute": "behavior_class",
+      "enabled": false,
+      "severity": "medium",
+      "confidence_threshold": 0.5,
+      "min_duration_ms": 1000,
+      "cooldown_ms": 5000
+    },
+    {
+      "model_id": "model_classroom_behavior_detection",
+      "class_name": "writing",
+      "event_type": "classroom.behavior.writing",
+      "class_attribute": "behavior_class",
+      "enabled": false,
+      "severity": "medium",
+      "confidence_threshold": 0.5,
+      "min_duration_ms": 1000,
+      "cooldown_ms": 5000
+    }
+  ]
+}

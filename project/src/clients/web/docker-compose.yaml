@@ -1,0 +1,52 @@
+name: ${WEB_COMPOSE_PROJECT_NAME:-yunshao-web}
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${WEB_BIND_ADDRESS:-127.0.0.1}:${WEB_HTTP_PORT:-80}:80/tcp"
+      - "${WEB_BIND_ADDRESS:-127.0.0.1}:${WEB_HTTPS_PORT:-443}:443/tcp"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    secrets:
+      - nginx_tls_certificate
+      - nginx_tls_private_key
+      - nginx_auth_header_config
+      - nginx_media_header_config
+      - nginx_mediamtx_reader_header_config
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    healthcheck:
+      test: ["CMD", "/bin/busybox", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8081/_health"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+      - /tmp
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE, CHOWN, SETUID, SETGID]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+    networks: [backend]
+
+networks:
+  backend:
+    external: true
+    name: ${BACKEND_NETWORK:-yunshao_backend}
+
+secrets:
+  nginx_tls_certificate:
+    file: ./.secret-nginx-tls-certificate.pem
+  nginx_tls_private_key:
+    file: ./.secret-nginx-tls-private-key.pem
+  nginx_auth_header_config:
+    file: ./.secret-nginx-auth-header.conf
+  nginx_media_header_config:
+    file: ./.secret-nginx-media-header.conf
+  nginx_mediamtx_reader_header_config:
+    file: ./.secret-nginx-mediamtx-reader-header.conf

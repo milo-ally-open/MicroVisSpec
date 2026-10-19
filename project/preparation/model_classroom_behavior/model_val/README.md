@@ -17,6 +17,8 @@ python model_val/accuracy_eval.py --backend onnx --model model_export/artifacts/
 
 把固定版本数据集、`model_val/` 和 OM 模型放到板端后，执行：
 
+静态 AIPP OM 接收 640×640 的 NV21 `YUV420SP_U8` 输入（Y 平面后接交错 VU 平面），与 ONNX 的 RGB NCHW float32 输入不同。评估脚本会按后端自动选择输入格式。
+
 ```bash
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 python model_val/accuracy_eval.py --backend om --model model_deployment/yolo11n_classroom_behavior_best.om --data model_train/datasets/classroom_behavior/data.yaml --split test --output model_val/reports/test --imgsz 640 --conf 0.25 --iou 0.45 --device 0 --warmup 5
