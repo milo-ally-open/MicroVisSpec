@@ -11,6 +11,8 @@
 - [ ] **T-05 课堂数据最小化与证据边界** — 边缘消息 schema、日志、event-service 证据；检查不含身份/跟踪/成绩/专注度字段，普通检测不存储、不截图、不上传，规则命中截图鉴权和 24 小时到期；覆盖 REQ-04 / AC-04.1、AC-04.2；依赖 T-03/T-04。
 - [ ] **T-06 课堂推理/多模型配置/规则自动化集成测试** — 确定性推理输出 fixture + 两个独立 profile 测试配置，覆盖 profile 解析与 model_id 隔离、插件身份命名、类别映射、缺失/失败模型状态、默认关闭、规则参数缺失/越界、未达阈值、持续命中只生成一个事件、规则版本乱序/失效、云端准入和事件负 ACK quarantine；模型包篡改/兼容/独立激活由 Atlas 边缘运行时测试覆盖；覆盖 REQ-01、REQ-02、REQ-03、REQ-04 / AC-01.1、AC-01.2、AC-01.3、AC-02.1、AC-02.2、AC-02.3、AC-03.1、AC-03.2、AC-03.3、AC-03.4、AC-03.5、AC-03.6、AC-04.1、AC-04.2；依赖 T-01–T-05 和 Atlas T-03/T-04。
 - [ ] **T-07 Atlas 实机模型验收与规格回写** — 对已入库 YOLO11n/640 OM 记录 SHA-256、CANN 转换参数，并实测板端加载、内存、推理延迟/帧率/NPU、授权视频输入/输出和断网恢复；固定测试集精度对比不作为本阶段使用前置条件，按需另行运行；覆盖 REQ-01、REQ-02、REQ-03 / AC-01.1、AC-01.2、AC-02.1、AC-02.2、AC-03.1；依赖 T-06 与设备模型包。
+- [ ] **T-08 恢复课堂模型部署验收 demo** — `model_deployment/src/` + CMake；恢复可在 Atlas 200I DK A2 上独立构建的 AscendCL/H.264 视频推理 demo，类别顺序取自 `classes.txt`；只负责模型准备验收，不复制正式 runtime 的模型 catalog/安装/激活/规则与服务生命周期；覆盖 REQ-05 / AC-05.1、AC-05.3；参考车辆/仓储模型部署工程。源码已恢复，板端重新构建验收仍待执行。
+- [x] **T-09 补齐三套模型研发流程复现文档** — `model_classroom_behavior`、`model_vehicle_detection`、`model_warehouse_detection` 的 train/export/convert/val/deployment 阶段 README.md SOP，说明固定数据来源/版本、环境、命令、产物和验收边界；模型根目录不新增总 README；覆盖 REQ-05 / AC-05.2。
 
 ## 验收记录
 
@@ -21,6 +23,8 @@
 | REQ-02/AC-02.1–02.3 | 多 profile 隔离、活动模型状态、授权固定视频推理与故障恢复测试 | Atlas 310B4 非 root C++ runtime 对 640×480 H.264 合成源完成 75/75 帧短 smoke；另以 15 FPS 本机 UDP 合成输入运行 694 秒，输出 8997/9000 帧、采样 RSS 峰值 459.27 MiB、NPU 峰值 3017/3513 MiB；见[短 smoke 报告](../../../preparation/model_classroom_behavior/model_val/reports/release_20261020/atlas_runtime_smoke.json)和[持续测试报告](../../../preparation/model_classroom_behavior/model_val/reports/release_20261020/atlas_runtime_sustained.json) | 部分通过：非真实 RTSP；3 帧缺失原因未定，需授权课堂视频与重连验收 |
 | REQ-03/AC-03.1–03.5 | 规则状态机、设备 ACK 与服务端规则校验集成测试 | 实现未开始 | 未执行 |
 | REQ-04/AC-04.1–04.2 | 消息 schema、日志字段和证据访问/保留测试 | 实现未开始 | 未执行 |
+| REQ-05/AC-05.1、AC-05.3 | demo 源码、CMake、类别映射和职责边界检查；Atlas 板端构建与 H.264 smoke | C++/CMake/媒体源码已恢复；生产 runtime 仍在 Atlas 正式工程树；板端重新构建尚未执行 | 部分通过：待 Atlas 构建/运行 |
+| REQ-05/AC-05.2 | 三套模型各阶段 README 检查；命令和产物路径与脚本核对 | train/export/convert/val/deployment 五个阶段 README.md 均已补齐；模型根总 README 不保留；未运行模型训练或转换 | 通过：文档结构与命令静态核对 |
 
 ## 完成摘要
 

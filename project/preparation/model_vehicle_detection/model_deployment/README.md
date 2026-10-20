@@ -1,26 +1,22 @@
-# 车辆检测部署 demo
+# 车辆检测：Atlas 视频验收阶段 SOP
 
-此目录是面向 Atlas 200I DK A2（Ascend 310B4）、Ubuntu 22.04 ARM64 和板端 CANN 7.0.RC1 的独立 C++/AscendCL 视频推理工程。
+## 目的与边界
 
-## 硬件链路
+此阶段在 Atlas 200I DK A2 / Ascend 310B4 上运行独立 C++/AscendCL 检测 demo，验收 OM 加载、类别解码、视频输入、Region OSD 和 H.264 输出。输出为不带容器的 H.264 elementary stream。视频 smoke 验证链路可运行，不替代 model_val 的 test split 指标。
 
-```text
-H.264 文件或 RTSP
-  → FFmpeg demux / Annex-B
-  → VDEC
-  → VPSS ch0（NV21 缩放与等比例留边）
-  → 静态 AIPP（色彩转换、归一化）
-  → ACL / Ascend 310B4 推理
-  → CPU 检测框解码与 NMS
-  → VPSS Region（叠加到 ch1）
-  → VENC（H.264）
+## 输入和类别检查
+
+OM 由 model_convert 阶段生成，放在本目录并命名 yolo11n_vehicle_detection_best.om。classes.txt 当前顺序为 motorcycle、car、bus、truck；必须与本次模型训练 data.yaml 和模型类别索引映射核对一致。manifest/哈希不匹配或类别数不符时停止验收。
+
+本 demo 的 VDEC 只接受 H.264。samples/smoke_h264.mp4 可用于本地链路烟测。公开样例 samples/road_traffic_open_video.webm 是原始 WebM，不能直接送入 demo；需先转 H.264：
+
+```bash
+ffmpeg -y -i samples/road_traffic_open_video.webm -vf 'scale=640:640:force_original_aspect_ratio=decrease,pad=640:640:(ow-iw)/2:(oh-ih)/2' -c:v libx264 -pix_fmt yuv420p -an /tmp/vehicle-open-h264.mp4
 ```
 
-视频帧由 VDEC、VPSS 和 VENC 处理；推理输入从 VPSS 的 NV21 设备缓冲区直接送入静态 AIPP 模型。不会用 OpenCV 解码、缩放、画整帧或编码。OpenCV 仅用于检测结果 NMS、Region 的 ARGB 画布绘制。Region 绑定 VPSS 输出通道 1。
+## 板端构建与运行
 
-## 构建环境
-
-依赖板端 CANN ACL 与媒体开发库、CMake、OpenCV C++ 4.x，以及 FFmpeg `libavformat`、`libavcodec`、`libavutil` 开发包。已在板端 OpenCV 4.5.4、FFmpeg 4.4、CANN 7.0.RC1 上构建。
+在 Atlas 上从本目录构建：
 
 ```bash
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
@@ -28,52 +24,27 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j2
 ```
 
-头文件在 `src/include/`，由 `src/main.cpp` 引用。
-
-## 运行
-
-输入必须是 H.264、YUV420 视频文件或 H.264 RTSP 流；模型必须是 `model_convert/convert_atc.sh` 生成的静态 NV21 AIPP OM。输出是无容器的 H.264 elementary stream：
+运行随包 H.264 smoke：
 
 ```bash
-./build/atlas_yolo_acl_demo \
-  --model yolo11n_vehicle_detection_best.om \
-  --video samples/smoke_h264.mp4 \
-  --output detected.h264 \
-  --labels classes.txt --conf 0.25 --iou 0.45
+./build/atlas_yolo_acl_demo --model yolo11n_vehicle_detection_best.om --video samples/smoke_h264.mp4 --output /tmp/vehicle-smoke.h264 --labels classes.txt --conf 0.25 --iou 0.45
 ```
 
-RTSP 示例：
+运行转码后的公开视频：
 
 ```bash
-./build/atlas_yolo_acl_demo \
-  --model yolo11n_vehicle_detection_best.om \
-  --video 'rtsp://user:password@camera/stream' \
-  --output detected.h264 --labels classes.txt
+./build/atlas_yolo_acl_demo --model yolo11n_vehicle_detection_best.om --video /tmp/vehicle-open-h264.mp4 --output /tmp/vehicle-open-output.h264 --labels classes.txt --conf 0.25 --iou 0.45
 ```
 
-板端 VENC 会硬件编码 H.264。若需要 MP4 容器，用 FFmpeg 封装输出流；将 `25` 替换为程序打印的编码帧率：
+程序应报告模型输出 shape、输入/输出分辨率、完整处理与编码帧数、FPS、推理/NMS/Region/VENC 耗时及峰值 RSS。检查输出可解码并查看画面：
 
 ```bash
-ffmpeg -y -framerate 25 -i detected.h264 -c:v copy detected.mp4
+ffprobe -v error -f h264 -count_frames -show_entries stream=codec_name,width,height,nb_read_frames -of default=noprint_wrappers=1 /tmp/vehicle-smoke.h264
+ffplay -f h264 -framerate 25 /tmp/vehicle-smoke.h264
 ```
 
-程序输出输入/输出分辨率、处理和编码帧数、有效 FPS、NPU 推理、NMS、Region 更新、VENC 耗时分位数及峰值 RSS。若没有成功完成端到端处理的帧数，程序会报错退出。
+如果输入编码不是 H.264、解码没有输出帧或帧尺寸触发 VDEC 限制，先转码为 yuv420p H.264 并把尺寸设为 16 的倍数。不要把 WebM/H.265 原文件直接作为通过证据。
 
-## 输入限制
+## 依赖与实验记录
 
-- 当前支持 H.264，不支持直接把 VP9、MPEG-4 Part 2 或 H.265 送入此 VDEC 工程。需先转为 H.264 `yuv420p`。
-- 板端 VDEC 要求可解码的 H.264 coded 尺寸；遇到特殊非对齐流没有解码帧时，可把宽高缩放到 16 的倍数后再编码。仓库原始 smoke 视频有 466×466 的非标准 coded 尺寸，板端验证时将它转成了 480×480 H.264。
-- VPSS ch0 输出 640×640 NV21；VPSS ch1 和 VENC 输出分辨率向上对齐到 16 像素。检测坐标会映射到编码输出分辨率。
-- 推理后处理和 Region 画布绘制仍包含 CPU 工作；该 demo 优先消除整帧 CPU 解码、预处理、绘制与编码往返，并非声称 CPU 完全不参与。
-
-车辆权重内部保存的类别编号为 `{0: 0, 1: 1, 2: 2, 3: 4}`。`classes.txt` 延续历史显示顺序（motorcycle、car、bus、truck）；语义映射来自已有报告，复测数据集时仍需与该数据集的 `data.yaml` 核对。
-
-## 板端烟测（2026-10-16）
-
-使用随包 `samples/smoke_h264.mp4`（3 秒、480×480、10 FPS）运行 30 帧。模型输出张量 `[1,8,8400]`，全部帧完整经过推理和编码；端到端 1.706 秒、17.588 FPS，推理均值 10.049 ms/帧，NMS 0.245 ms，Region 更新 0.380 ms，硬件 VENC 0.929 ms，峰值 RSS 364.508 MiB。生成的 H.264 经 FFmpeg 封装并由 FFprobe 检查为 480×480、10 FPS、30 帧，完整解码成功。
-
-官方 API 参考：[VDEC 与 VPSS 视频处理流程](https://www.hiascend.com/document/detail/zh/Atlas200IDKA2DeveloperKit/23.0.RC2/Application%20Development%20Guide/aadgc/aclcppdevg_000033.html)、[Region 管理接口](https://www.hiascend.com/document/detail/zh/Atlas200IDKA2DeveloperKit/23.0.RC2/Application%20Development%20Guide/aadgc/aclcppdevg_03_0389.html)。
-
-## 工作流来源
-
-训练、ONNX 导出和 ATC 转换流程位于 `project/preparation/model_vehicle_detection/`。部署模型须由同一目录的 `model_convert/convert_atc.sh` 和板端配套 ATC 生成；精度报告请以 `model_val/` 对同一固定 test 集的 ONNX 与 OM 评估为准，视频 demo 烟测不是测试集精度评估。
+CMake 依赖 CANN ACL/DVPP、OpenCV C++、FFmpeg libavformat/libavcodec/libavutil、PkgConfig 和 CMake。记录代码提交、板卡/SOC/CANN、系统依赖版本、OM 与类别文件哈希、输入视频来源/编码/尺寸/帧数、命令、退出码、处理帧数和输出 SHA-256。检测类别语义仍需用同版本 data.yaml 核验。

@@ -1,59 +1,62 @@
-# 仓储物品检测：分项评估
+# 仓储检测：模型评估阶段 SOP
 
-model_val 中只提供四个独立评估脚本，每个脚本的输入均使用具名 --参数名 值：
+本阶段分别评估 ONNX 和 Atlas OM 的检测精度、推理流水线性能和内存占用，并校验后端精度差异。四个脚本分别为 accuracy_eval.py、performance_eval.py、memory_eval.py、precision_eval.py；视频 demo 的 smoke 不替代测试集精度。
 
-- ccuracy_eval.py：固定数据集上的总体与逐类别 Precision、Recall、F1、AP50、mAP50-95；报告数据集和标签清单哈希。
-- performance_eval.py：预处理、推理、后处理延迟的 mean、p50、p95、p99 和流水线 FPS。
-- memory_eval.py：模型文件大小、进程峰值 RSS、输入/输出张量内存；板端可附带
-pu-smi info 快照。
-- precision_eval.py：校验同一测试集的 ONNX 与 OM 精度报告并生成总体及逐类别差异和验收结论。
+## 固定数据和环境
 
-ONNX 使用 WSL yunshao 环境的 ONNX Runtime；OM 在 Atlas 200I DK A2 上使用板载 Miniconda ase 中的 clruntime。板端先执行 source /usr/local/Ascend/ascend-toolkit/set_env.sh。不要用系统 Python。完整测试集当前不在仓库中；恢复固定 test split 后才能运行并声称精度结果。示例的 --limit 20 仅用于快速冒烟，不能替代完整评估。
+固定使用 Roboflow warehouse-detection-xtbsn v1 的同一完整 test split。工作站运行 ONNX，Atlas 200I DK A2 运行 OM。确保两端 data.yaml、图片和 labels 完全相同，类别名/顺序一致，输入尺寸 640，阈值一致。仓储历史测试曾因检测框与分割标签混用跳过图片；复现必须检查脚本报告中的参与/跳过数量。
 
-## 精度分析
+工作站 ONNX Runtime 1.20.1 固定使用 CPUExecutionProvider，--device 参数只用于 OM 的 ais_bench InferSession。Atlas 基线为 CANN 7.0.RC1、Miniconda Python 3.9.2、NumPy 1.23.5 和板载 ais_bench/aclruntime。
 
-从此模型目录运行 ONNX 基线：
+```bash
+conda activate yunshao
+cd project/preparation/model_warehouse_detection
+```
 
-`ash
-python model_val/accuracy_eval.py --backend onnx --model model_export/artifacts/yolo11n_warehouse_detection_best.onnx --data model_train/datasets/warehouse_detection/data.yaml --split test --output model_val/reports/test --imgsz 640 --conf 0.25 --iou 0.45 --device 0 --warmup 5
-`
+## 精度评估
 
-板端将同一份数据集、data.yaml、model_val 和 OM 放到包目录中，然后运行：
+开发机 ONNX：
 
-`ash
-python model_val/accuracy_eval.py --backend om --model model_deployment/yolo11n_warehouse_detection_best.om --data /root/model_library/datasets/warehouse_detection/data.yaml --split test --output model_val/reports/test --imgsz 640 --conf 0.25 --iou 0.45 --device 0 --warmup 5
-`
+```bash
+python model_val/accuracy_eval.py --backend onnx --model model_export/artifacts/yolo11n_warehouse_detection_best.onnx --data model_train/datasets/warehouse_detection/data.yaml --split test --output model_val/reports/release/onnx --imgsz 640 --conf 0.001 --iou 0.45 --device 0 --warmup 5
+```
 
-输出 onnx_report.json / om_report.json 和各自的 *_per_class.csv。报告包含总体 micro Precision/Recall/F1、macro AP50、mAP50-95 及每个类别的指标。AP 使用 IoU 0.50 至 0.95、间隔 0.05 的 101 点插值。
+Atlas OM：
 
-## 性能评估
+在 Atlas 模型目录内准备与工作站相同的 data.yaml、图像/标签目录、model_val 脚本和部署 OM，并保持 YAML/数据内容一致。
 
-`ash
-python model_val/performance_eval.py --backend onnx --model model_export/artifacts/yolo11n_warehouse_detection_best.onnx --data model_train/datasets/warehouse_detection/data.yaml --split test --output model_val/reports/test/onnx_performance.json --imgsz 640 --conf 0.25 --iou 0.45 --device 0 --warmup 5
-`
+```bash
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
+/usr/local/miniconda3/bin/python model_val/accuracy_eval.py --backend om --model model_deployment/yolo11n_warehouse_detection_best.om --data model_train/datasets/warehouse_detection/data.yaml --split test --output model_val/reports/release/om --imgsz 640 --conf 0.001 --iou 0.45 --device 0 --warmup 5
+```
 
-OM 测量时将 --backend onnx 与模型路径替换为 --backend om --model model_deployment/yolo11n_warehouse_detection_best.om，并在板端执行。--limit 20 可以限制快速试跑图片数。
+两份结果各自产生 backend_report.json 和逐类 CSV。完整精度评估不得添加 --limit；小样本试跑必须标记为 smoke。
 
-## 内存评估
+## 性能和内存评估
 
-`ash
-python model_val/memory_eval.py --backend onnx --model model_export/artifacts/yolo11n_warehouse_detection_best.onnx --data model_train/datasets/warehouse_detection/data.yaml --split test --output model_val/reports/test/onnx_memory.json --imgsz 640 --device 0 --limit 1
-`
+ONNX 示例：
 
-板端 OM 示例：
+```bash
+python model_val/performance_eval.py --backend onnx --model model_export/artifacts/yolo11n_warehouse_detection_best.onnx --data model_train/datasets/warehouse_detection/data.yaml --split test --output model_val/reports/release/onnx_performance.json --imgsz 640 --conf 0.25 --iou 0.45 --device 0 --warmup 5
+python model_val/memory_eval.py --backend onnx --model model_export/artifacts/yolo11n_warehouse_detection_best.onnx --data model_train/datasets/warehouse_detection/data.yaml --split test --output model_val/reports/release/onnx_memory.json --imgsz 640 --device 0 --limit 1
+```
 
-`ash
-python model_val/memory_eval.py --backend om --model model_deployment/yolo11n_warehouse_detection_best.om --data /root/model_library/datasets/warehouse_detection/data.yaml --split test --output model_val/reports/test/om_memory.json --imgsz 640 --device 0 --limit 1
-`
+Atlas OM 性能和内存命令：
 
-其中进程 RSS 是进程峰值常驻内存，不等同于 NPU 显存；NPU 快照另存为同名 .npu-smi.txt 文件。
+```bash
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
+/usr/local/miniconda3/bin/python model_val/performance_eval.py --backend om --model model_deployment/yolo11n_warehouse_detection_best.om --data model_train/datasets/warehouse_detection/data.yaml --split test --output model_val/reports/release/om_performance.json --imgsz 640 --conf 0.25 --iou 0.45 --device 0 --warmup 5
+/usr/local/miniconda3/bin/python model_val/memory_eval.py --backend om --model model_deployment/yolo11n_warehouse_detection_best.om --data model_train/datasets/warehouse_detection/data.yaml --split test --output model_val/reports/release/om_memory.json --imgsz 640 --device 0 --limit 1
+```
 
-## 精度验证与对比
+内存报告记录 RSS 与 tensor bytes，并写入 npu-smi 快照；RSS 不等于 NPU 显存。性能结果必须注明设备、CANN、Python、预热次数与系统负载。
 
-把板端 om_report.json 复制到开发机的 model_val/reports/test/ 后运行：
+## 差异分析与结果归档
 
-`ash
-python model_val/precision_eval.py --onnx-report model_val/reports/test/onnx_report.json --om-report model_val/reports/test/om_report.json --output model_val/reports/test/onnx_vs_om --max-map-drop 0.02 --max-class-ap50-drop 0.05
-`
+将 OM 报告复制回工作站后运行：
 
-脚本检查 YAML 哈希、图片与标注清单哈希、split、图片数、尺寸、阈值和类别一致性；生成总体/逐类别 JSON 与 CSV。默认判定阈值为总体 mAP50-95 下降不超过 0.02、任一类别 AP50 下降不超过 0.05。没有同一固定 test split 的两份报告时拒绝进行对比。
+```bash
+python model_val/precision_eval.py --onnx-report model_val/reports/release/onnx/onnx_report.json --om-report model_val/reports/release/om/om_report.json --output model_val/reports/release/onnx_vs_om --max-map-drop 0.02 --max-class-ap50-drop 0.05
+```
+
+脚本对比 data.yaml、样本/标签清单哈希、split、样本数、尺寸、阈值和类别，输出总体/逐类差异。默认通过线为 mAP50-95 下降不超过 0.02、任一类别 AP50 下降不超过 0.05。归档代码提交、数据和模型 SHA-256、工具版本、设备信息及未过滤的原始报告；不基于不完整数据写精度结论。

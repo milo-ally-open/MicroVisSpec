@@ -4,7 +4,7 @@
 
 ## 当前实现与目标
 
-- 模型准备目录 `project/preparation/model_classroom_behavior/` 有 YOLO11n/640 训练/导出资料和 PT、ONNX、Ascend 310B4 OM；OM SHA-256 已与模型清单核对并安装到 Atlas，非 root 产品 runtime 已对合成 H.264 完成 75/75 帧推理/OSD/编码；真实课堂流仍未接入。
+- 模型准备目录 `project/preparation/model_classroom_behavior/` 保存 YOLO11n/640 训练/导出资料、PT、ONNX、Ascend 310B4 OM 及模型清单。`model_deployment/` 另提供独立 C++/AscendCL 视频验收 demo；它复用车辆/仓储流程的 VDEC、VPSS、AIPP、ACL、Region OSD 和 VENC 路径，不管理产品模型 catalog。OM SHA-256 已与运行时清单核对并安装到 Atlas；正式非 root runtime 已对合成 H.264 完成 75/75 帧推理/OSD/编码；课堂模型 demo 源码恢复后的板端重新构建与真实课堂流仍待验收。
 - 正式边缘代码 `project/src/device_sides/atlas200idka2/` 已包含 agent、模型包校验/outbox、课堂推理 runtime、`ModelClassroomBehaviorDetection` 插件及媒体 pipeline；Atlas 交叉编译和现有配置/插件身份 CTest 已通过。
 - 目标为同一 Atlas 工程树内包含可构建的 `agent`、`classroom-runtime`、共享 model catalog 和持久事件缓存。组织方式借鉴 [device_side_ax650](https://gitee.com/milo-ally-intern/manhole-cover-detection/tree/master/model_deployment/device_side_ax650)：稳定模型插件 ABI、manager/pipeline、逐流模型绑定和独立告警 JSON；AX650 的 AX Engine/AX SYS/视频接口不得复制，Atlas 插件和媒体 pipeline 使用 AscendCL/DVPP。模型包目录、校验、按 model_id 独立激活和回滚沿用 [Atlas 边缘运行时设计](../atlas_edge_runtime/design.md)。
 
@@ -27,6 +27,10 @@ flowchart LR
   MQTT --> Events[event-service]
   Runtime --> Evidence[规则触发截图 HTTPS 上传]
 ```
+
+### preparation 独立验收 demo
+
+`model_classroom_behavior/model_deployment/` 保留独立 CLI 工程：`src/main.cpp` 负责 OM 加载、YOLO 输出解码、按 labels 类别数校验和帧循环；`src/include/media_pipeline.hpp` 负责 H.264 demux、Atlas VDEC/VPSS、静态 NV21 AIPP 输入路径和 H.264 VENC 输出；`src/include/region_osd.hpp` 负责 VPSS Region 叠加。`classes.txt` 的行顺序必须与模型训练类别顺序一致。其输入/输出和阈值由 CLI 指定，结果只用于模型部署调试，不发布业务事件、不读取 active model symlink，也不替代 systemd `classroom-runtime`。训练、导出、转换、构建、烟测和评估 SOP 分别保存在各模型对应阶段目录的 README.md。
 
 ## 接口和数据
 
@@ -65,3 +69,4 @@ flowchart LR
 |---|---|
 | 2026-10-18 | 定义 Classroom edge 服务、模型目录、规则禁用优先及云边交互设计。 |
 | 2026-10-19 | 按 AX650 示例调整为 AI plugin + manager/pipeline、逐流模型绑定和独立 alarm rules，硬件后端使用 AscendCL。 |
+| 2026-10-20 | 明确 preparation 模型验收 demo 与生产 runtime 的边界；在三套模型工作流内统一补充分阶段复现文档。 |

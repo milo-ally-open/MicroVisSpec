@@ -1,59 +1,62 @@
-# 车辆检测：分项评估
+# 车辆检测：模型评估阶段 SOP
 
-model_val 中只提供四个独立评估脚本，每个脚本的输入均使用具名 --参数名 值：
+此阶段有四个独立程序：accuracy_eval 计算总体/逐类 P、R、F1、AP50、mAP50-95；performance_eval 记录流水线延迟和 FPS；memory_eval 记录模型文件、RSS、张量和 NPU 快照；precision_eval 验证 ONNX 与 OM 是否来自相同评测输入并汇总差异。
 
-- ccuracy_eval.py：固定数据集上的总体与逐类别 Precision、Recall、F1、AP50、mAP50-95；报告数据集和标签清单哈希。
-- performance_eval.py：预处理、推理、后处理延迟的 mean、p50、p95、p99 和流水线 FPS。
-- memory_eval.py：模型文件大小、进程峰值 RSS、输入/输出张量内存；板端可附带
-pu-smi info 快照。
-- precision_eval.py：校验同一测试集的 ONNX 与 OM 精度报告并生成总体及逐类别差异和验收结论。
+## 数据、环境和边界
 
-ONNX 使用 WSL yunshao 环境的 ONNX Runtime；OM 在 Atlas 200I DK A2 上使用板载 Miniconda ase 中的 clruntime。板端先执行 source /usr/local/Ascend/ascend-toolkit/set_env.sh。不要用系统 Python。完整测试集当前不在仓库中；恢复固定 test split 后才能运行并声称精度结果。示例的 --limit 20 仅用于快速冒烟，不能替代完整评估。
+工作站 ONNX 在 yunshao 环境中运行，Atlas OM 在板载 CANN/ais_bench Python 环境中运行。两端必须使用 Roboflow vehicle-detection-tqbaf-7cck5 v1 的同一完整 test split、data.yaml、类别顺序、640 尺寸和阈值。数据集不随仓库保证提供；必须先还原并核对图片/标签。历史报告曾记录某些标签被忽略，复现时须以本次实际评估数量为准。
 
-## 精度分析
-
-从此模型目录运行 ONNX 基线：
+工作站 ONNX Runtime 1.20.1 固定使用 CPUExecutionProvider，--device 参数只用于 OM 的 ais_bench InferSession。Atlas 基线为 CANN 7.0.RC1、Miniconda Python 3.9.2、NumPy 1.23.5 和板载 ais_bench/aclruntime。
 
 ```bash
-python model_val/accuracy_eval.py --backend onnx --model model_export/artifacts/yolo11n_vehicle_detection_best.onnx --data model_train/datasets/vehicle_detection/data.yaml --split test --output model_val/reports/test --imgsz 640 --conf 0.25 --iou 0.45 --device 0 --warmup 5
+conda activate yunshao
+cd project/preparation/model_vehicle_detection
 ```
 
-板端将同一份数据集、data.yaml、model_val 和 OM 放到包目录中，然后运行：
+## 精度评估
+
+工作站 ONNX：
 
 ```bash
-python model_val/accuracy_eval.py --backend om --model model_deployment/yolo11n_vehicle_detection_best.om --data /root/model_library/datasets/vehicle_detection/data.yaml --split test --output model_val/reports/test --imgsz 640 --conf 0.25 --iou 0.45 --device 0 --warmup 5
+python model_val/accuracy_eval.py --backend onnx --model model_export/artifacts/yolo11n_vehicle_detection_best.onnx --data model_train/datasets/vehicle_detection/data.yaml --split test --output model_val/reports/release/onnx --imgsz 640 --conf 0.001 --iou 0.45 --device 0 --warmup 5
 ```
 
-输出 onnx_report.json / om_report.json 和各自的 *_per_class.csv。报告包含总体 micro Precision/Recall/F1、macro AP50、mAP50-95 及每个类别的指标。AP 使用 IoU 0.50 至 0.95、间隔 0.05 的 101 点插值。
+板端 OM：
 
-## 性能评估
+在 Atlas 模型目录内准备与工作站相同的 data.yaml、图像/标签目录、model_val 脚本和部署 OM，并保持 YAML/数据内容一致。
 
 ```bash
-python model_val/performance_eval.py --backend onnx --model model_export/artifacts/yolo11n_vehicle_detection_best.onnx --data model_train/datasets/vehicle_detection/data.yaml --split test --output model_val/reports/test/onnx_performance.json --imgsz 640 --conf 0.25 --iou 0.45 --device 0 --warmup 5
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
+/usr/local/miniconda3/bin/python model_val/accuracy_eval.py --backend om --model model_deployment/yolo11n_vehicle_detection_best.om --data model_train/datasets/vehicle_detection/data.yaml --split test --output model_val/reports/release/om --imgsz 640 --conf 0.001 --iou 0.45 --device 0 --warmup 5
 ```
 
-OM 测量时将 --backend onnx 与模型路径替换为 --backend om --model model_deployment/yolo11n_vehicle_detection_best.om，并在板端执行。--limit 20 可以限制快速试跑图片数。
+每份输出含 backend_report.json 与 backend_per_class.csv。正式对比不加 --limit；限制图片数量仅用于排查运行错误。
 
-## 内存评估
+## 性能和内存
+
+ONNX 端示例：
 
 ```bash
-python model_val/memory_eval.py --backend onnx --model model_export/artifacts/yolo11n_vehicle_detection_best.onnx --data model_train/datasets/vehicle_detection/data.yaml --split test --output model_val/reports/test/onnx_memory.json --imgsz 640 --device 0 --limit 1
+python model_val/performance_eval.py --backend onnx --model model_export/artifacts/yolo11n_vehicle_detection_best.onnx --data model_train/datasets/vehicle_detection/data.yaml --split test --output model_val/reports/release/onnx_performance.json --imgsz 640 --conf 0.25 --iou 0.45 --device 0 --warmup 5
+python model_val/memory_eval.py --backend onnx --model model_export/artifacts/yolo11n_vehicle_detection_best.onnx --data model_train/datasets/vehicle_detection/data.yaml --split test --output model_val/reports/release/onnx_memory.json --imgsz 640 --device 0 --limit 1
 ```
 
-板端 OM 示例：
+在 Atlas 执行 OM 性能和内存测量：
 
 ```bash
-python model_val/memory_eval.py --backend om --model model_deployment/yolo11n_vehicle_detection_best.om --data /root/model_library/datasets/vehicle_detection/data.yaml --split test --output model_val/reports/test/om_memory.json --imgsz 640 --device 0 --limit 1
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
+/usr/local/miniconda3/bin/python model_val/performance_eval.py --backend om --model model_deployment/yolo11n_vehicle_detection_best.om --data model_train/datasets/vehicle_detection/data.yaml --split test --output model_val/reports/release/om_performance.json --imgsz 640 --conf 0.25 --iou 0.45 --device 0 --warmup 5
+/usr/local/miniconda3/bin/python model_val/memory_eval.py --backend om --model model_deployment/yolo11n_vehicle_detection_best.om --data model_train/datasets/vehicle_detection/data.yaml --split test --output model_val/reports/release/om_memory.json --imgsz 640 --device 0 --limit 1
 ```
 
-其中进程 RSS 是进程峰值常驻内存，不等同于 NPU 显存；NPU 快照另存为同名 .npu-smi.txt 文件。
+memory_eval 附带 npu-smi 快照；进程 RSS 不等于 NPU 显存。性能记录应同时记录预热、设备和系统负载。
 
-## 精度验证与对比
+## ONNX/OM 对比和归档
 
-把板端 om_report.json 复制到开发机的 model_val/reports/test/ 后运行：
+将 OM 报告复制回工作站后运行：
 
 ```bash
-python model_val/precision_eval.py --onnx-report model_val/reports/test/onnx_report.json --om-report model_val/reports/test/om_report.json --output model_val/reports/test/onnx_vs_om --max-map-drop 0.02 --max-class-ap50-drop 0.05
+python model_val/precision_eval.py --onnx-report model_val/reports/release/onnx/onnx_report.json --om-report model_val/reports/release/om/om_report.json --output model_val/reports/release/onnx_vs_om --max-map-drop 0.02 --max-class-ap50-drop 0.05
 ```
 
-脚本检查 YAML 哈希、图片与标注清单哈希、split、图片数、尺寸、阈值和类别一致性；生成总体/逐类别 JSON 与 CSV。默认判定阈值为总体 mAP50-95 下降不超过 0.02、任一类别 AP50 下降不超过 0.05。没有同一固定 test split 的两份报告时拒绝进行对比。
+对比器会校验 dataset YAML、图片和标签清单哈希、split、图片数、尺寸、阈值及类别，并生成 JSON/CSV 差异。默认阈值为总体 mAP50-95 下降不超过 0.02、任一类别 AP50 下降不超过 0.05。保留代码提交、数据/模型哈希、工具版本、完整命令和原始报告。没有完整且同源的 test split 报告时，不形成精度等价结论。

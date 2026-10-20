@@ -1,5 +1,5 @@
 ---
-name: project-docset
+name: project-docset-initialization
 description: Create or maintain a project-agnostic software-engineering document set through interactive PRD discovery, evidence-based research, system design, and traceable technical specification.
 ---
 

@@ -1,26 +1,22 @@
-# 仓储物品检测部署 demo
+# 仓储检测：Atlas 视频验收阶段 SOP
 
-此目录是面向 Atlas 200I DK A2（Ascend 310B4）、Ubuntu 22.04 ARM64 和板端 CANN 7.0.RC1 的独立 C++/AscendCL 视频推理工程。
+## 目的与边界
 
-## 硬件链路
+在 Atlas 200I DK A2 / Ascend 310B4 使用 C++/AscendCL demo 验证仓储检测 OM 和视频媒体管线。demo 覆盖 VDEC、VPSS、静态 AIPP、ACL 推理、检测框/Region OSD 和 VENC H.264 输出，结果为无容器的 H.264 elementary stream。此验收不是 test split 精度报告。
 
-```text
-H.264 文件或 RTSP
-  → FFmpeg demux / Annex-B
-  → VDEC
-  → VPSS ch0（NV21 缩放与等比例留边）
-  → 静态 AIPP（色彩转换、归一化）
-  → ACL / Ascend 310B4 推理
-  → CPU 检测框解码与 NMS
-  → VPSS Region（叠加到 ch1）
-  → VENC（H.264）
+## 输入核对
+
+使用 model_convert 阶段输出的 yolo11n_warehouse_detection_best.om，放置于本目录。classes.txt 顺序为 Toolbox、bottles、extinguisher、fitting box、forklift、full box、pallet、pallet_truck、palletjack、person、small_load_carrier、stillage；执行前须和当前 data.yaml/模型输出索引核对。模型类别数或标签不一致时停止运行。
+
+仅支持 H.264 输入。samples/smoke_h264.mp4 用于初始 smoke；公开文件 samples/forklift_open_video.webm 需要转码后才可使用：
+
+```bash
+ffmpeg -y -i samples/forklift_open_video.webm -vf 'scale=640:640:force_original_aspect_ratio=decrease,pad=640:640:(ow-iw)/2:(oh-ih)/2' -c:v libx264 -pix_fmt yuv420p -an /tmp/warehouse-open-h264.mp4
 ```
 
-视频帧由 VDEC、VPSS 和 VENC 处理；推理输入从 VPSS 的 NV21 设备缓冲区直接送入静态 AIPP 模型。不会用 OpenCV 解码、缩放、画整帧或编码。OpenCV 仅用于检测结果 NMS、Region 的 ARGB 画布绘制。Region 绑定 VPSS 输出通道 1。
+## 板端构建及运行
 
-## 构建环境
-
-依赖板端 CANN ACL 与媒体开发库、CMake、OpenCV C++ 4.x，以及 FFmpeg `libavformat`、`libavcodec`、`libavutil` 开发包。已在板端 OpenCV 4.5.4、FFmpeg 4.4、CANN 7.0.RC1 上构建。
+加载板端 CANN 后从本目录构建：
 
 ```bash
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
@@ -28,50 +24,27 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j2
 ```
 
-头文件在 `src/include/`，由 `src/main.cpp` 引用。
-
-## 运行
-
-输入必须是 H.264、YUV420 视频文件或 H.264 RTSP 流；模型必须是 `model_convert/convert_atc.sh` 生成的静态 NV21 AIPP OM。输出是无容器的 H.264 elementary stream：
+先运行随包短视频：
 
 ```bash
-./build/atlas_yolo_acl_demo \
-  --model yolo11n_warehouse_detection_best.om \
-  --video samples/smoke_h264.mp4 \
-  --output detected.h264 \
-  --labels classes.txt --conf 0.25 --iou 0.45
+./build/atlas_yolo_acl_demo --model yolo11n_warehouse_detection_best.om --video samples/smoke_h264.mp4 --output /tmp/warehouse-smoke.h264 --labels classes.txt --conf 0.25 --iou 0.45
 ```
 
-RTSP 示例：
+再运行转码后的公开样例：
 
 ```bash
-./build/atlas_yolo_acl_demo \
-  --model yolo11n_warehouse_detection_best.om \
-  --video 'rtsp://user:password@camera/stream' \
-  --output detected.h264 --labels classes.txt
+./build/atlas_yolo_acl_demo --model yolo11n_warehouse_detection_best.om --video /tmp/warehouse-open-h264.mp4 --output /tmp/warehouse-open-output.h264 --labels classes.txt --conf 0.25 --iou 0.45
 ```
 
-板端 VENC 会硬件编码 H.264。若需要 MP4 容器，用 FFmpeg 封装输出流；将 `25` 替换为程序打印的编码帧率：
+终端应显示 OM 输出维度、输入/输出尺寸、处理帧数、FPS、推理/NMS/Region/VENC 延迟和峰值 RSS。检查输出：
 
 ```bash
-ffmpeg -y -framerate 25 -i detected.h264 -c:v copy detected.mp4
+ffprobe -v error -f h264 -count_frames -show_entries stream=codec_name,width,height,nb_read_frames -of default=noprint_wrappers=1 /tmp/warehouse-smoke.h264
+ffplay -f h264 -framerate 25 /tmp/warehouse-smoke.h264
 ```
 
-程序输出输入/输出分辨率、处理和编码帧数、有效 FPS、NPU 推理、NMS、Region 更新、VENC 耗时分位数及峰值 RSS。若没有成功完成端到端处理的帧数，程序会报错退出。
+Atlas VDEC 只接受 H.264；如解码失败，检查码流并使用 yuv420p 重新编码。输入尺寸异常时将输出设为 16 的倍数后重试。WebM 源文件不能作为通过记录。
 
-## 输入限制
+## 追溯记录
 
-- 当前支持 H.264，不支持直接把 VP9、MPEG-4 Part 2 或 H.265 送入此 VDEC 工程。需先转为 H.264 `yuv420p`。
-- 板端 VDEC 要求可解码的 H.264 coded 尺寸；遇到特殊非对齐流没有解码帧时，可把宽高缩放到 16 的倍数后再编码。仓库原始 smoke 视频有 466×466 的非标准 coded 尺寸，板端验证时将它转成了 480×480 H.264。
-- VPSS ch0 输出 640×640 NV21；VPSS ch1 和 VENC 输出分辨率向上对齐到 16 像素。检测坐标会映射到编码输出分辨率。
-- 推理后处理和 Region 画布绘制仍包含 CPU 工作；该 demo 优先消除整帧 CPU 解码、预处理、绘制与编码往返，并非声称 CPU 完全不参与。
-
-## 板端烟测（2026-10-16）
-
-使用随包 `samples/smoke_h264.mp4`（3 秒、640×640、10 FPS）运行 30 帧。仓储模型输出张量 `[1,16,8400]`，端到端 1.740 秒、17.239 FPS，推理均值 10.389 ms/帧，NMS 0.531 ms，Region 更新 0.742 ms，硬件 VENC 1.207 ms，峰值 RSS 365.020 MiB。生成的 H.264 经 FFmpeg 封装并由 FFprobe 检查为 640×640、10 FPS、30 帧；完整解码成功。
-
-官方 API 参考：[VDEC 与 VPSS 视频处理流程](https://www.hiascend.com/document/detail/zh/Atlas200IDKA2DeveloperKit/23.0.RC2/Application%20Development%20Guide/aadgc/aclcppdevg_000033.html)、[Region 管理接口](https://www.hiascend.com/document/detail/zh/Atlas200IDKA2DeveloperKit/23.0.RC2/Application%20Development%20Guide/aadgc/aclcppdevg_03_0389.html)。
-
-## 工作流来源
-
-训练、ONNX 导出和 ATC 转换流程位于 `project/preparation/model_warehouse_detection/`。部署模型须由同一目录的 `model_convert/convert_atc.sh` 和板端配套 ATC 生成；精度报告请以 `model_val/` 对同一固定 test 集的 ONNX 与 OM 评估为准，视频 demo 烟测不是测试集精度评估。
+记录提交号、板卡/SOC/CANN、CMake/OpenCV/FFmpeg 版本、OM/classes SHA-256、输入视频来源和编码、帧数、完整命令、退出码、输出帧数及 H.264 文件哈希。demo smoke 只证明硬件推理和编码链路工作；精度、性能对比仍以 model_val 的同源测试报告为准。

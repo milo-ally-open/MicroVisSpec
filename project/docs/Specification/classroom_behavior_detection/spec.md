@@ -1,7 +1,7 @@
 # 教室行为检测行为规格
 
 > 关联提案：[proposal.md](proposal.md)；边缘运行时：[atlas_edge_runtime](../atlas_edge_runtime/spec.md)；云端事件：[event_service](../event_service/spec.md)。<br>
-> 状态：运行时/插件/配置已进入 Atlas 产品树；PT、ONNX、OM 已在 preparation，OM 已安装到 Atlas 并完成合成视频推理 smoke；真实课堂流及精度评估仍待验收。<br>
+> 状态：运行时/插件/配置已进入 Atlas 产品树；PT、ONNX、OM 已在 preparation，OM 已安装到 Atlas 并完成合成视频推理 smoke；独立模型部署 demo 源码与复现文档已补齐，Atlas 上重新构建待验收；真实课堂流及精度评估仍待验收。<br>
 > 来源：用户决定与仓库现有模型流程。
 
 ## 范围和术语
@@ -62,6 +62,18 @@
 - **AC-04.2** Given 规则命中产生的截图，When 上传并到期，Then 图片只经账号鉴权读取，上传成功 24 小时后返回过期状态；事件元数据按既有服务合同保留。
 
 **验证方式**：载荷 schema 检查、访问控制集成测试、过期证据接口测试。
+
+### REQ-05：模型部署验收 demo 与研发复现
+
+**需求**：课堂模型研发目录必须保留可独立构建的 Atlas AscendCL 视频推理 demo，用于验证指定 OM、类别顺序、H.264 输入、推理后处理和 H.264 输出。该 demo 不负责模型包安装/激活、产品服务生命周期、云端事件或告警；这些行为由 Atlas 产品 runtime 与 agent 唯一负责。课堂、车辆和仓储模型工作流的训练、导出、转换、评估、部署阶段目录分别提供 README.md SOP，说明依赖、输入、命令、输出和已知限制；不要求在模型根目录增加总 README。
+
+**验收条件**
+
+- **AC-05.1** Given Ascend 310B4 兼容 OM、与模型类别顺序一致的 labels 文件和 H.264 文件/RTSP 输入，When 构建并运行 `model_deployment` demo，Then demo 校验模型输入/输出与类别数、逐帧运行检测及 OSD，并输出 H.264 和处理/推理统计；错误输入或输出形状不匹配时明确失败。
+- **AC-05.2** Given 课堂模型开发或复现人员，When 按训练、导出、转换、评估、部署各阶段目录中的 README.md SOP 操作，Then 可定位固定数据集版本、模型参数、产物路径、转换命令、评估方法和设备要求；文档不含真实密钥/密码，也不把烟测描述成精度验收。
+- **AC-05.3** Given 产品发布或服务运维，When 使用正式边缘服务，Then 生产推理仍由 `project/src/device_sides/atlas200idka2/` 内的 `classroom-runtime` 执行；研发 demo 不替代或重复模型 catalog、安装、激活、规则上报或 systemd 服务。
+
+**验证方式**：源码布局与配置静态检查；Atlas 200I DK A2/CANN 实机 CMake 构建及有效模型 H.264 输入输出 smoke。每次结果须记录板卡、CANN、模型哈希和实际完成帧数；开发机文档检查不能代替板端构建证据。
 
 ## 不变项与兼容要求
 
