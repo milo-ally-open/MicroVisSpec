@@ -10,9 +10,9 @@ import AppIcon from './AppIcon.vue'
       <span><strong>云哨</strong><small>EDGE INTELLIGENCE</small></span>
     </RouterLink>
     <div class="auth-aside__copy">
-      <span class="eyebrow eyebrow--light">云边协同 · 课堂守护</span>
+      <span class="eyebrow eyebrow--light">云边协同 · 智能感知</span>
       <h1>让现场可见，<br>让响应有据。</h1>
-      <p>连接边缘设备与每一次现场响应，<br>在一个工作台里掌握课堂动态。</p>
+      <p>连接边缘设备与现场数据，<br>在一个工作台掌握运行状态。</p>
       <div class="auth-flow" aria-label="从现场感知到事件处置">
         <div><AppIcon name="camera" :size="28" /><strong>现场感知</strong><small>边缘设备与视频</small></div>
         <span class="auth-flow__connector"></span>

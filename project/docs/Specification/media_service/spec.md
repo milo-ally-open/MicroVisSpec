@@ -12,8 +12,10 @@
 
 仅配置已授权摄像头来源，控制面重启后恢复期望配置。
 
-- **AC-01.1**：校验摄像头归属并加密来源凭据。
+- **AC-01.1**：校验摄像头归属并加密来源 RTSP URL。
 - **AC-01.2**：MediaMTX 重启或漂移后重新对账。
+- **AC-01.3**：来源写接口仅接受 `rtsp_url`；拒绝独立用户名/密码字段、URL userinfo、非 RTSP scheme、空 host 和非法 URL。来源配置保持加密保存，MediaMTX 收到的 URL 不增加来源认证信息。
+- **AC-01.4**：登录账号查询其已登记摄像头状态时，响应提供该摄像头已保存的 `rtsp_url` 供设备详情页回显；不返回其他账号摄像头来源。升级时将旧加密记录中的独立 username/password 字段剔除并重加密 URL。
 
 ### REQ-02 播放授权与配额
 
@@ -42,7 +44,7 @@
 
 **摄像头归属 → 流来源登记 → MediaMTX 配置/拉流 → 账号授权与观看配额 → WebRTC/HLS 播放 → 状态与故障反馈**。
 
-任务按五个阶段实施。首发由 Atlas 200I DK A2 侧生成兼容浏览器的码流；本服务不承载视频帧、不对视频软件转码。流路径和来源凭据均不得直接暴露给未授权的浏览器。[MediaMTX 文档](https://mediamtx.org/docs/read/web-browsers)
+任务按五个阶段实施。首发由 Atlas 200I DK A2 侧生成兼容浏览器的码流；本服务不承载视频帧、不对视频软件转码。原始 RTSP URL 不得返回给播放授权或未授权请求；仅授权摄像头所有者可在来源状态接口读取以便配置回显。[MediaMTX 文档](https://mediamtx.org/docs/read/web-browsers)
 
 ## 二、第一阶段：服务骨架与数据所有权
 
@@ -50,8 +52,8 @@
 
 1. 在现有 `go/` 占位目录内建立 Go module、入口、配置、健康接口和数据库迁移；实现后把占位 Dockerfile 补为可构建镜像。`/health/live` 表示进程存活，`/health/ready` 反映 PostgreSQL 与必需的 MediaMTX 控制面状态。
 2. 由 media-service 独占 PostgreSQL `media` schema，至少保存 `streams`、`viewer_leases` 与 `inbox`。`streams` 保存 `stream_id`、`account_id`、经 device-service 核对的 `device_id`、唯一 `camera_id`、加密的 RTSP URL/凭据、配置版本及状态；`viewer_leases` 保存 `session_id`、流 ID、到期时间和播放器关联；`inbox` 对 `session.revoked`、`device.disabled` 去重。
-3. 来源凭据使用部署机密加密保存，密钥不写仓库、镜像或普通日志。数据库账号仅有 `media` schema 所需权限；不直接读取 device-service 的表。
-4. 日志和指标携带请求 ID、camera_id、stream_id；不输出 RTSP 明文 URL、来源密码、浏览器 Cookie、内部服务凭据或可复用播放凭据。
+3. RTSP URL 使用现有部署密钥加密保存，密钥不写仓库、镜像或普通日志。数据库账号仅有 `media` schema 所需权限；不直接读取 device-service 的表。
+4. 日志和指标携带请求 ID、camera_id、stream_id；不输出 RTSP URL、浏览器 Cookie、内部服务凭据或可复用播放凭据。
 
 ### 2.2 交付物与阶段验收
 
@@ -67,22 +69,22 @@
 
 | 接口 | 实现要求 |
 | --- | --- |
-| `PUT /api/v1/media/cameras/{cameraId}/source` | 接收 RTSP URL 和独立的 `source_username`、`source_password`；先向 device-service 核对摄像头属于当前账号，再保存来源并返回 `stream_id`、`config_status`。 |
-| `GET /api/v1/media/cameras/{cameraId}/status` | 返回设备关联、来源可达、拉流状态、最近错误和浏览器编码兼容提示；不能仅复制设备在线状态。 |
+| `PUT /api/v1/media/cameras/{cameraId}/source` | 仅接收 `rtsp_url`；先向 device-service 核对摄像头属于当前账号，再加密保存来源并返回 `stream_id`、`config_status`。 |
+| `GET /api/v1/media/cameras/{cameraId}/status` | 返回设备关联、来源可达、拉流状态、最近错误、浏览器编码兼容提示，以及当前账号配置该摄像头时可回显的 `rtsp_url`；不能仅复制设备在线状态。 |
 | MediaMTX 内部控制 API | 仅 media-service 调用，用于按 `stream_id` 新增、修改、删除路径并读取实际状态；不经公网暴露。 |
 
 ### 3.2 实现任务
 
-1. `camera_id` 必须是 device-service 已登记且属于当前账号的摄像头；浏览器请求体中的 `account_id` 无效。RTSP 用户名/密码单独传递，拒绝在 URL 中嵌入凭据；数据库保存加密值。
-2. MediaMTX 路径使用不暴露设备信息的 `stream_id`。将来源设置为边缘设备输出的私有 RTSP 地址，显式启用 `sourceOnDemand`；来源无人观看时释放拉流，恢复观看时向界面呈现连接中状态。[MediaMTX 配置](https://mediamtx.org/docs/references/configuration-file/)
+1. `camera_id` 必须是 device-service 已登记且属于当前账号的摄像头；浏览器请求体中的 `account_id` 无效。新接口只接受 `rtsp_url`，拒绝 URL userinfo；数据库仅加密保存 URL。部署升级时解密历史来源、移除旧 username/password 属性并重加密，代码不得再使用旧来源认证字段。
+2. MediaMTX 路径使用不暴露设备信息的 `stream_id`。将来源设置为 Atlas 输出的可达 RTSP 地址，显式启用 `sourceOnDemand`；来源无人观看时释放拉流，恢复观看时向界面呈现连接中状态。[MediaMTX 配置](https://mediamtx.org/docs/references/configuration-file/)
 3. 维护“期望配置版本”和“MediaMTX 实际配置版本”。配置更新失败时标记 `pending`/`failed`，后台定期对账重试；不得把数据库已保存误认为 MediaMTX 已生效。
 4. 接收 device-service 的 `device.disabled`，按设备关闭关联流路径和观看租约；重复通知幂等。定期向 device-service 对账摄像头归属与设备启用状态，补偿消息延迟或 MediaMTX 重启。历史事件、截图与处置由 event-service 按自己的留存规则管理。
 5. 监控“设备在线”“RTSP 来源可达”“媒体正在拉取”“浏览器可播放”四个不同状态，界面按具体原因提示。
 
 ### 3.3 交付物与阶段验收
 
-- 摄像头来源配置和状态接口、MediaMTX 配置对账任务、凭据保存与轮换说明。
-- MediaMTX 重启后，路径可由 media-service 自动恢复；来源密码不会出现在浏览器响应、控制面日志或数据库明文字段。
+- 摄像头来源配置和状态接口、MediaMTX 配置对账任务及加密 URL 保存说明。
+- MediaMTX 重启后路径可由 media-service 自动恢复；URL userinfo、独立来源用户名/密码字段均被拒绝；来源 URL 只在已授权摄像头状态响应中返回，不出现在播放授权响应和控制面日志，数据库不保存明文。
 - 不存在的摄像头、其他账号摄像头和不合法 RTSP 来源均被拒绝；摄像头删除后不再允许观看。
 
 ---
@@ -97,11 +99,11 @@
 | `POST /api/v1/media/viewer-leases/{leaseId}/renew` | 播放期间每 15 秒续租，服务端租约有效期 30 秒。 |
 | `DELETE /api/v1/media/viewer-leases/{leaseId}` | 页面关闭、切换流或主动停止播放时释放观看连接；重复释放成功。 |
 | `/media/{streamId}/whep`、`/media/{streamId}/index.m3u8` | Nginx 代理到 MediaMTX；WHEP 信令、HLS 播放列表及每个分片都经过账号与摄像头归属鉴权。 |
-| `GET /internal/v1/media/authorize-playback` | 仅 Nginx 的内部授权子请求可调用；读取经 auth-service 校验后覆写的 `X-Account-ID`、`X-Session-ID` 和原始 `X-Original-URI`，不接收请求体。URI 必须是 `/media/{streamId}/...`，可带 `lease_id` 查询参数；每个 HLS 子资源仍按当前会话、流和有效租约检查。 |
+| `GET /internal/v1/media/authorize-playback` | 仅 Nginx 的内部授权子请求可调用；接收原始 Cookie、CSRF、Origin、方法及 `X-Original-URI`，由 media-service 使用服务间凭据调用 auth-service `/internal/v1/sessions/validate`。账号和会话 ID 只采用 auth-service 响应头，忽略客户端身份头；不接收请求体。URI 必须是 `/media/{streamId}/...`，可带 `lease_id` 查询参数；每个 HLS 子资源仍按当前会话、流和有效观看租约检查。 |
 
 ### 4.2 实现任务
 
-1. Nginx 对媒体请求先调用 auth-service 会话/Origin/CSRF 授权子请求，再将已验证会话身份及原始媒体 URI 交给 media-service 的 `GET /internal/v1/media/authorize-playback`；该入口验证账号、stream_id、会话和有效观看租约。Nginx 清除客户端伪造的身份头；MediaMTX 直接 HTTP 读入口仅允许经受控代理访问，并使用内部身份，不能保留默认匿名可读配置。[MediaMTX 鉴权](https://mediamtx.org/docs/features/authentication)
+1. Nginx 对每个媒体请求只调用 media-service 的 `GET /internal/v1/media/authorize-playback` 授权子请求，并传递原始 Cookie、CSRF、Origin、方法及媒体 URI。media-service 再使用 `MEDIA_AUTH_SERVICE_TOKEN` 调用 auth-service 会话校验接口；只有 auth-service 返回的账号和会话身份可用于验证 stream_id、摄像头归属和有效观看租约。客户端提供的身份头一律忽略，校验失败时拒绝播放。MediaMTX 直接 HTTP 读入口仅允许经受控代理访问，并使用内部身份，不能保留默认匿名可读配置。[MediaMTX 鉴权](https://mediamtx.org/docs/features/authentication)
 2. 全平台最多同时活动 12 路来源、24 个观看连接；一个完整 12 分屏桌面会话占 12 个连接。并发申请以数据库事务或等效原子操作限制，不能两个请求同时越过额度；租约超时、页面关闭和 MediaMTX 会话对账均可回收连接。
 3. 已建立的 WebRTC 媒体连接不会因之后一次 HTTP 鉴权失败而自动结束。经受限 `/internal/v1/inbox` 幂等接收 auth-service 的 `session.revoked` 后，media-service 结束关联的播放会话；租约到期也停止播放。HLS 每次新请求仍需鉴权。
 4. 前端 HLS 播放器使用同源受保护地址，并让分片请求携带会话 Cookie；不要用无法附带受控鉴权信息的公开 iframe。WHEP 信令由同源 HTTPS 发起，媒体 UDP 连接单独处理。
@@ -148,10 +150,10 @@
 
 ### 6.1 运行任务
 
-1. 指标覆盖活动源流、观看连接、配额拒绝、RTSP 来源失败、WebRTC/HLS 成功与失败、租约回收、MediaMTX 对账差异。日志使用 request_id、camera_id 和 stream_id 串联，不记录来源凭据。
+1. 指标覆盖活动源流、观看连接、配额拒绝、RTSP 来源失败、WebRTC/HLS 成功与失败、租约回收、MediaMTX 对账差异。日志使用 request_id、camera_id 和 stream_id 串联，不记录 RTSP URL。
 2. PostgreSQL 或 MediaMTX 不可用时，明确暴露就绪与播放错误；media-service 恢复后重建期望路径，不需要用户重复录入配置。
 3. 流来源配置变更后旧来源停止、观看者得到可解释的中断或重连；配置失败保留版本与错误，避免显示假在线。
-4. 备份 `media` schema 与 MediaMTX 必要配置；密钥轮换与恢复操作须保留来源凭据可用性，但不导出明文给前端。
+4. 备份 `media` schema 与 MediaMTX 必要配置；密钥轮换与恢复操作须保留来源 URL 可用性，且不向播放接口或日志输出 URL。
 
 ### 6.2 最终交付物与验收
 
@@ -163,5 +165,7 @@
 
 | 日期 | 变更 |
 | --- | --- |
+| 2026-10-21 | 摄像头 RTSP 配置简化为单 URL；移除来源独立用户名/密码，status 为所属账号回显已保存 URL，升级时清理旧加密字段；Atlas 来源仅以可达 RTSP 地址接入。 | 用户要求降低设备配置复杂度；数据所有权仍由 media-service 管理，并保留来源 URL 加密存储。 |
+| 2026-10-20 | 修正媒体授权链路：Nginx 单次调用 media-service 授权子请求；media-service 通过 auth-service 内部会话校验获取可信身份，避免嵌套 Nginx 子请求丢失账号和会话响应头。 |
 | 2026-10-19 | 明确 Nginx 无请求体授权子请求通过 `X-Original-URI` 调用内部 GET 播放校验，并要求先由 auth-service 验证会话及写请求 CSRF。 |
 | 2026-10-04 | 从总技术规格拆分 media-service 实现任务，明确流配置、MediaMTX 对账、观看授权与配额、Atlas 200I DK A2 视频参数及阶段验收。 |

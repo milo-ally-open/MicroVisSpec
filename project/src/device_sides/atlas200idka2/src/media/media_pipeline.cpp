@@ -94,8 +94,11 @@ public:
         }
     }
 
-    void get_output_frame(hi_video_frame_info& frame) {
-        require(hi_mpi_vpss_get_chn_frame(group_, output_channel_, &frame, 1500), "hi_mpi_vpss_get_chn_frame(output)");
+    bool get_output_frame(hi_video_frame_info& frame) {
+        const hi_s32 result = hi_mpi_vpss_get_chn_frame(group_, output_channel_, &frame, 1500);
+        if (result == HI_SUCCESS) return true;
+        if (result == HI_ERR_VPSS_BUF_EMPTY || result == HI_ERR_VPSS_NOBUF || result == HI_ERR_VPSS_BUSY) return false;
+        throw std::runtime_error("hi_mpi_vpss_get_chn_frame(output) failed with media error " + std::to_string(result));
     }
 
     void release_inference_frame(const hi_video_frame_info& frame) {
@@ -459,7 +462,7 @@ int MediaPipeline::infer_height() const { return impl_->infer_height(); }
 int MediaPipeline::group() const { return impl_->group(); }
 int MediaPipeline::output_channel() const { return impl_->output_channel(); }
 bool MediaPipeline::next_inference_frame(hi_video_frame_info& frame) { return impl_->next_inference_frame(frame); }
-void MediaPipeline::get_output_frame(hi_video_frame_info& frame) { impl_->get_output_frame(frame); }
+bool MediaPipeline::get_output_frame(hi_video_frame_info& frame) { return impl_->get_output_frame(frame); }
 void MediaPipeline::release_inference_frame(const hi_video_frame_info& frame) { impl_->release_inference_frame(frame); }
 void MediaPipeline::release_output_frame(const hi_video_frame_info& frame) { impl_->release_output_frame(frame); }
 void MediaPipeline::encode_frame(const hi_video_frame_info& frame) { impl_->encode_frame(frame); }

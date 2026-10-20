@@ -28,6 +28,7 @@ type App struct {
 	config   Config
 	device   CameraOwnershipResolver
 	mediaMTX MediaPathControl
+	auth     AuthSessionValidator
 }
 
 func OpenDatabase(dsn string) (*gorm.DB, error) {
@@ -45,7 +46,7 @@ func OpenDatabase(dsn string) (*gorm.DB, error) {
 }
 
 func NewApp(config Config, db *gorm.DB, device CameraOwnershipResolver, mediaMTX MediaPathControl) *App {
-	return &App{db: db, config: config, device: device, mediaMTX: mediaMTX}
+	return &App{db: db, config: config, device: device, mediaMTX: mediaMTX, auth: NewAuthSessionClient(config)}
 }
 
 func NewAppFromConfig(config Config, db *gorm.DB) *App {
@@ -162,6 +163,7 @@ func (a *App) requireNginxToken() gin.HandlerFunc {
 		provided := c.GetHeader("X-Internal-Service-Token")
 		expected := a.config.InternalNginxToken
 		if expected == "" || len(expected) != len(provided) || subtle.ConstantTimeCompare([]byte(provided), []byte(expected)) != 1 {
+			slog.Warn("media_authorization_proxy_token_rejected", "request_id", c.GetString("request_id"), "provided_present", provided != "", "expected_present", expected != "")
 			writeError(c, http.StatusUnauthorized, "unauthorized", "media authorization request is not trusted")
 			c.Abort()
 			return
@@ -190,16 +192,15 @@ func (a *App) putSource(c *gin.Context) {
 		return
 	}
 	var input struct {
-		RTSPURL        string `json:"rtsp_url"`
-		SourceUsername string `json:"source_username"`
-		SourcePassword string `json:"source_password"`
+		RTSPURL string `json:"rtsp_url"`
 	}
-	if decodeJSON(c, &input) != nil || len(input.SourceUsername) > 256 || len(input.SourcePassword) > 512 {
-		writeError(c, http.StatusUnprocessableEntity, "invalid_request", "RTSP URL and source credentials are invalid")
+	if decodeJSON(c, &input) != nil {
+		writeError(c, http.StatusUnprocessableEntity, "invalid_request", "request must contain only an RTSP URL")
 		return
 	}
-	parsed, err := url.Parse(strings.TrimSpace(input.RTSPURL))
-	if err != nil || (parsed.Scheme != "rtsp" && parsed.Scheme != "rtsps") || parsed.Host == "" || parsed.User != nil || parsed.Fragment != "" || len(input.RTSPURL) > 2048 {
+	trimmedURL := strings.TrimSpace(input.RTSPURL)
+	parsed, err := url.Parse(trimmedURL)
+	if err != nil || len(trimmedURL) > 2048 || (parsed.Scheme != "rtsp" && parsed.Scheme != "rtsps") || parsed.Host == "" || parsed.User != nil || parsed.Fragment != "" {
 		writeError(c, http.StatusUnprocessableEntity, "invalid_request", "rtsp_url must be an RTSP URL without embedded credentials")
 		return
 	}
@@ -231,7 +232,7 @@ func (a *App) putSource(c *gin.Context) {
 		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "media source encryption is not configured")
 		return
 	}
-	encrypted, err := encryptMediaSource(a.config.MediaSourceEncryptionKey, mediaSourceSecret{URL: parsed.String(), Username: input.SourceUsername, Password: input.SourcePassword})
+	encrypted, err := encryptMediaSource(a.config.MediaSourceEncryptionKey, mediaSourceSecret{URL: parsed.String()})
 	if err != nil {
 		writeError(c, http.StatusInternalServerError, "internal_error", "media source could not be secured")
 		return
@@ -306,6 +307,11 @@ func (a *App) cameraStatus(c *gin.Context) {
 		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "media stream status could not be loaded")
 		return
 	}
+	source, err := decryptMediaSource(a.config.MediaSourceEncryptionKey, stream.EncryptedSource)
+	if err != nil {
+		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "media source configuration is unavailable")
+		return
+	}
 	sourceState := "not_probed"
 	mediaState := "idle"
 	browserCompatibility := "unknown"
@@ -335,7 +341,7 @@ func (a *App) cameraStatus(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"stream_id": stream.ID, "device_id": stream.DeviceID, "camera_id": stream.CameraID,
 		"source_state": sourceState, "media_state": mediaState, "browser_compatibility": browserCompatibility,
-		"config_status": stream.ConfigStatus, "config_version": stream.ConfigVersion,
+		"rtsp_url": source.URL, "config_status": stream.ConfigStatus, "config_version": stream.ConfigVersion,
 		"applied_config_version": stream.AppliedConfigVersion, "last_error": stream.LastError})
 }
 
@@ -467,11 +473,8 @@ func (a *App) reconcileStream(ctx context.Context, streamID uuid.UUID) error {
 		return err
 	}
 	parsed, err := url.Parse(source.URL)
-	if err != nil {
+	if err != nil || parsed.User != nil || (parsed.Scheme != "rtsp" && parsed.Scheme != "rtsps") || parsed.Host == "" {
 		return errors.New("stored media source URL is invalid")
-	}
-	if source.Username != "" || source.Password != "" {
-		parsed.User = url.UserPassword(source.Username, source.Password)
 	}
 	if err := a.mediaMTX.ApplyPath(ctx, stream.ID.String(), parsed.String()); err != nil {
 		_ = a.db.WithContext(ctx).Model(&Stream{}).Where("id = ?", stream.ID).Updates(map[string]any{"config_status": "pending", "last_error": "mediamtx_reconcile_failed"}).Error

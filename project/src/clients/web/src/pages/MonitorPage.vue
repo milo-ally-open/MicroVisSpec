@@ -29,7 +29,7 @@ onMounted(load)
 </script>
 
 <template>
-  <section class="page-heading page-heading--split"><div><span class="eyebrow">LIVE CLASSROOM</span><h1>实时监控</h1><p>查看已授权的视频画面，及时了解课堂现场状态。</p></div><div class="monitor-actions"><label class="select-field"><span class="sr-only">筛选设备</span><select v-model="selectedDevice"><option value="all">全部设备</option><option v-for="device in devices" :key="device.device_id" :value="device.device_id">{{ device.name }}</option></select></label><button class="button button--secondary" @click="load" :disabled="busy"><AppIcon name="refresh" :size="16" />刷新</button></div></section>
+  <section class="page-heading page-heading--split"><div><span class="eyebrow">LIVE MONITORING</span><h1>实时监控</h1><p>查看已授权的视频画面，了解现场设备与运行状态。</p></div><div class="monitor-actions"><label class="select-field"><span class="sr-only">筛选设备</span><select v-model="selectedDevice"><option value="all">全部设备</option><option v-for="device in devices" :key="device.device_id" :value="device.device_id">{{ device.name }}</option></select></label><button class="button button--secondary" @click="load" :disabled="busy"><AppIcon name="refresh" :size="16" />刷新</button></div></section>
   <div v-if="error" class="notice notice--error" role="alert">{{ error }}</div>
   <div class="monitor-summary"><span><i class="status-dot status-dot--green"></i>设备在线状态独立于视频播放状态</span><span>当前显示 {{ cameras.length }} / 最多 12 路</span><span class="monitor-summary__mobile">监控大屏请使用桌面浏览器</span></div>
   <section v-if="busy" class="monitor-grid"><div v-for="n in 4" :key="n" class="panel monitor-skeleton"></div></section>

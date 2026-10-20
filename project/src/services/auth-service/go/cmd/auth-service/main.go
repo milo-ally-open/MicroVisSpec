@@ -200,9 +200,7 @@ func NewHandler(config Config, db *gorm.DB) http.Handler {
 	api.POST("/logout", app.sameOrigin, app.logout)
 	api.PUT("/password", app.sameOrigin, app.changePassword)
 
-	internal := r.Group("/internal/v1")
-	internal.Use(app.requireInternalToken())
-	internal.GET("/sessions/validate", app.validateSession)
+	r.GET("/internal/v1/sessions/validate", app.requireSessionValidationToken(), app.validateSession)
 	return r
 }
 
@@ -262,9 +260,12 @@ func (a *App) limitByIP(bucket string) gin.HandlerFunc {
 	}
 }
 
-func (a *App) requireInternalToken() gin.HandlerFunc {
+func (a *App) requireSessionValidationToken() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !constantTimeEqual(c.GetHeader("X-Internal-Service-Token"), a.config.InternalToken) {
+		provided := c.GetHeader("X-Internal-Service-Token")
+		validToken := provided != "" && ((a.config.InternalToken != "" && constantTimeEqual(provided, a.config.InternalToken)) ||
+			(a.config.MediaServiceToken != "" && constantTimeEqual(provided, a.config.MediaServiceToken)))
+		if !validToken {
 			writeError(c, http.StatusUnauthorized, "unauthorized", "service authentication required")
 			c.Abort()
 			return

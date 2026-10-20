@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { apiRequest, clearCsrfToken, csrfHeaders, setCsrfToken } from '../api/client'
+import { mediaApi } from '../api/media'
 import { createDefaultClassroomRules, validateClassroomRules } from '../lib/classroomRules'
 import { safeInAppPath } from '../lib/navigation'
 import { eventNotificationRoute } from '../lib/pushRouting'
@@ -14,6 +15,18 @@ afterEach(() => {
 })
 
 describe('same-origin API client', () => {
+  it('sends an RTSP source URL without source authentication fields', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{"stream_id":"stream-1","config_status":"applied","config_version":1}', { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const source = 'rtsp://192.168.0.2:8554/classroom-demo'
+
+    await mediaApi.putSource('camera-1', { rtsp_url: source })
+
+    const [path, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(path).toBe('/api/v1/media/cameras/camera-1/source')
+    expect(JSON.parse(String(init.body))).toEqual({ rtsp_url: source })
+  })
+
   it('sends the in-memory CSRF token on cookie-authenticated writes', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response('{"saved":true}', { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)

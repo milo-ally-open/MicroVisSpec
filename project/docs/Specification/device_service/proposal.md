@@ -19,6 +19,10 @@ Atlas 激活响应不得把 Compose 内部 DNS 地址下发给设备。device-se
 
 Atlas agent 上报设备、相机、NPU、模型、流、MQTT、配置版本和本地队列状态。device-service 必须识别并校验这些顶层状态字段，同时继续支持现有 `cameras`、`algorithms` 数组；有效报告更新 `last_seen_at` 并原样存入 `reported_state`。未知字段或无效值仍拒绝，以维持严格 schema 校验。
 
+## 本次变更：设备详情中的 RTSP 地址配置入口
+
+设备详情页为设备下登记的摄像头提供一个 RTSP 地址配置入口，方便用户从设备工作区完成边缘视频接入。摄像头及账号归属仍由 device-service 校验；来源 URL、状态与 MediaMTX 对账继续由 media-service 持有。界面和写请求不提供来源用户名或密码。
+
 ## 边界
 
 事件处置、媒体播放授权和其他服务数据库读写。

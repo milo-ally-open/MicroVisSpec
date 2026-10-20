@@ -33,7 +33,7 @@ sequenceDiagram
 
 模型包目录按 `models/{model_id}/{version}/` 只读保存模型文件和 `manifest.json`；安装流程在 `staging/` 校验 SHA-256，并按 `models.json` 中对应 profile 比较芯片/格式/输入尺寸/类别，成功后以原子符号链接切换 `active/{model_id}`，至少保留该 model_id 的上一个版本。公共配置/入库逻辑只做通用结构校验，不含 classroom class、类别数和 classroom event type 常量。
 
-配置按参考项目职责拆成三份：`config/models.json` 在 runtime 节包含本机构建所支持的 backend/model family/decoder/pixel format/preprocessing/format/SoC 集合、模型加载上限和 NPU 设备；每个 profile 提供算法键、模型文件名、SoC、插件、输入、类别、置信度/NMS 和最大检测数。`config/streams_config.json` 按摄像头/来源引用配置 stream、model_id、输出尺寸/帧率/目标码率、live 来源标记、输入读取超时、RTSP 输出监听地址/端口/路径、`max_queue_ms`（100–5000 毫秒）及凭据环境变量引用和可选阈值覆盖；RTSP 密码只从受权限保护的 systemd 环境文件读取，不进 JSON、日志或浏览器。`config/alarm_rules.json` 提供允许的等级及 model_id/class 到 event_type/事件类别字段的映射、启用开关与持续/冷却条件。类别清单仍以安装包 manifest 为准，profile 只做一致性校验。FFmpeg 打开输入、探测流和读取每个 packet 均通过 interrupt callback 使用逐操作的有界 deadline，协议级 timeout 作为补充；live 来源断开时报告不含凭据的来源错误并进入有界退避重连，普通本地文件 EOF 正常结束。Atlas RTSP 输出使用 GStreamer RTSP Server `appsrc` 接收 VENC Annex-B H.264 access unit，时间戳由各 RTSP media pipeline 的 running time 生成，客户端中途加入时从当前画面开始发送。匿名 RTSP 角色只允许发现 mount 并收到认证挑战，不能构造媒体；有效 Basic/Digest 凭据通过 `rtph264pay` 对外提供源。无客户端时不缓存帧，慢客户端达到配置缓冲上限时丢预览帧而不阻塞推理。MediaMTX 以 `sourceOnDemand=true` 拉取此源，浏览器只访问其受保护的 WHEP/HLS 路由。RTSP 模式默认不保存本地 H.264 连续文件，仅显式传入诊断路径时落盘。Atlas 默认 `max_loaded_models=1`；只有目标 OM 同时加载内存、时延和稳定性实测后才提高。SQLite 队列记录稳定 event_id、发布状态、重试时间与末次错误；应用 ACK 匹配设备和 ID 后完成记录，保留期限另由磁盘配额策略规定，不提前删除未确认事件。
+配置按参考项目职责拆成三份：`config/models.json` 在 runtime 节包含本机构建所支持的 backend/model family/decoder/pixel format/preprocessing/format/SoC 集合、模型加载上限和 NPU 设备；每个 profile 提供算法键、模型文件名、SoC、插件、输入、类别、置信度/NMS 和最大检测数。`config/streams_config.json` 按摄像头/来源引用配置 stream、model_id、输出尺寸/帧率/目标码率、live 来源标记、输入读取超时、RTSP 输出监听地址/端口/路径、`max_queue_ms`（100–5000 毫秒）及可选阈值覆盖；流来源 URL 由调用端提供，不要求板端注入 RTSP 输出认证字段。`config/alarm_rules.json` 提供允许的等级及 model_id/class 到 event_type/事件类别字段的映射、启用开关与持续/冷却条件。类别清单仍以安装包 manifest 为准，profile 只做一致性校验。FFmpeg 打开输入、探测流和读取每个 packet 均通过 interrupt callback 使用逐操作的有界 deadline，协议级 timeout 作为补充；live 来源断开时报告不含凭据的来源错误并进入有界退避重连，普通本地文件 EOF 正常结束。Atlas RTSP 输出使用 GStreamer RTSP Server `appsrc` 接收 VENC Annex-B H.264 access unit，时间戳由各 RTSP media pipeline 的 running time 生成，客户端中途加入时从当前画面开始发送。RTSP mount 允许匿名读取，不创建认证 manager 或 reader token；MediaMTX 及园区内受信任客户端使用 `rtsp://atlas-host:8554/classroom-demo` 形式的地址直接拉流。RTSP 端口应只在园区可路由且受控的网络开放，不向公网开放。无客户端时不缓存帧，慢客户端达到配置缓冲上限时丢预览帧而不阻塞推理。浏览器只访问受保护的 WHEP/HLS 路由。RTSP 模式默认不保存本地 H.264 连续文件，仅显式传入诊断路径时落盘。Atlas 默认 `max_loaded_models=1`；只有目标 OM 同时加载内存、时延和稳定性实测后才提高。SQLite 队列记录稳定 event_id、发布状态、重试时间与末次错误；应用 ACK 匹配设备和 ID 后完成记录，保留期限另由磁盘配额策略规定，不提前删除未确认事件。
 
 模型和插件统一使用 `model_` 前缀、领域名和任务类型组成的下划线命名；末尾任务段为 `detection`、`segmentation` 或 `classification`。课堂行为检测对应 `model_classroom_behavior_detection`、`plugins/model_classroom_behavior_detection.cpp`、`libmodel_classroom_behavior_detection.so` 和 `ModelClassroomBehaviorDetection`。`IAIModel::name()` 返回该 profile 的 model_id。`algorithm_key`（课堂为 `classroom_behavior_detection`）和 `model_family`（如 `yolo11`）分别表示云端算法语义和网络/输出族，不混入产品模型标识。
 
@@ -80,7 +80,8 @@ The layout mirrors the reference project’s plugin/manager/config responsibilit
 - Atlas 310B4 实测表明 CANN/ACL 初始化依赖进程可见的主机文件系统与共享临时目录：在正式 runtime 的 systemd unit 中启用 `ProtectHome`、`PrivateTmp`、`ProtectSystem=full/strict` 或 `ReadWritePaths` 会导致 `aclInit` 返回 507008；保留 `NoNewPrivileges=true`、非 root 用户及硬件组，同时移除这些文件系统隔离设置后，service 成功处理固定 H.264 视频 75/75 帧。正式 runtime unit 不使用上述未兼容选项；未来若 CANN/驱动版本改变，需先在目标板验证再调整。
 - 2026-10-20 的 30 分钟 Atlas systemd 合成实时 UDP 测试保持 runtime active、0 次重启、RSS 约 375 MiB；来源发送端到时退出后，runtime 仍挂起等待。该结果证明长时进程 RSS 稳定，但暴露实时源读超时/服务恢复缺口；AC-05.2 要求为修复门禁。
 - 修复后在 Atlas systemd runtime 上以 3 秒测试超时验证无源等待、UDP 源恢复、再次断流和第二次恢复；同一 PID 保持 active、NRestarts=0，两次恢复各输出约 1.49 MB。加入 FFmpeg interrupt callback 后，持续合成 UDP 流采样 535 秒，RSS 样本保持 383164 KiB，NPU 样本峰值为 2332/3513 MiB、目标码率约 1.52 Mbps；首次接源时仍发生一次原因未明的自动重启，结束后重开本地输出导致最终帧数不可计。详见 `atlas_runtime_reconnect_sustained.json`。此测试不代替真实 RTSP 或 MediaMTX 发布验收。
-- 2026-10-20：MediaMTX 的云边合同要求按需拉取 Atlas 私有 RTSP 预览；Atlas 现状只有本地 H.264 文件输出。采用进程内 GStreamer RTSP Server/AppSrc 将每帧 VENC Annex-B H.264 发布为认证 RTSP 源，不在板端再部署 MediaMTX，也不把客户端播放连接耦合到推理生命周期。RTSP 凭据由环境文件注入；需要在 Atlas 实机和 MediaMTX 上验证后才可标记 AC-05.1 通过。
+- 2026-10-20：采用进程内 GStreamer RTSP Server/AppSrc 将每帧 VENC Annex-B H.264 发布为 RTSP 源，不在板端再部署 MediaMTX，也不把客户端播放连接耦合到推理生命周期。此记录中的认证方式由 2026-10-21 的简化决定取代。
+- 2026-10-21：Atlas RTSP 输出去除认证 manager、reader token 和 RTSP 环境变量；配置地址直接以可达 RTSP URL 提交 media-service。RTSP 只在受控园区网络开放；MQTT TLS/设备身份不变。
 - 部署验收在最小 `PATH` 和 systemd 环境中检查 agent/runtime 的共享库解析；toolkit/driver 路径来自目标板实际安装，不写入模型 JSON 或提交 CANN 机器专属绝对路径。
 - 健康检查分活性与就绪；无模型文件时控制服务可 alive，但算法和整体 NPU readiness 标为 false。
 - 日志带 device_id、request/event/config ID，不带密码、私钥、完整视频 URL 或课堂图片内容。
@@ -98,7 +99,7 @@ The layout mirrors the reference project’s plugin/manager/config responsibilit
 ## 未决项
 
 - 编译验证 `libmosquitto` 或等效 MQTT TLS 客户端的 aarch64 包和 TLS 证书路径。
-- 验证 GStreamer RTSP Server/AppSrc 与 RTP H.264 payloader 在目标 Atlas CANN/OS 镜像中的开发与运行依赖、鉴权、VENC access-unit 封装和 MediaMTX `sourceOnDemand` 拉流。
+- 验证 GStreamer RTSP Server/AppSrc 与 RTP H.264 payloader 在目标 Atlas CANN/OS 镜像中的开发与运行依赖、匿名拉流、VENC access-unit 封装和 MediaMTX `sourceOnDemand` 拉流。
 - 记录目标摄像头帧率、推理延迟、编码负载、RSS、NPU 使用率和队列磁盘上限。
 
 ## 变更记录

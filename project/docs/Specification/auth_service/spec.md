@@ -93,7 +93,7 @@
 
 ### 4.1 实现任务
 
-1. 提供仅供 Nginx 调用的内部会话校验接口；有效会话返回可信 `account_id`、`session_id`，无效会话返回 401。接口路径和头字段在 OpenAPI/部署配置中固定，内部端口不对公网开放。
+1. 提供内部会话校验接口，仅接受 Nginx 的 `AUTH_INTERNAL_SERVICE_TOKEN` 或 media-service 的专用 `AUTH_MEDIA_SERVICE_TOKEN`；有效会话返回可信 `account_id`、`session_id`，无效会话返回 401。接口路径和头字段在 OpenAPI/部署配置中固定，内部端口不对公网开放。
 2. Nginx 对受保护的 `/api/v1` 请求发起 `auth_request`，先清除客户端传入的 `X-Account-ID`、`X-Session-ID` 等身份头，再写入校验后的值。Gin 配置只信任 Nginx 容器代理地址。
 3. 所有带 Cookie 的写请求校验 `Origin`，并要求与当前会话关联的 `X-CSRF-Token`；注册/登录等尚无会话的入口按同源 `Origin` 检查与限流处理。前端请求客户端在登录后或重载后获取 token 并附于写请求。
 4. 内部调用使用按服务区分的可轮换凭据；业务服务仍须在资源查询中加 `account_id` 条件，不因有可信身份头就放过跨账号资源 ID。
@@ -149,4 +149,5 @@
 
 | 日期 | 变更 |
 | --- | --- |
+| 2026-10-21 | 允许 media-service 使用专用服务间凭据调用会话校验接口，使媒体播放可在 media-service 内完成会话与观看租约联合鉴权。 |
 | 2026-10-04 | 从总技术规格拆分 auth-service 阶段任务、交付物及可执行验收。 |

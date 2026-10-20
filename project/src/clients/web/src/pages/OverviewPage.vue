@@ -57,14 +57,14 @@ onBeforeUnmount(() => { if (clockTimer !== undefined) window.clearInterval(clock
 <template>
   <section class="overview-hero">
     <div class="overview-hero__copy">
-      <span class="hero-date"><AppIcon name="calendar" :size="16" />{{ currentDate }}<span class="hero-date__divider"></span>课堂运行工作台</span>
+      <span class="hero-date"><AppIcon name="calendar" :size="16" />{{ currentDate }}<span class="hero-date__divider"></span>边缘智能运行总览</span>
       <h1>{{ greeting }}，{{ authState.user?.username }}<span class="greeting-dot">。</span></h1>
-      <p v-if="busy">正在为你汇总设备状态和课堂事件。</p>
-      <p v-else-if="eventStats">{{ eventStats.open_events > 0 ? `还有 ${countLabel(eventStats.open_events)} 条异常事件需要跟进，现场状态尽在掌握。` : '当前没有待跟进事件，随时掌握设备与课堂动态。' }}</p>
-      <p v-else>在这里查看设备状态，跟进每一条课堂异常。</p>
+      <p v-if="busy">正在为你汇总设备状态和异常事件。</p>
+      <p v-else-if="eventStats">{{ eventStats.open_events > 0 ? `还有 ${countLabel(eventStats.open_events)} 条异常事件需要跟进，现场状态尽在掌握。` : '当前没有待跟进事件，随时掌握设备与运行动态。' }}</p>
+      <p v-else>在这里查看设备状态，跟进每一条异常事件。</p>
       <div class="hero-actions"><RouterLink class="button button--primary" to="/events">查看异常事件 <AppIcon name="arrow" :size="17" /></RouterLink><RouterLink class="button button--hero" to="/devices"><AppIcon name="devices" :size="17" />管理设备</RouterLink></div>
     </div>
-    <div class="hero-scene" aria-hidden="true"><div class="hero-scene__orbit"></div><div class="hero-scene__core"><AppIcon name="monitor" :size="44" /></div><span class="hero-scene__label">课堂行为检测</span><div class="hero-behaviors"><span><AppIcon name="hand" :size="16" />举手</span><span><AppIcon name="book" :size="16" />阅读</span><span><AppIcon name="pen" :size="16" />书写</span></div></div>
+    <div class="hero-scene" aria-hidden="true"><div class="hero-scene__orbit"></div><div class="hero-scene__core"><AppIcon name="monitor" :size="44" /></div><span class="hero-scene__label">边缘 AI 感知</span><div class="hero-behaviors"><span><AppIcon name="devices" :size="16" />设备状态</span><span><AppIcon name="monitor" :size="16" />实时视频</span><span><AppIcon name="events" :size="16" />智能告警</span></div></div>
   </section>
   <div v-if="error" class="notice notice--error" role="alert"><span>服务连接暂不可用</span><p>{{ error }}</p><button class="text-button" @click="load">重新加载</button></div>
 
@@ -72,7 +72,7 @@ onBeforeUnmount(() => { if (clockTimer !== undefined) window.clearInterval(clock
     <article class="stat-card"><div class="stat-card__top"><span>已登记设备</span><span class="stat-icon stat-icon--blue"><AppIcon name="devices" /></span></div><strong>{{ busy ? '—' : countLabel(deviceStats?.registered ?? 0) }}<small>台</small></strong><div class="stat-foot"><span class="stat-live" :class="{ 'stat-live--idle': !deviceStats?.online }"><i></i>{{ deviceStats ? `${countLabel(deviceStats.online)} 台在线` : '等待设备数据' }}</span><small>{{ formatDate(deviceStats?.as_of, false) }} 更新</small></div></article>
     <article class="stat-card"><div class="stat-card__top"><span>{{ rangeCaption }}异常事件</span><span class="stat-icon stat-icon--orange"><AppIcon name="events" /></span></div><strong>{{ busy ? '—' : countLabel(eventStats?.total_events ?? 0) }}<small>条</small></strong><div class="stat-foot"><span class="stat-muted">已命中规则的事件</span><small>{{ formatDate(eventStats?.as_of, false) }} 更新</small></div></article>
     <article class="stat-card stat-card--attention"><div class="stat-card__top"><span>待跟进事件</span><span class="stat-icon stat-icon--gold"><AppIcon name="arrowUp" /></span></div><strong>{{ busy ? '—' : countLabel(eventStats?.open_events ?? 0) }}<small>条</small></strong><div class="stat-foot"><span class="stat-muted">待处置与处理中</span><RouterLink class="inline-link" to="/events?status=pending">进入处置 <AppIcon name="arrow" :size="14" /></RouterLink></div></article>
-    <article class="stat-card stat-card--model"><div class="stat-card__top"><span>课堂告警规则</span><span class="stat-icon stat-icon--green"><AppIcon name="shield" /></span></div><strong>按设备配置</strong><div class="stat-foot"><span class="stat-muted">举手 · 阅读 · 书写</span><RouterLink class="inline-link" to="/devices">管理规则 <AppIcon name="arrow" :size="14" /></RouterLink></div></article>
+    <article class="stat-card stat-card--model"><div class="stat-card__top"><span>智能告警规则</span><span class="stat-icon stat-icon--green"><AppIcon name="shield" /></span></div><strong>按设备配置</strong><div class="stat-foot"><span class="stat-muted">按算法与场景设置</span><RouterLink class="inline-link" to="/devices">管理规则 <AppIcon name="arrow" :size="14" /></RouterLink></div></article>
   </section>
 
   <section class="overview-grid">

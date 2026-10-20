@@ -81,11 +81,12 @@ Atlas 媒体公共接口放在 `include/media/`，实现放在 `src/media/`；�
 
 **验收条件**
 
-- **AC-05.1** Given 可用输入流，When runtime 处理视频，Then 按该 stream 配置的输出尺寸、帧率和目标码率生成检测叠加预览，并通过经过认证的 Atlas RTSP server 提供私有 RTSP 源；media-service 将该源登记为 MediaMTX `sourceOnDemand` 路径，浏览器只使用鉴权后的 WHEP/HLS 地址且不能获得 RTSP URL 凭据。
+- **AC-05.1** Given 可用输入流，When runtime 处理视频，Then 按该 stream 配置的输出尺寸、帧率和目标码率生成检测叠加预览，并通过无需 RTSP 用户名/密码的 Atlas RTSP server 提供园区内可达 RTSP 源；media-service 以单一 `rtsp_url` 将该源登记为 MediaMTX `sourceOnDemand` 路径，浏览器只使用鉴权后的 WHEP/HLS 地址且不获得来源 URL。
 - **AC-05.2** Given live 输入流断开/读超时、RTSP server 启动失败或媒体客户端断开，When runtime 检测到故障，Then 以不含凭据的独立来源/发布错误状态和日志报告；live 输入读超时必须有界，RTSP 客户端断开不得阻塞推理或编码，慢客户端最多产生配置时限内的有界排队，超限时可丢弃预览帧；服务故障须由 systemd 恢复。无故障的本地文件 EOF 可正常结束。
 - **AC-05.3** Given 未启用规则的普通检测，When 运行模型，Then 不截图、不调用证据上传；命中规则的图片使用设备授权 HTTPS 接口并受 event-service 的大小/格式/24 小时合同约束。
+- **AC-05.4** Given MediaMTX 或园区内受信任客户端连接配置的 RTSP mount，When 未提供 RTSP Authorization 头时拉取媒体，Then Atlas RTSP server 可直接提供 H.264；runtime 配置、环境文件和 systemd unit 不包含 RTSP 用户名/密码引用。Atlas RTSP 端口只部署在可路由且受控的园区网络，不向公网开放。
 
-**验证方式**：Atlas RTSP 鉴权/未授权拒绝测试、MediaMTX `sourceOnDemand` 拉流和断开测试、真实相机视频/证据测试；固定配置的输出尺寸/帧率/码率、断流超时与重连测试；编码、推流和长时资源预算记录。
+**验证方式**：匿名 Atlas RTSP 拉流、MediaMTX `sourceOnDemand` 拉流和断开测试、真实相机视频/证据测试；固定配置的输出尺寸/帧率/码率、断流超时与重连测试；编码、推流和长时资源预算记录。
 
 RTSP 模式默认不保存本地 H.264 连续文件；仅显式传入诊断输出路径时才落盘，防止常驻流持续占满设备存储。
 
@@ -129,7 +130,7 @@ RTSP 模式默认不保存本地 H.264 连续文件；仅显式传入诊断输�
 |---|---|---|---|---|---|
 | 总 SPEC §2：设备身份与配置版本 | REQ-01、REQ-02 | device-service、agent | T-01/T-02/T-06/T-07/T-08 | AC-01.1、AC-01.2、AC-01.3、AC-02.1、AC-02.2、AC-02.3、AC-02.5 | Atlas TLS/MQTT 持续连接；device-service 已接受 agent 心跳并更新 `last_seen_at`，配置 ACK 仍待实测 |
 | 总 SPEC §3：事件幂等与 ACK | REQ-04 | agent、event-service | T-04/T-07/T-08 | AC-04.1、AC-04.2、AC-04.3、AC-04.4、AC-04.5、AC-04.6 | 待执行 |
-| PRD §4：Atlas、教室视频与模型 | REQ-03、REQ-05 | Atlas plugin/manager runtime、model catalog、media-service | T-03/T-05/T-06/T-07/T-08 | AC-03.1–03.10、AC-05.1、AC-05.2、AC-05.3 | 完整工程覆盖部署并在板端 CMake build/CTest 3/3 通过；OM SHA 与清单一致；非 root systemd runtime 对合成 H.264 完成 75/75 帧推理/OSD/编码；真实 RTSP/课堂源、发布和持续性能待验收 |
+| PRD §4：Atlas、教室视频与模型 | REQ-03、REQ-05 | Atlas plugin/manager runtime、model catalog、media-service | T-03/T-05/T-06/T-07/T-08 | AC-03.1–03.10、AC-05.1、AC-05.2、AC-05.3、AC-05.4 | 完整工程覆盖部署并在板端 CMake build/CTest 3/3 通过；OM SHA 与清单一致；非 root systemd runtime 对合成 H.264 完成 75/75 帧推理/OSD/编码；新匿名 RTSP 合同待实机验收 |
 | 运维部署：systemd 运行时依赖 | REQ-06 | Atlas agent、classroom-runtime、systemd、udev | T-01/T-06/T-08 | AC-06.1、AC-06.2、AC-06.3、AC-06.4 | 最小环境依赖解析、权限受限 `/dev/rgn`、CANN 环境文件通过；agent active/enabled 且云端心跳新鲜；正式 runtime unit 保留非 root、硬件组和 `NoNewPrivileges`，未使用未经验证的文件系统隔离选项，合成 H.264 75/75 帧通过 |
 
 ## 假设与未决问题

@@ -1490,7 +1490,7 @@ a {
 
 .source-form {
   display: grid;
-  grid-template-columns: 1.5fr .8fr .8fr auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
   gap: 13px;
   margin: 18px 0 0 0;

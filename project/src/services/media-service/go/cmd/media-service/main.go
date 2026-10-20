@@ -23,6 +23,10 @@ func main() {
 		slog.Error("database_initialization_failed", "error", err.Error())
 		os.Exit(1)
 	}
+	if err := migrateLegacyMediaSources(context.Background(), db, config.MediaSourceEncryptionKey); err != nil {
+		slog.Error("media_source_migration_failed", "error", err.Error())
+		os.Exit(1)
+	}
 	sqlDB, err := db.DB()
 	if err != nil {
 		slog.Error("database_initialization_failed", "error", err.Error())

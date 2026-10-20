@@ -11,9 +11,6 @@
 namespace yunshao {
 namespace {
 
-constexpr const char* kAuthenticatedRole = "stream_reader";
-constexpr const char* kAnonymousRole = "anonymous";
-
 void require_element_factory(const char* name) {
     GstElementFactory* factory = gst_element_factory_find(name);
     if (factory == nullptr) throw std::runtime_error(std::string("required GStreamer element is unavailable: ") + name);
@@ -42,8 +39,7 @@ RtspServer::RtspServer(RtspServerConfig config) : fps_(config.fps) {
     if (!config.enabled) throw std::invalid_argument("RTSP server configuration is disabled");
     if (config.listen_address.empty() || config.port < 1024 || config.port > 65535 ||
         config.mount_path.empty() || config.mount_path.front() != '/' || fps_ < 1 ||
-        config.bitrate_kbps < 1 || config.max_queue_ms < 1 ||
-        config.username.empty() || config.password.empty()) {
+        config.bitrate_kbps < 1 || config.max_queue_ms < 1) {
         throw std::invalid_argument("RTSP server configuration is incomplete");
     }
 
@@ -75,24 +71,8 @@ RtspServer::RtspServer(RtspServerConfig config) : fps_(config.fps) {
         gst_rtsp_server_set_address(server_, config.listen_address.c_str());
         gst_rtsp_server_set_service(server_, service.c_str());
 
-        GstRTSPAuth* auth = gst_rtsp_auth_new();
-        if (auth == nullptr) throw std::runtime_error("cannot create GStreamer RTSP auth manager");
-        gst_rtsp_auth_set_supported_methods(auth, static_cast<GstRTSPAuthMethod>(GST_RTSP_AUTH_BASIC | GST_RTSP_AUTH_DIGEST));
-
-        GstRTSPToken* anonymous = gst_rtsp_token_new(GST_RTSP_TOKEN_MEDIA_FACTORY_ROLE,
-                                                      G_TYPE_STRING, kAnonymousRole, nullptr);
-        gst_rtsp_auth_set_default_token(auth, anonymous);
-        gst_rtsp_token_unref(anonymous);
-
-        GstRTSPToken* reader = gst_rtsp_token_new(GST_RTSP_TOKEN_MEDIA_FACTORY_ROLE,
-                                                   G_TYPE_STRING, kAuthenticatedRole, nullptr);
-        gchar* basic_token = gst_rtsp_auth_make_basic(config.username.c_str(), config.password.c_str());
-        gst_rtsp_auth_add_basic(auth, basic_token, reader);
-        g_free(basic_token);
         GstRTSPMediaFactory* factory = gst_rtsp_media_factory_new();
         if (factory == nullptr) {
-            gst_rtsp_token_unref(reader);
-            g_object_unref(auth);
             throw std::runtime_error("cannot create GStreamer RTSP media factory");
         }
         const std::string launch = "( appsrc name=edge_src is-live=true format=time block=false ! "
@@ -100,23 +80,7 @@ RtspServer::RtspServer(RtspServerConfig config) : fps_(config.fps) {
         gst_rtsp_media_factory_set_launch(factory, launch.c_str());
         gst_rtsp_media_factory_set_shared(factory, TRUE);
         gst_rtsp_media_factory_set_protocols(factory, GST_RTSP_LOWER_TRANS_TCP);
-        GstRTSPPermissions* permissions = gst_rtsp_permissions_new();
-        gst_rtsp_permissions_add_role(permissions, kAnonymousRole,
-                                      GST_RTSP_PERM_MEDIA_FACTORY_ACCESS, G_TYPE_BOOLEAN, TRUE,
-                                      GST_RTSP_PERM_MEDIA_FACTORY_CONSTRUCT, G_TYPE_BOOLEAN, FALSE,
-                                      nullptr);
-        gst_rtsp_permissions_add_role(permissions, kAuthenticatedRole,
-                                      GST_RTSP_PERM_MEDIA_FACTORY_ACCESS, G_TYPE_BOOLEAN, TRUE,
-                                      GST_RTSP_PERM_MEDIA_FACTORY_CONSTRUCT, G_TYPE_BOOLEAN, TRUE,
-                                      nullptr);
-        gst_rtsp_media_factory_set_permissions(factory, permissions);
-        gst_rtsp_permissions_unref(permissions);
         g_signal_connect(factory, "media-configure", G_CALLBACK(&RtspServer::configure_media), this);
-
-        gst_rtsp_auth_add_digest(auth, config.username.c_str(), config.password.c_str(), reader);
-        gst_rtsp_token_unref(reader);
-        gst_rtsp_server_set_auth(server_, auth);
-        g_object_unref(auth);
 
         GstRTSPMountPoints* mounts = gst_rtsp_server_get_mount_points(server_);
         if (mounts == nullptr) {
@@ -148,10 +112,8 @@ RtspServer::RtspServer(RtspServerConfig config) : fps_(config.fps) {
         loop_ = nullptr;
         context_ = nullptr;
         server_ = nullptr;
-        std::fill(config.password.begin(), config.password.end(), '\0');
         throw;
     }
-    std::fill(config.password.begin(), config.password.end(), '\0');
 }
 
 RtspServer::~RtspServer() {

@@ -245,11 +245,6 @@ int main(int argc, char** argv) {
             rtsp_server_config.fps = stream.output_fps;
             rtsp_server_config.bitrate_kbps = stream.output_bitrate_kbps;
             rtsp_server_config.max_queue_ms = stream.rtsp_output.max_queue_ms;
-            rtsp_server_config.username = env(stream.rtsp_output.username_ref.c_str());
-            rtsp_server_config.password = env(stream.rtsp_output.password_ref.c_str());
-            if (rtsp_server_config.username.empty() || rtsp_server_config.password.empty()) {
-                throw std::runtime_error("RTSP server credentials are missing from the runtime environment");
-            }
         }
         InferenceManager inference(config.max_loaded_models, config.npu_device_id,
                                    options.model_root, options.plugin_dir);

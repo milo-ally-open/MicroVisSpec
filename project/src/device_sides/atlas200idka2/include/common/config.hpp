@@ -39,8 +39,6 @@ struct RtspOutputProfile {
     int port = 8554;
     std::string mount_path;
     int max_queue_ms = 1000;
-    std::string username_ref;
-    std::string password_ref;
 };
 
 struct StreamProfile {

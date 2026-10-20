@@ -29,7 +29,8 @@ func TestAuthSessionLifecycleIntegration(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = sqlDB.Close() })
 
-	config := Config{PublicOrigin: "https://yunshao.test", CookieName: "test_session", InternalToken: "integration-internal-token", RateLimitPerMinute: 1000}
+	config := Config{PublicOrigin: "https://yunshao.test", CookieName: "test_session", InternalToken: "integration-internal-token",
+		MediaServiceToken: "integration-media-token", RateLimitPerMinute: 1000}
 	handler := NewHandler(config, db)
 	username := "itest_" + uuid.NewString()[:8]
 	register := request(t, handler, http.MethodPost, "/api/v1/auth/register", `{"username":"`+username+`","password":"correct horse battery staple"}`, nil, config)
@@ -85,6 +86,19 @@ func TestAuthSessionLifecycleIntegration(t *testing.T) {
 	validated := request(t, handler, http.MethodGet, "/internal/v1/sessions/validate", "", internalHeaders, config)
 	if validated.Code != http.StatusNoContent || validated.Header().Get("X-Account-ID") != loginBody.AccountID || validated.Header().Get("X-Session-ID") == "" {
 		t.Fatalf("session validation status=%d headers=%v", validated.Code, validated.Header())
+	}
+	mediaServiceHeaders := map[string]string{
+		"Cookie": cookie.Name + "=" + cookie.Value, "X-Internal-Service-Token": config.MediaServiceToken,
+		"X-Original-Method": http.MethodPost, "X-Original-Origin": config.PublicOrigin, "X-CSRF-Token": meBody.CSRF,
+	}
+	mediaValidated := request(t, handler, http.MethodGet, "/internal/v1/sessions/validate", "", mediaServiceHeaders, config)
+	if mediaValidated.Code != http.StatusNoContent || mediaValidated.Header().Get("X-Account-ID") != loginBody.AccountID || mediaValidated.Header().Get("X-Session-ID") == "" {
+		t.Fatalf("media-service session validation status=%d headers=%v", mediaValidated.Code, mediaValidated.Header())
+	}
+	mediaServiceHeaders["X-Internal-Service-Token"] = "wrong-media-token"
+	mediaValidated = request(t, handler, http.MethodGet, "/internal/v1/sessions/validate", "", mediaServiceHeaders, config)
+	if mediaValidated.Code != http.StatusUnauthorized {
+		t.Fatalf("invalid media-service token status=%d body=%s", mediaValidated.Code, mediaValidated.Body.String())
 	}
 	proxyWriteHeaders := map[string]string{
 		"Cookie": cookie.Name + "=" + cookie.Value, "X-Internal-Service-Token": config.InternalToken,

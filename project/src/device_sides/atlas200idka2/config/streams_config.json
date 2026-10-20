@@ -26,9 +26,7 @@
         "listen_address": "0.0.0.0",
         "port": 8554,
         "mount_path": "/classroom-demo",
-        "max_queue_ms": 1000,
-        "username_ref": "YUNSHAO_RTSP_CLASSROOM_USERNAME",
-        "password_ref": "YUNSHAO_RTSP_CLASSROOM_PASSWORD"
+        "max_queue_ms": 1000
       }
     }
   ]

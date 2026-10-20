@@ -68,6 +68,11 @@ void VideoStreamManager::run(const StreamProfile& stream, const std::string& inp
             std::size_t frames = 0;
             hi_video_frame_info inference_frame{};
             while (pipeline.next_inference_frame(inference_frame)) {
+                hi_video_frame_info output_frame{};
+                if (!pipeline.get_output_frame(output_frame)) {
+                    pipeline.release_inference_frame(inference_frame);
+                    continue;
+                }
                 const hi_video_frame& frame = inference_frame.v_frame;
                 const hi_u32 height_stride = frame.height_stride[0] == 0 ? frame.height : frame.height_stride[0];
                 const size_t bytes = static_cast<size_t>(frame.width_stride[0]) * height_stride * 3 / 2;
@@ -91,6 +96,7 @@ void VideoStreamManager::run(const StreamProfile& stream, const std::string& inp
                 try {
                     inference_.infer(stream.model_id, view, confidence_threshold, nms_threshold, detections);
                 } catch (...) {
+                    pipeline.release_output_frame(output_frame);
                     pipeline.release_inference_frame(inference_frame);
                     throw;
                 }
@@ -98,6 +104,7 @@ void VideoStreamManager::run(const StreamProfile& stream, const std::string& inp
                     const auto alarms = alarms_.observe(stream.model_id, detections, std::chrono::steady_clock::now());
                     if (on_alarm_) for (const auto& alarm : alarms) on_alarm_(alarm);
                 } catch (...) {
+                    pipeline.release_output_frame(output_frame);
                     pipeline.release_inference_frame(inference_frame);
                     throw;
                 }
@@ -108,8 +115,6 @@ void VideoStreamManager::run(const StreamProfile& stream, const std::string& inp
                                                           detection.x, detection.y, detection.width, detection.height});
                 }
                 region.update(overlay, model_profile.classes);
-                hi_video_frame_info output_frame{};
-                pipeline.get_output_frame(output_frame);
                 try {
                     pipeline.encode_frame(output_frame);
                 } catch (...) {

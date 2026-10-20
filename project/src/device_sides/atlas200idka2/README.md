@@ -41,13 +41,13 @@
 
 ### 3. 绑定视频流和告警规则
 
-在 `config/streams_config.json` 新增 stream，填 `stream_id`、`camera_id`、环境变量形式的 `source_ref`、profile 的 `model_id`、`live_source`、输出尺寸/帧率/目标码率、AI 帧率、输入读取超时、重连初始/最大退避和 RTSP 输入传输方式。视频输入 URL/密码及 RTSP 输出认证凭据均通过 systemd 环境文件注入，不能写入 JSON。live 输入超时或断开后会记录不含来源凭据的错误并按 profile 退避重连；本地文件 profile 可将 `live_source` 设为 false，EOF 后正常退出。示例流默认关闭。
+在 `config/streams_config.json` 新增 stream，填 `stream_id`、`camera_id`、环境变量形式的 `source_ref`、profile 的 `model_id`、`live_source`、输出尺寸/帧率/目标码率、AI 帧率、输入读取超时、重连初始/最大退避和 RTSP 输入传输方式。实际视频输入 URL 通过 systemd 环境文件提供；RTSP 输出不配置用户名或密码。live 输入超时或断开后会记录不含 URL 的错误并按 profile 退避重连；本地文件 profile 可将 `live_source` 设为 false，EOF 后正常退出。示例流默认关闭。
 
 课堂默认预览参数为 1280×720、15 fps、1500 kbps；runtime 从每路 stream profile 读取目标码率，`MediaPipeline` 不再固化编码码率。`input_timeout_ms` 控制 FFmpeg 网络读取上限；`reconnect_initial_delay_ms` / `reconnect_max_delay_ms` 控制断流重试退避；RTSP 可选择 TCP 或 UDP transport。
 
-需要提供云端预览时，将该 stream 的 `rtsp_output.enabled` 设为 `true`，配置 `listen_address`、`port`、`mount_path` 和 `max_queue_ms`。服务启动时从 `username_ref` / `password_ref` 指向的 systemd 环境变量读取 RTSP 输出凭据，并以 TCP interleaved RTSP 服务处理后的 H.264；客户端未连接时不排队，慢客户端超过缓冲上限时丢弃预览帧，不阻塞推理。RTSP 模式不持续写本地 H.264 文件；显式传入 `--output <path>` 才保存诊断视频。生产环境应限制 RTSP 监听端口只允许 media-service 所在网络访问。
+需要提供云端预览时，将该 stream 的 `rtsp_output.enabled` 设为 `true`，配置 `listen_address`、`port`、`mount_path` 和 `max_queue_ms`。服务以无需 RTSP 账号密码的 TCP interleaved RTSP 输出处理后的 H.264；客户端未连接时不排队，慢客户端超过缓冲上限时丢弃预览帧，不阻塞推理。RTSP 模式不持续写本地 H.264 文件；显式传入 `--output <path>` 才保存诊断视频。生产环境应限制 RTSP 监听端口只允许 MediaMTX 所在的受控园区网络访问。
 
-Atlas RTSP 输出地址需由 media-service 所在网络实际可达。以板卡地址 `192.168.0.2` 和默认 stream 为例，RTSP 来源 URL 是 `rtsp://192.168.0.2:8554/classroom-demo`；通过 media-service 摄像头来源接口提交该 URL 与独立的 RTSP 用户名/密码，MediaMTX 按 `sourceOnDemand` 拉流。URL 不嵌入凭据，浏览器只能取得受保护的 WHEP/HLS 播放地址。此地址示例只有在云端容器能路由到板卡 LAN 时有效。
+Atlas RTSP 输出地址需由 media-service 所在网络实际可达。以板卡地址 `192.168.0.2` 和默认 stream 为例，RTSP 来源 URL 是 `rtsp://192.168.0.2:8554/classroom-demo`；在设备详情只提交该地址，MediaMTX 按 `sourceOnDemand` 匿名拉流。此地址示例只有在云端容器能路由到板卡所在园区网络时有效；不要将 Atlas RTSP 端口开放到公网。浏览器仍只取得受保护的 WHEP/HLS 播放地址。
 
 在 `config/alarm_rules.json` 为需要告警的 model/class 添加 `event_type`、类别属性名、等级、置信度阈值、最短持续时间和冷却时间。新增规则必须先设为 `enabled: false`；未配置或禁用时仍可推理/OSD，但不写事件 outbox。只有明确启用且满足规则时才生成业务事件。
 
@@ -91,7 +91,7 @@ cmake --build build -j2
 ctest --test-dir build --output-on-failure
 ```
 
-先用 `yunshao-classroom-runtime --check-config` 验证三份配置，再以授权 H.264 样例源运行指定 `--stream-id`。开启 `rtsp_output` 后，先通过 `ffprobe` 或 GStreamer RTSP 客户端确认认证成功、画面可解码，再由 media-service 注册为 MediaMTX 按需来源；未接入真实相机和云端播放前不得宣称端到端验收完成。模型文件大小/哈希和 Atlas 是否能加载可以由安装结果确认；完整 ONNX/OM 测试集精度对比按需运行 `model_val/`，不作为模型注册的前置步骤。
+先用 `yunshao-classroom-runtime --check-config` 验证三份配置，再以授权 H.264 样例源运行指定 `--stream-id`。开启 `rtsp_output` 后，用 `ffprobe` 匿名读取 `rtsp://<atlas-ip>:<port>/<mount>` 并确认画面可解码，再由 media-service 使用单一 RTSP 地址注册为 MediaMTX 按需来源；未接入真实相机和云端播放前不得宣称端到端验收完成。模型文件大小/哈希和 Atlas 是否能加载可以由安装结果确认；完整 ONNX/OM 测试集精度对比按需运行 `model_val/`，不作为模型注册的前置步骤。
 
 开发依赖包（Debian/Ubuntu）包括 `libgstreamer1.0-dev`、`libgstreamer-plugins-base1.0-dev`、`libgstrtspserver-1.0-dev` 和 `gstreamer1.0-plugins-good`。运行镜像/板卡至少需提供 GStreamer core、app、RTSP server 库以及 `appsrc`、`rtph264pay` 插件。
 
@@ -136,12 +136,10 @@ sudo systemctl enable yunshao-agent.service
 
 编辑 `/etc/yunshao/streams_config.json`，只对 `classroom-demo` 将 `enabled`、`enable_ai` 和 `rtsp_output.enabled` 设为 `true`；保留已有的 `source_ref`、8554 端口和 `/classroom-demo` 路径。确认 `/etc/yunshao/alarm_rules.json` 中规则仍全部为 `false`。安装的默认配置会关闭这三个开关；只配置环境变量并重启服务不会启用视频流。
 
-编辑 `/etc/yunshao/classroom-runtime.env`，加入本次测试用的来源和 RTSP 登录信息（请使用临时凭据）：
+编辑 `/etc/yunshao/classroom-runtime.env`，只加入本次测试的输入来源地址：
 
 ```text
 YUNSHAO_CAMERA_CLASSROOM_DEMO_URL=udp://0.0.0.0:5000
-YUNSHAO_RTSP_CLASSROOM_USERNAME=test
-YUNSHAO_RTSP_CLASSROOM_PASSWORD=Test1234
 ```
 
 保存后，在板端启动服务并检查日志：
@@ -161,10 +159,10 @@ sudo journalctl -u yunshao-classroom-runtime.service -n 20 --no-pager
 
 必须让 RTSP 播放器先连上，再开始 UDP 推流。RTSP 输出是实时流；推流先结束、播放器后启动时，播放器不会回放之前发过的 UDP 数据。本板端的编码流需要客户端从首个关键帧开始接收参数集；播放器晚加入时可能报 H.264 PPS 错误并一直没有画面。
 
-先在 Windows 终端 A 启动播放器（用户名和密码替换为板端环境文件中的值），保持终端运行：
+先在 Windows 终端 A 启动播放器，无需用户名或密码，保持终端运行：
 
 ```text
-ffplay -rtsp_transport tcp "rtsp://test:Test1234@192.168.0.2:8554/classroom-demo"
+ffplay -rtsp_transport tcp "rtsp://192.168.0.2:8554/classroom-demo"
 ```
 
 再在 Windows 终端 B 从仓库根目录开始推流，并保持推流运行：
@@ -175,11 +173,11 @@ ffmpeg -re -stream_loop -1 -i video/classroom_behavior.mp4 -map 0:v:0 -vf "scale
 
 `ffplay` 应显示处理后的视频；检测框按模型实际结果显示。不要在播放器启动前结束推流。确认画面正常后，按 `Ctrl+C` 停止终端 B 的推流，再关闭终端 A 的播放器。
 
-测试结束后，在板端关闭该流的三个开关、从环境文件移除本次测试的三项变量，再运行 `sudo systemctl stop yunshao-classroom-runtime.service`。如果安装前备份过配置，恢复备份即可。不要删除已入库的模型。
+测试结束后，在板端关闭该流的三个开关、从环境文件移除本次测试的输入 URL，再运行 `sudo systemctl stop yunshao-classroom-runtime.service`。如果安装前备份过配置，恢复备份即可。不要删除已入库的模型。
 
 ## 部署与配置边界
 
-- systemd 单元在 `systemd/`；CANN 运行库与算子路径由必需的 `/etc/yunshao/cann.env` 提供，主机身份、MQTT TLS 参数和视频源 URL 分别由 `/etc/yunshao/agent.env`、`/etc/yunshao/classroom-runtime.env` 注入。`cann.env` 必须从目标板已安装的 CANN 环境生成，权限设为 `root:yunshao 0640`；CMake 从此文件读取 toolkit 与运行库路径，安装二进制写入对应 RPATH；`yunshao-agent model` 在执行 ACL 操作前也会读取该文件。不要依赖登录 shell、Conda 或手工导出环境变量。CMake 安装会更新 `/etc/yunshao` 中的工程 JSON 配置，但不覆盖环境文件；保留板上对 JSON 的本地定制时，应在升级前备份并在安装后合并。Atlas CANN/ACL 当前不能与 runtime unit 的 `ProtectHome`、`PrivateTmp`、`ProtectSystem`、`ReadWritePaths` 文件系统隔离选项共同工作；这些选项须先在目标板通过 CANN 初始化及固定视频处理验收。unit 仍以非 root `yunshao` 运行，保留 `NoNewPrivileges=true` 并加入 `video`、`HwHiAiUser`、`HwBaseUser` 组。安装包提供 `udev/99-yunshao-rgn.rules`，将 `/dev/rgn` 设为 `root:HwHiAiUser 0660`；安装后重载 udev 规则并触发现有 `rgn` 节点，然后重启服务。`agent.env` 中的 `YUNSHAO_MQTT_CLIENT_ID` 必须使用 device-service 激活响应的原值，不能从 device_id 本地派生；MQTT 用户名、密码和 CA 同样来自激活/部署流程。
+- systemd 单元在 `systemd/`；CANN 运行库与算子路径由必需的 `/etc/yunshao/cann.env` 提供，主机身份、MQTT TLS 参数和视频源 URL 分别由 `/etc/yunshao/agent.env`、`/etc/yunshao/classroom-runtime.env` 注入。`cann.env` 必须从目标板已安装的 CANN 环境生成，权限设为 `root:yunshao 0640`；CMake 从此文件读取 toolkit 与运行库路径，安装二进制写入对应 RPATH；`yunshao-agent model` 在执行 ACL 操作前也会读取该文件。不要依赖登录 shell、Conda 或手工导出环境变量。CMake 安装会更新 `/etc/yunshao` 中的工程 JSON 配置，但不覆盖环境文件；保留板上对 JSON 的本地定制时，应在升级前备份并在安装后合并。Atlas CANN/ACL 当前不能与 runtime unit 的 `ProtectHome`、`PrivateTmp`、`ProtectSystem`、`ReadWritePaths` 文件系统隔离选项共同工作；这些选项须先在目标板通过 CANN 初始化及固定视频处理验收。unit 仍以非 root `yunshao` 运行，保留 `NoNewPrivileges=true` 并加入 `video`、`HwHiAiUser`、`HwBaseUser` 组。安装包提供 `udev/99-yunshao-rgn.rules`，将 `/dev/rgn` 设为 `root:HwHiAiUser 0660`；安装后重载 udev 规则并触发现有 `rgn` 节点，然后重启服务。`agent.env` 中的 `YUNSHAO_MQTT_CLIENT_ID` 必须使用 device-service 激活响应的原值，不能从 device_id 本地派生；MQTT 用户名、密码和 CA 同样来自激活/部署流程。Atlas 的 RTSP 输出不使用这些 MQTT 凭据，也无需额外配置用户名或密码。
 - 模型 profile、流绑定、告警规则分别维护在 `config/models.json`、`config/streams_config.json`、`config/alarm_rules.json`。secret 不写入这些 JSON。
 - `max_loaded_models` 默认 1。只有目标板多模型驻留、内存、延迟和稳定性验证通过后，才提高上限。
 - 关键验证见 [Atlas 边缘运行时 Spec](../../docs/Specification/atlas_edge_runtime/spec.md) 与 [课堂行为检测 Spec](../../docs/Specification/classroom_behavior_detection/spec.md)。

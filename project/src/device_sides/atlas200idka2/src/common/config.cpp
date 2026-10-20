@@ -251,15 +251,13 @@ EdgeAppConfig EdgeAppConfig::parse(const Json& models_json,
         stream.reconnect_max_delay_ms = value.at("reconnect_max_delay_ms").get<int>();
         stream.rtsp_transport = value.at("rtsp_transport").get<std::string>();
         const Json& rtsp_output = value.at("rtsp_output");
-        require_keys(rtsp_output, {"enabled", "listen_address", "port", "mount_path", "max_queue_ms",
-                                   "username_ref", "password_ref"}, "stream profile rtsp_output");
+        require_keys(rtsp_output, {"enabled", "listen_address", "port", "mount_path", "max_queue_ms"},
+                     "stream profile rtsp_output");
         stream.rtsp_output.enabled = rtsp_output.at("enabled").get<bool>();
         stream.rtsp_output.listen_address = rtsp_output.at("listen_address").get<std::string>();
         stream.rtsp_output.port = rtsp_output.at("port").get<int>();
         stream.rtsp_output.mount_path = rtsp_output.at("mount_path").get<std::string>();
         stream.rtsp_output.max_queue_ms = rtsp_output.at("max_queue_ms").get<int>();
-        stream.rtsp_output.username_ref = rtsp_output.at("username_ref").get<std::string>();
-        stream.rtsp_output.password_ref = rtsp_output.at("password_ref").get<std::string>();
         if (!valid_component(stream.stream_id) || !stream_ids.insert(stream.stream_id).second ||
             stream.camera_id.empty() || stream.camera_id.size() > 128) {
             throw std::invalid_argument("stream ID is invalid/duplicated or camera_id is invalid");
@@ -280,10 +278,8 @@ EdgeAppConfig EdgeAppConfig::parse(const Json& models_json,
             !std::regex_match(stream.rtsp_output.mount_path, mount_path) ||
             stream.rtsp_output.mount_path.find("//") != std::string::npos ||
             stream.rtsp_output.mount_path.find("/../") != std::string::npos || ends_with(stream.rtsp_output.mount_path, "/..") ||
-            stream.rtsp_output.mount_path.find("/./") != std::string::npos || ends_with(stream.rtsp_output.mount_path, "/.") ||
-            !std::regex_match(stream.rtsp_output.username_ref, env_name) ||
-            !std::regex_match(stream.rtsp_output.password_ref, env_name)) {
-            throw std::invalid_argument("stream RTSP output settings or environment references are invalid");
+            stream.rtsp_output.mount_path.find("/./") != std::string::npos || ends_with(stream.rtsp_output.mount_path, "/.")) {
+            throw std::invalid_argument("stream RTSP output settings are invalid");
         }
         if (stream.rtsp_output.enabled && !stream.live_source) {
             throw std::invalid_argument("RTSP output requires a live source");

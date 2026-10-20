@@ -2,7 +2,7 @@
   <main v-if="!online" class="offline-screen" role="status" aria-live="polite">
     <span class="offline-screen__mark">Y</span>
     <h1>当前处于离线状态</h1>
-    <p>应用页面可离线打开。账号数据、课堂视频与事件证据需要重新联网后读取。</p>
+    <p>应用页面可离线打开。账号数据、视频与事件证据需要重新联网后读取。</p>
   </main>
   <RouterView v-else />
   <PwaUpdatePrompt />

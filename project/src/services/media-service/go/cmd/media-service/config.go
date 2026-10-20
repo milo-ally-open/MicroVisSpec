@@ -15,6 +15,7 @@ type Config struct {
 	InternalDeviceToken      string
 	InternalAuthToken        string
 	InternalNginxToken       string
+	AuthServiceInternalURL   string
 	DeviceServiceURL         string
 	DeviceServiceToken       string
 	MediaMTXAPIURL           string
@@ -38,17 +39,18 @@ func LoadConfig() (Config, error) {
 		return value
 	}
 	c := Config{
-		DatabaseURL:         read("DATABASE_URL"),
-		ListenAddress:       env("MEDIA_LISTEN_ADDRESS", ":8080"),
-		InternalDeviceToken: read("MEDIA_DEVICE_SERVICE_TOKEN"),
-		InternalAuthToken:   read("MEDIA_AUTH_SERVICE_TOKEN"),
-		InternalNginxToken:  read("MEDIA_NGINX_INTERNAL_TOKEN"),
-		DeviceServiceURL:    strings.TrimRight(os.Getenv("DEVICE_SERVICE_INTERNAL_URL"), "/"),
-		DeviceServiceToken:  read("DEVICE_SERVICE_INTERNAL_TOKEN"),
-		MediaMTXAPIURL:      strings.TrimRight(os.Getenv("MEDIAMTX_API_URL"), "/"),
-		MediaMTXUsername:    read("MEDIAMTX_API_USERNAME"),
-		MediaMTXPassword:    read("MEDIAMTX_API_PASSWORD"),
-		PublicMediaBaseURL:  strings.TrimRight(os.Getenv("MEDIA_PUBLIC_BASE_URL"), "/"),
+		DatabaseURL:            read("DATABASE_URL"),
+		ListenAddress:          env("MEDIA_LISTEN_ADDRESS", ":8080"),
+		InternalDeviceToken:    read("MEDIA_DEVICE_SERVICE_TOKEN"),
+		InternalAuthToken:      read("MEDIA_AUTH_SERVICE_TOKEN"),
+		InternalNginxToken:     read("MEDIA_NGINX_INTERNAL_TOKEN"),
+		AuthServiceInternalURL: strings.TrimRight(os.Getenv("AUTH_SERVICE_INTERNAL_URL"), "/"),
+		DeviceServiceURL:       strings.TrimRight(os.Getenv("DEVICE_SERVICE_INTERNAL_URL"), "/"),
+		DeviceServiceToken:     read("DEVICE_SERVICE_INTERNAL_TOKEN"),
+		MediaMTXAPIURL:         strings.TrimRight(os.Getenv("MEDIAMTX_API_URL"), "/"),
+		MediaMTXUsername:       read("MEDIAMTX_API_USERNAME"),
+		MediaMTXPassword:       read("MEDIAMTX_API_PASSWORD"),
+		PublicMediaBaseURL:     strings.TrimRight(os.Getenv("MEDIA_PUBLIC_BASE_URL"), "/"),
 	}
 	if configErr != nil {
 		return c, configErr
@@ -61,6 +63,9 @@ func LoadConfig() (Config, error) {
 	}
 	if c.DeviceServiceToken == "" {
 		return c, errors.New("DEVICE_SERVICE_INTERNAL_TOKEN is required")
+	}
+	if err := validateHTTPURL("AUTH_SERVICE_INTERNAL_URL", c.AuthServiceInternalURL); err != nil {
+		return c, err
 	}
 	if err := validateHTTPURL("DEVICE_SERVICE_INTERNAL_URL", c.DeviceServiceURL); err != nil {
 		return c, err

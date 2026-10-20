@@ -22,13 +22,13 @@ serviceWorker.addEventListener('push', (event: PushEvent) => {
   const eventId = typeof payload.event_id === 'string' ? payload.event_id : ''
   const route = eventNotificationRoute(eventId)
   if (!route) return
-  const location = typeof payload.location === 'string' ? payload.location.slice(0, 80) : '教室'
+  const location = typeof payload.location === 'string' ? payload.location.slice(0, 80) : '未命名位置'
   const severity = typeof payload.severity === 'string' ? payload.severity : '异常'
   const occurredAt = typeof payload.occurred_at === 'string' ? payload.occurred_at : ''
   const timeLabel = occurredAt && !Number.isNaN(Date.parse(occurredAt))
     ? new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' }).format(new Date(occurredAt))
     : ''
-  event.waitUntil(serviceWorker.registration.showNotification('课堂异常提醒', {
+  event.waitUntil(serviceWorker.registration.showNotification('云哨异常事件提醒', {
     body: [location, severity, timeLabel].filter(Boolean).join(' · '),
     tag: `yunshao-event-${eventId}`,
     data: { event_id: eventId },

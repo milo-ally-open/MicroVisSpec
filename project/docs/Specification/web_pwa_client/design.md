@@ -14,17 +14,21 @@
 
 ```mermaid
 flowchart LR
-  Browser[Vue Web / PWA] -->|Same-origin HTTPS /api/v1| Nginx[Nginx: 静态资源、CSRF 会话授权]
+  Browser[Vue Web / PWA] -->|Same-origin HTTPS /api/v1| Nginx[Nginx: 静态资源、API 会话授权]
   Nginx --> Auth[auth-service]
   Nginx --> Device[device-service]
   Nginx --> Event[event-service]
   Nginx --> Media[media-service]
   Nginx --> Push[push-service]
-  Browser -->|WebRTC / HLS playback URL| MediaPlane[MediaMTX]
+  Browser -->|Same-origin WHEP / HLS| Nginx
+  Nginx -->|媒体 auth_request| Media[media-service]
+  Media -->|校验原始 Cookie 与请求元数据| Auth
+  Nginx -->|授权后代理 HTTP 媒体请求| MediaPlane[MediaMTX]
+  Browser -->|WebRTC 媒体 UDP| MediaPlane
   SW[Service Worker] -->|Web Push| Browser
 ```
 
-路由包含公开注册/登录页与受保护的概览、设备、监控、事件、分析、账号/通知设置。桌面导航提供概览、监控和统计；窄屏优先事件、设备与处置。监控由 media-service 返回 viewer URL 与协议，客户端只负责播放器，不访问 MediaMTX 管理端口。告警规则表单把模型可用类别渲染为 allowlisted 选项，所有项默认 disabled；保存后分别展示云端期望配置版本和设备实报配置版本，避免乐观地显示已生效。
+路由包含公开注册/登录页与受保护的概览、设备、监控、事件、分析、账号/通知设置。桌面导航提供概览、监控和统计；窄屏优先事件、设备与处置。平台级品牌和引导文案保持跨行业通用，实际算法类别只在相关规则、筛选和事件记录中按部署能力呈现。监控由 media-service 返回 viewer URL 与协议，客户端只负责播放器，不访问 MediaMTX 管理端口。告警规则表单把模型可用类别渲染为 allowlisted 选项，所有项默认 disabled；保存后分别展示云端期望配置版本和设备实报配置版本，避免乐观地显示已生效。
 
 API client 使用同源请求、`credentials: include`、CSRF 头和 snake_case 序列化；统一解码 `{error:{code,message,request_id}}`。401 清空账号态并执行安全站内返回；409 触发资源刷新，410 显示证据过期；请求取消随路由切换，避免旧账号响应污染当前用户。
 
@@ -33,7 +37,7 @@ PWA worker 只缓存应用壳、manifest 和版本化静态资源；明确排除
 ## 接口和数据
 
 - 复用 [全局 API 合同](../../Analysis/SPEC.md) 及 auth/device/event/media/push 服务规格；web 不引入第二份 API 字段定义。
-- 本地类型定义与服务响应保持一致；客户端状态不存 `account_id` 权限结论、RTSP 凭据、完整截图或历史通知敏感数据。
+- 本地类型定义与服务响应保持一致；设备详情来源表单仅持有授权状态接口返回的 RTSP URL，不持有独立 RTSP 认证凭据、`account_id` 权限结论、完整截图或历史通知敏感数据。写入使用 media-service 来源 API，账号归属由后端验证。
 - 播放 URL 和过期时间由 media-service 发放；证据始终走 event-service 同源授权 API。
 
 ## 安全、运维与兼容
@@ -60,3 +64,5 @@ PWA worker 只缓存应用壳、manifest 和版本化静态资源；明确排除
 | 日期 | 变更 |
 |---|---|
 | 2026-10-18 | 定义首发工作台页面、同源安全 API、媒体播放和 PWA 缓存边界。 |
+| 2026-10-20 | 明确工作台通用产品定位；具体行业与算法只在对应数据和配置中出现。 |
+| 2026-10-21 | 设备详情来源配置仅保留 RTSP 地址；URL 通过 media-service 状态接口回显和写接口保存。 |

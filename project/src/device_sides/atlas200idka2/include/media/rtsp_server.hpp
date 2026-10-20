@@ -20,8 +20,6 @@ struct RtspServerConfig {
     int fps = 0;
     int bitrate_kbps = 0;
     int max_queue_ms = 0;
-    std::string username;
-    std::string password;
 };
 
 class RtspServer {

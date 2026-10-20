@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -169,35 +170,40 @@ func (a *App) releaseViewerLease(c *gin.Context) {
 
 func (a *App) authorizePlayback(c *gin.Context) {
 	requestURI := strings.TrimSpace(c.GetHeader("X-Original-URI"))
+	logReject := func(reason string) {
+		slog.Warn("media_playback_authorization_denied", "request_id", c.GetString("request_id"), "reason", reason,
+			"original_uri_present", requestURI != "")
+	}
 	if requestURI == "" || len(requestURI) > 4096 || strings.ContainsAny(requestURI, "\r\n") {
+		logReject("invalid_original_uri")
 		writeError(c, http.StatusUnauthorized, "unauthorized", "media access is not authorized")
 		return
 	}
 	parsedURI, err := url.ParseRequestURI(requestURI)
 	if err != nil || parsedURI.IsAbs() || parsedURI.Host != "" || parsedURI.Fragment != "" {
+		logReject("invalid_original_uri")
 		writeError(c, http.StatusUnauthorized, "unauthorized", "media access is not authorized")
 		return
 	}
 	pathParts := strings.Split(strings.Trim(parsedURI.Path, "/"), "/")
 	if len(pathParts) < 3 || pathParts[0] != "media" {
+		logReject("invalid_media_path")
 		writeError(c, http.StatusUnauthorized, "unauthorized", "media access is not authorized")
 		return
 	}
 	streamID, streamErr := uuid.Parse(pathParts[1])
-	accountID, accountErr := uuid.Parse(c.GetHeader("X-Account-ID"))
-	sessionID := strings.TrimSpace(c.GetHeader("X-Session-ID"))
-	if streamErr != nil || accountErr != nil || streamID == uuid.Nil || accountID == uuid.Nil || sessionID == "" {
+	if streamErr != nil || streamID == uuid.Nil {
+		logReject("invalid_stream_id")
 		writeError(c, http.StatusUnauthorized, "unauthorized", "media access is not authorized")
 		return
 	}
-	query := a.db.WithContext(c.Request.Context()).Table("media.viewer_leases AS leases").
-		Joins("JOIN media.streams AS streams ON streams.id = leases.stream_id").
-		Where("leases.account_id = ? AND leases.session_id = ? AND leases.stream_id = ? AND leases.released_at IS NULL AND leases.expires_at > ? AND streams.active = ?", accountID, sessionID, streamID, time.Now().UTC(), true)
 	values, err := url.ParseQuery(parsedURI.RawQuery)
 	if err != nil || len(values) > 1 || len(values["lease_id"]) > 1 {
+		logReject("invalid_lease_query")
 		writeError(c, http.StatusUnauthorized, "unauthorized", "media access is not authorized")
 		return
 	}
+	var requestedLeaseID uuid.UUID
 	if leaseValues, hasLease := values["lease_id"]; hasLease {
 		if len(leaseValues) != 1 || strings.TrimSpace(leaseValues[0]) == "" {
 			writeError(c, http.StatusUnauthorized, "unauthorized", "media access is not authorized")
@@ -205,10 +211,40 @@ func (a *App) authorizePlayback(c *gin.Context) {
 		}
 		leaseID, err := uuid.Parse(leaseValues[0])
 		if err != nil || leaseID == uuid.Nil {
+			logReject("invalid_lease_id")
 			writeError(c, http.StatusUnauthorized, "unauthorized", "media access is not authorized")
 			return
 		}
-		query = query.Where("leases.id = ?", leaseID)
+		requestedLeaseID = leaseID
+	}
+	if a.auth == nil {
+		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "session could not be validated")
+		return
+	}
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 4*time.Second)
+	identity, authErr := a.auth.ValidateSession(ctx, c.Request.Header.Get("Cookie"), c.GetHeader("X-CSRF-Token"),
+		c.GetHeader("X-Original-Method"), c.GetHeader("X-Original-Origin"), c.GetString("request_id"))
+	cancel()
+	if errors.Is(authErr, errAuthSessionUnauthorized) {
+		slog.Warn("media_auth_session_rejected", "request_id", c.GetString("request_id"),
+			"cookie_present", c.Request.Header.Get("Cookie") != "", "csrf_token_present", c.GetHeader("X-CSRF-Token") != "",
+			"original_method_present", c.GetHeader("X-Original-Method") != "", "origin_present", c.GetHeader("X-Original-Origin") != "")
+		writeError(c, http.StatusUnauthorized, "unauthorized", "a valid session is required")
+		return
+	}
+	if errors.Is(authErr, errAuthSessionForbidden) {
+		writeError(c, http.StatusForbidden, "csrf_rejected", "same-origin request with a valid CSRF token required")
+		return
+	}
+	if authErr != nil {
+		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "session could not be validated")
+		return
+	}
+	query := a.db.WithContext(c.Request.Context()).Table("media.viewer_leases AS leases").
+		Joins("JOIN media.streams AS streams ON streams.id = leases.stream_id").
+		Where("leases.account_id = ? AND leases.session_id = ? AND leases.stream_id = ? AND leases.released_at IS NULL AND leases.expires_at > ? AND streams.active = ?", identity.AccountID, identity.SessionID, streamID, time.Now().UTC(), true)
+	if requestedLeaseID != uuid.Nil {
+		query = query.Where("leases.id = ?", requestedLeaseID)
 	}
 	var count int64
 	err = query.Count(&count).Error
@@ -217,6 +253,7 @@ func (a *App) authorizePlayback(c *gin.Context) {
 		return
 	}
 	if count != 1 {
+		logReject("lease_not_found_for_session")
 		writeError(c, http.StatusUnauthorized, "unauthorized", "media access is not authorized")
 		return
 	}

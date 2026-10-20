@@ -22,7 +22,6 @@ int main() {
     assert(config.require_stream("room-a").rtsp_output.enabled);
     assert(config.require_stream("room-a").rtsp_output.mount_path == "/room-a");
     assert(config.require_stream("room-a").rtsp_output.max_queue_ms == 1000);
-    assert(config.require_stream("room-a").rtsp_output.username_ref == "RTSP_ROOM_A_USERNAME");
     assert(config.find_rule("model_classroom_behavior_detection", "hand-raising") != nullptr);
     assert(!config.find_rule("model_classroom_behavior_detection", "hand-raising")->enabled);
 
@@ -105,10 +104,10 @@ int main() {
 
     rejected = false;
     invalid_streams = test_fixture::streams();
-    invalid_streams["streams"][0]["rtsp_output"]["password_ref"] = "secret-value";
+    invalid_streams["streams"][0]["rtsp_output"]["username_ref"] = "RTSP_USER";
     try { (void)EdgeAppConfig::parse(test_fixture::models(), invalid_streams, test_fixture::alarm_rules(false)); }
     catch (const std::invalid_argument&) { rejected = true; }
-    assert(rejected);
+    assert(rejected);  // Legacy RTSP authentication settings are no longer part of the config schema.
 
     rejected = false;
     invalid_streams = test_fixture::streams();

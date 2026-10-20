@@ -2,6 +2,9 @@
 
 #include "common/config.hpp"
 
+#include <string>
+#include <utility>
+
 namespace test_fixture {
 
 using yunshao::EdgeAppConfig;
@@ -40,33 +43,24 @@ inline Json models() {
                     model_profile("model_room_occupancy_detection", "room_occupancy", Json::array({"person", "chair"}), 416, 416)})}};
 }
 
+inline Json stream_profile(std::string stream_id, std::string camera_id, std::string source_ref,
+                           std::string model_id, bool rtsp_enabled, int port, std::string mount_path) {
+    Json rtsp_output{{"enabled", rtsp_enabled}, {"listen_address", "0.0.0.0"}, {"port", port},
+                     {"mount_path", std::move(mount_path)}, {"max_queue_ms", 1000}};
+    return Json{{"stream_id", std::move(stream_id)}, {"camera_id", std::move(camera_id)},
+                {"source_ref", std::move(source_ref)}, {"model_id", std::move(model_id)},
+                {"enabled", true}, {"enable_ai", true}, {"live_source", true}, {"output_width", 1280},
+                {"output_height", 720}, {"output_fps", 15}, {"ai_fps", 15},
+                {"output_bitrate_kbps", 1500}, {"input_timeout_ms", 5000},
+                {"reconnect_initial_delay_ms", 1000}, {"reconnect_max_delay_ms", 30000},
+                {"rtsp_transport", "tcp"}, {"rtsp_output", std::move(rtsp_output)}};
+}
+
 inline Json streams() {
     return Json{{"schema_version", 1}, {"global_settings", Json{{"output_fps", 15}}},
                 {"streams", Json::array({
-                    Json{{"stream_id", "room-a"}, {"camera_id", "camera-a"},
-                         {"source_ref", "CAMERA_ROOM_A_URL"}, {"model_id", "model_classroom_behavior_detection"},
-                         {"enabled", true}, {"enable_ai", true}, {"live_source", true}, {"output_width", 1280},
-                         {"output_height", 720}, {"output_fps", 15}, {"ai_fps", 15},
-                         {"output_bitrate_kbps", 1500}, {"input_timeout_ms", 5000},
-                         {"reconnect_initial_delay_ms", 1000}, {"reconnect_max_delay_ms", 30000},
-                         {"rtsp_transport", "tcp"},
-                         {"rtsp_output", Json{{"enabled", true}, {"listen_address", "0.0.0.0"},
-                                                {"port", 8554}, {"mount_path", "/room-a"},
-                                                {"max_queue_ms", 1000},
-                                                {"username_ref", "RTSP_ROOM_A_USERNAME"},
-                                                {"password_ref", "RTSP_ROOM_A_PASSWORD"}}}},
-                    Json{{"stream_id", "room-b"}, {"camera_id", "camera-b"},
-                         {"source_ref", "CAMERA_ROOM_B_URL"}, {"model_id", "model_room_occupancy_detection"},
-                         {"enabled", true}, {"enable_ai", true}, {"live_source", true}, {"output_width", 1280},
-                         {"output_height", 720}, {"output_fps", 15}, {"ai_fps", 15},
-                         {"output_bitrate_kbps", 1500}, {"input_timeout_ms", 5000},
-                         {"reconnect_initial_delay_ms", 1000}, {"reconnect_max_delay_ms", 30000},
-                         {"rtsp_transport", "tcp"},
-                         {"rtsp_output", Json{{"enabled", false}, {"listen_address", "0.0.0.0"},
-                                                {"port", 8555}, {"mount_path", "/room-b"},
-                                                {"max_queue_ms", 1000},
-                                                {"username_ref", "RTSP_ROOM_B_USERNAME"},
-                                                {"password_ref", "RTSP_ROOM_B_PASSWORD"}}}}})}};
+                    stream_profile("room-a", "camera-a", "CAMERA_ROOM_A_URL", "model_classroom_behavior_detection", true, 8554, "/room-a"),
+                    stream_profile("room-b", "camera-b", "CAMERA_ROOM_B_URL", "model_room_occupancy_detection", false, 8555, "/room-b")})}};
 }
 
 inline Json alarm_rules(bool enabled) {

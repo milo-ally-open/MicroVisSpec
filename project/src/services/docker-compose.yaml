@@ -218,6 +218,7 @@ services:
       DATABASE_URL_FILE: /run/secrets/media_database_url
       DEVICE_SERVICE_INTERNAL_URL: http://device-service:8080
       DEVICE_SERVICE_INTERNAL_TOKEN_FILE: /run/secrets/device_internal_service_token
+      AUTH_SERVICE_INTERNAL_URL: http://auth-service:8080
       MEDIA_DEVICE_SERVICE_TOKEN_FILE: /run/secrets/device_media_service_token
       MEDIA_AUTH_SERVICE_TOKEN_FILE: /run/secrets/auth_media_service_token
       MEDIA_NGINX_INTERNAL_TOKEN_FILE: /run/secrets/media_nginx_internal_token

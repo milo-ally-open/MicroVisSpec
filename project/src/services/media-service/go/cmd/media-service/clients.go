@@ -11,6 +11,75 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
+)
+
+type AuthenticatedSession struct {
+	AccountID uuid.UUID
+	SessionID string
+}
+
+type AuthSessionValidator interface {
+	ValidateSession(context.Context, string, string, string, string, string) (AuthenticatedSession, error)
+}
+
+type AuthSessionClient struct {
+	baseURL string
+	token   string
+	client  *http.Client
+}
+
+func NewAuthSessionClient(config Config) *AuthSessionClient {
+	return &AuthSessionClient{
+		baseURL: strings.TrimRight(config.AuthServiceInternalURL, "/"),
+		token:   config.InternalAuthToken,
+		client:  &http.Client{Timeout: 3 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }},
+	}
+}
+
+func (c *AuthSessionClient) ValidateSession(ctx context.Context, cookie, csrfToken, originalMethod, originalOrigin, requestID string) (AuthenticatedSession, error) {
+	var identity AuthenticatedSession
+	if c.baseURL == "" || c.token == "" {
+		return identity, errors.New("auth service client is not configured")
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/internal/v1/sessions/validate", nil)
+	if err != nil {
+		return identity, errors.New("auth service request could not be created")
+	}
+	request.Header.Set("X-Internal-Service-Token", c.token)
+	request.Header.Set("X-Internal-Service", "media-service")
+	request.Header.Set("Cookie", cookie)
+	request.Header.Set("X-CSRF-Token", csrfToken)
+	request.Header.Set("X-Original-Method", originalMethod)
+	request.Header.Set("X-Original-Origin", originalOrigin)
+	request.Header.Set("X-Request-ID", requestID)
+	response, err := c.client.Do(request)
+	if err != nil {
+		return identity, errors.New("auth service is unavailable")
+	}
+	defer response.Body.Close()
+	_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 64<<10))
+	switch response.StatusCode {
+	case http.StatusNoContent:
+		accountID, parseErr := uuid.Parse(response.Header.Get("X-Account-ID"))
+		sessionID := strings.TrimSpace(response.Header.Get("X-Session-ID"))
+		if parseErr != nil || accountID == uuid.Nil || sessionID == "" || len(sessionID) > 128 {
+			return identity, errors.New("auth service returned an invalid session identity")
+		}
+		return AuthenticatedSession{AccountID: accountID, SessionID: sessionID}, nil
+	case http.StatusUnauthorized:
+		return identity, errAuthSessionUnauthorized
+	case http.StatusForbidden:
+		return identity, errAuthSessionForbidden
+	default:
+		return identity, fmt.Errorf("auth service returned HTTP %d", response.StatusCode)
+	}
+}
+
+var (
+	errAuthSessionUnauthorized = errors.New("auth session is not authorized")
+	errAuthSessionForbidden    = errors.New("auth session request was rejected")
 )
 
 type CameraOwnership struct {

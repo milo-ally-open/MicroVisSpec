@@ -34,7 +34,7 @@ public:
     int group() const;
     int output_channel() const;
     bool next_inference_frame(hi_video_frame_info& frame);
-    void get_output_frame(hi_video_frame_info& frame);
+    bool get_output_frame(hi_video_frame_info& frame);
     void release_inference_frame(const hi_video_frame_info& frame);
     void release_output_frame(const hi_video_frame_info& frame);
     void encode_frame(const hi_video_frame_info& frame);

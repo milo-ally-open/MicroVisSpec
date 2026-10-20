@@ -78,7 +78,7 @@ const primaryLinks = [
       </nav>
 
       <div class="sidebar-bottom">
-        <div class="connection-card"><AppIcon name="layers" :size="23" /><div><strong>课堂行为工作台</strong><small>连接现场，跟进每次响应</small></div></div>
+        <div class="connection-card"><AppIcon name="layers" :size="23" /><div><strong>边缘智能工作台</strong><small>连接设备，掌握运行状态</small></div></div>
         <RouterLink class="nav-link" :to="{ name: 'settings' }" :class="{ 'nav-link--active': route.name === 'settings' }"><span class="nav-icon"><AppIcon name="settings" /></span><span>账号与通知</span></RouterLink>
         <button class="profile-button" type="button" aria-label="退出登录" @click="signOut" :disabled="signingOut">
           <span class="avatar">{{ authState.user?.username.slice(0, 1).toUpperCase() || 'U' }}</span>

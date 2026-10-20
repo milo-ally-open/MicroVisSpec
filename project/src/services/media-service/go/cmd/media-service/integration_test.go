@@ -99,10 +99,14 @@ func mediaRequest(handler http.Handler, method, path string, accountID uuid.UUID
 	return response
 }
 
-func mediaAuthorizationRequest(handler http.Handler, accountID uuid.UUID, originalURI, internalToken string) *httptest.ResponseRecorder {
+func mediaAuthorizationRequest(handler http.Handler, forgedAccountID uuid.UUID, originalURI, internalToken, originalMethod string) *httptest.ResponseRecorder {
 	request := httptest.NewRequest(http.MethodGet, "/internal/v1/media/authorize-playback", nil)
-	request.Header.Set("X-Account-ID", accountID.String())
-	request.Header.Set("X-Session-ID", "session-it")
+	request.Header.Set("Cookie", "yunshao_session=opaque-session-cookie")
+	request.Header.Set("X-CSRF-Token", "csrf-it")
+	request.Header.Set("X-Original-Method", originalMethod)
+	request.Header.Set("X-Original-Origin", "https://app.example.test")
+	request.Header.Set("X-Account-ID", forgedAccountID.String())
+	request.Header.Set("X-Session-ID", "forged-session")
 	request.Header.Set("X-Original-URI", originalURI)
 	if internalToken != "" {
 		request.Header.Set("X-Internal-Service-Token", internalToken)
@@ -112,7 +116,7 @@ func mediaAuthorizationRequest(handler http.Handler, accountID uuid.UUID, origin
 	return response
 }
 
-func TestSourceConfigurationChecksOwnershipAndEncryptsCredentials(t *testing.T) {
+func TestSourceConfigurationChecksOwnershipAndStoresOnlyURL(t *testing.T) {
 	db := mediaIntegrationDB(t)
 	accountID, deviceID, cameraID := uuid.New(), uuid.New(), uuid.New()
 	ownership := CameraOwnership{AccountID: accountID.String(), DeviceID: deviceID.String(), CameraID: cameraID.String(), DeviceName: "Atlas room", DeviceLocation: "Room 102", CameraName: "Front"}
@@ -121,31 +125,31 @@ func TestSourceConfigurationChecksOwnershipAndEncryptsCredentials(t *testing.T) 
 	app := NewApp(config, db, fakeOwnershipResolver{ownership: ownership}, mtx)
 	handler := app.Handler()
 	defer db.Where("camera_id = ?", cameraID).Delete(&Stream{})
-	input := map[string]string{"rtsp_url": "rtsp://192.168.0.2:8554/processed", "source_username": "source-user", "source_password": "source-secret"}
+	input := map[string]string{"rtsp_url": "rtsp://192.168.0.2:8554/processed"}
 	response := mediaRequest(handler, http.MethodPut, "/api/v1/media/cameras/"+cameraID.String()+"/source", accountID, input, "", "")
 	if response.Code != http.StatusOK {
 		t.Fatalf("configure stream: status=%d body=%s", response.Code, response.Body.String())
 	}
-	if strings.Contains(response.Body.String(), input["rtsp_url"]) || strings.Contains(response.Body.String(), input["source_password"]) {
-		t.Fatal("source configuration response exposed RTSP source information")
+	if strings.Contains(response.Body.String(), input["rtsp_url"]) {
+		t.Fatal("source write response exposed the RTSP URL")
 	}
 	var stream Stream
 	if err := db.First(&stream, "camera_id = ?", cameraID).Error; err != nil {
 		t.Fatal(err)
 	}
-	if bytes.Contains(stream.EncryptedSource, []byte(input["rtsp_url"])) || bytes.Contains(stream.EncryptedSource, []byte(input["source_password"])) {
-		t.Fatal("database source ciphertext contains plaintext")
+	if bytes.Contains(stream.EncryptedSource, []byte(input["rtsp_url"])) {
+		t.Fatal("database source ciphertext contains the plaintext URL")
 	}
 	secret, err := decryptMediaSource(config.MediaSourceEncryptionKey, stream.EncryptedSource)
-	if err != nil || secret.URL != input["rtsp_url"] || secret.Username != input["source_username"] || secret.Password != input["source_password"] {
+	if err != nil || secret.URL != input["rtsp_url"] || secret.Version != currentMediaSourceVersion {
 		t.Fatalf("stored source did not decrypt correctly: %+v err=%v", secret, err)
 	}
-	if stream.ConfigStatus != "applied" || stream.AppliedConfigVersion != stream.ConfigVersion || mtx.applyCalls != 1 || !strings.Contains(mtx.lastSource, input["source_password"]) {
+	if stream.ConfigStatus != "applied" || stream.AppliedConfigVersion != stream.ConfigVersion || mtx.applyCalls != 1 || mtx.lastSource != input["rtsp_url"] {
 		t.Fatalf("source path was not applied: stream=%+v mtx=%+v", stream, mtx)
 	}
 	status := mediaRequest(handler, http.MethodGet, "/api/v1/media/cameras/"+cameraID.String()+"/status", accountID, nil, "", "")
-	if status.Code != http.StatusOK || strings.Contains(status.Body.String(), input["source_password"]) {
-		t.Fatalf("camera status leaked source credentials: %d %s", status.Code, status.Body.String())
+	if status.Code != http.StatusOK || !strings.Contains(status.Body.String(), `"rtsp_url":"`+input["rtsp_url"]+`"`) {
+		t.Fatalf("camera status did not return the authorized source URL: %d %s", status.Code, status.Body.String())
 	}
 
 	otherAccount := uuid.New()
@@ -153,10 +157,71 @@ func TestSourceConfigurationChecksOwnershipAndEncryptsCredentials(t *testing.T) 
 	if denied.Code != http.StatusNotFound {
 		t.Fatalf("cross-account source configuration must be hidden, got %d", denied.Code)
 	}
+	withCredentials := map[string]string{"rtsp_url": input["rtsp_url"], "source_username": "legacy-user", "source_password": "legacy-password"}
+	legacyFields := mediaRequest(handler, http.MethodPut, "/api/v1/media/cameras/"+cameraID.String()+"/source", accountID, withCredentials, "", "")
+	if legacyFields.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("legacy source credential fields should be rejected, got %d", legacyFields.Code)
+	}
 	badURL := map[string]string{"rtsp_url": "rtsp://embedded:secret@192.168.0.2:8554/stream"}
 	invalid := mediaRequest(handler, http.MethodPut, "/api/v1/media/cameras/"+cameraID.String()+"/source", accountID, badURL, "", "")
 	if invalid.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("URL-embedded credentials should be rejected, got %d", invalid.Code)
+	}
+}
+
+func TestLegacyMediaSourceMigrationRemovesCredentialsAndIsIdempotent(t *testing.T) {
+	db := mediaIntegrationDB(t)
+	key := bytes.Repeat([]byte{0x82}, 32)
+	legacyURL := "rtsp://192.168.0.2:8554/processed"
+	legacyPlaintext, err := json.Marshal(legacyMediaSourcePayload{URL: legacyURL, Username: "legacy-user", Password: "legacy-secret"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacyCiphertext, err := encryptMediaSourcePayload(key, legacyPlaintext)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream := Stream{ID: uuid.New(), AccountID: uuid.New(), DeviceID: uuid.New(), CameraID: uuid.New(), EncryptedSource: legacyCiphertext,
+		ConfigVersion: 1, ConfigStatus: "applied", SourceState: "configured", MediaState: "idle", Active: true, CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
+	broken := Stream{ID: uuid.New(), AccountID: stream.AccountID, DeviceID: stream.DeviceID, CameraID: uuid.New(), EncryptedSource: []byte("not-ciphertext"),
+		ConfigVersion: 1, ConfigStatus: "applied", SourceState: "configured", MediaState: "idle", Active: true, CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
+	if err := db.Create(&stream).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&broken).Error; err != nil {
+		t.Fatal(err)
+	}
+	defer db.Delete(&Stream{}, "id IN ?", []uuid.UUID{stream.ID, broken.ID})
+	if err := migrateLegacyMediaSources(context.Background(), db, key); err == nil {
+		t.Fatal("migration should fail closed when an existing ciphertext cannot be opened")
+	}
+	var unchanged Stream
+	if err := db.First(&unchanged, "id = ?", stream.ID).Error; err != nil || !bytes.Equal(unchanged.EncryptedSource, legacyCiphertext) {
+		t.Fatal("failed migration must not partially rewrite stored sources")
+	}
+	if err := db.Delete(&Stream{}, "id = ?", broken.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := migrateLegacyMediaSources(context.Background(), db, key); err != nil {
+		t.Fatalf("migrate legacy source: %v", err)
+	}
+	var migrated Stream
+	if err := db.First(&migrated, "id = ?", stream.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Equal(migrated.EncryptedSource, legacyCiphertext) || bytes.Contains(migrated.EncryptedSource, []byte("legacy-secret")) {
+		t.Fatal("migration did not replace the legacy ciphertext")
+	}
+	payload, err := decryptMediaSourcePayload(key, migrated.EncryptedSource)
+	if err != nil || payload.Version != currentMediaSourceVersion || payload.URL != legacyURL || payload.Username != "" || payload.Password != "" {
+		t.Fatalf("migration retained legacy credentials: payload=%+v err=%v", payload, err)
+	}
+	stableCiphertext := append([]byte(nil), migrated.EncryptedSource...)
+	if err := migrateLegacyMediaSources(context.Background(), db, key); err != nil {
+		t.Fatalf("repeat migration: %v", err)
+	}
+	if err := db.First(&migrated, "id = ?", stream.ID).Error; err != nil || !bytes.Equal(stableCiphertext, migrated.EncryptedSource) {
+		t.Fatal("repeat migration should be a no-op")
 	}
 }
 
@@ -213,8 +278,29 @@ func TestPlaybackLeaseEnforcesQuotaAuthorizationAndRelease(t *testing.T) {
 	defer db.Delete(&ViewerLease{}, "stream_id = ?", streamID)
 	defer db.Delete(&Stream{}, "id = ?", streamID)
 
+	authCalls := 0
+	authServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		authCalls++
+		if r.Method != http.MethodGet || r.URL.Path != "/internal/v1/sessions/validate" || r.Header.Get("X-Internal-Service-Token") != "auth-internal-token" {
+			t.Errorf("unexpected auth-service request: %s %s", r.Method, r.URL.Path)
+		}
+		if r.Header.Get("Cookie") != "yunshao_session=opaque-session-cookie" || r.Header.Get("X-Original-Origin") != "https://app.example.test" {
+			t.Errorf("original browser session metadata was not forwarded")
+		}
+		if r.Header.Get("X-Account-ID") != "" || r.Header.Get("X-Session-ID") != "" {
+			t.Errorf("untrusted client identity headers reached auth-service")
+		}
+		if r.Header.Get("X-Original-Method") == http.MethodPost && r.Header.Get("X-CSRF-Token") != "csrf-it" {
+			t.Errorf("CSRF token was not forwarded for the proxied write")
+		}
+		w.Header().Set("X-Account-ID", accountID.String())
+		w.Header().Set("X-Session-ID", "session-it")
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer authServer.Close()
 	mtx := &fakeMediaMTX{online: true}
-	app := NewApp(Config{PublicMediaBaseURL: "https://media.example.test"}, db, fakeOwnershipResolver{ownership: ownership}, mtx)
+	app := NewApp(Config{PublicMediaBaseURL: "https://media.example.test", AuthServiceInternalURL: authServer.URL,
+		InternalAuthToken: "auth-internal-token", InternalNginxToken: "nginx-token"}, db, fakeOwnershipResolver{ownership: ownership}, mtx)
 	handler := app.Handler()
 	seeded := make([]ViewerLease, 0, maxActiveSourceCount)
 	for index := 0; index < maxActiveSourceCount; index++ {
@@ -266,16 +352,19 @@ func TestPlaybackLeaseEnforcesQuotaAuthorizationAndRelease(t *testing.T) {
 	if renew.Code != http.StatusOK {
 		t.Fatalf("lease renewal status=%d body=%s", renew.Code, renew.Body.String())
 	}
-	authorization := mediaAuthorizationRequest(handler, accountID, "/media/"+streamID.String()+"/whep?lease_id="+body.LeaseID.String(), "")
+	forgedAccountID := uuid.New()
+	authorization := mediaAuthorizationRequest(handler, forgedAccountID, "/media/"+streamID.String()+"/whep?lease_id="+body.LeaseID.String(), "", http.MethodPost)
 	if authorization.Code != http.StatusUnauthorized {
 		t.Fatalf("authorization must reject a request without the internal proxy credential, got %d", authorization.Code)
 	}
-	app.config.InternalNginxToken = "nginx-token"
-	authorization = mediaAuthorizationRequest(handler, accountID, "/media/"+streamID.String()+"/whep?lease_id="+body.LeaseID.String(), "nginx-token")
-	if authorization.Code != http.StatusNoContent {
-		t.Fatalf("active lease should authorize its owner, got %d %s", authorization.Code, authorization.Body.String())
+	if authCalls != 0 {
+		t.Fatal("auth-service must not be called for a request without the internal proxy credential")
 	}
-	fragmentAuthorization := mediaAuthorizationRequest(handler, accountID, "/media/"+streamID.String()+"/index.m3u8/segment_0.m4s", "nginx-token")
+	authorization = mediaAuthorizationRequest(handler, forgedAccountID, "/media/"+streamID.String()+"/whep?lease_id="+body.LeaseID.String(), "nginx-token", http.MethodPost)
+	if authorization.Code != http.StatusNoContent {
+		t.Fatalf("active lease should authorize the identity resolved by auth-service despite forged identity headers, got %d %s", authorization.Code, authorization.Body.String())
+	}
+	fragmentAuthorization := mediaAuthorizationRequest(handler, forgedAccountID, "/media/"+streamID.String()+"/index.m3u8/segment_0.m4s", "nginx-token", http.MethodGet)
 	if fragmentAuthorization.Code != http.StatusNoContent {
 		t.Fatalf("HLS fragment without a lease query should authorize through the current session, got %d", fragmentAuthorization.Code)
 	}
@@ -283,7 +372,7 @@ func TestPlaybackLeaseEnforcesQuotaAuthorizationAndRelease(t *testing.T) {
 	if released.Code != http.StatusNoContent || mtx.kickCalls != 1 {
 		t.Fatalf("lease release should close the MediaMTX session: status=%d kicks=%d", released.Code, mtx.kickCalls)
 	}
-	authorization = mediaAuthorizationRequest(handler, accountID, "/media/"+streamID.String()+"/whep?lease_id="+body.LeaseID.String(), "nginx-token")
+	authorization = mediaAuthorizationRequest(handler, forgedAccountID, "/media/"+streamID.String()+"/whep?lease_id="+body.LeaseID.String(), "nginx-token", http.MethodPost)
 	if authorization.Code != http.StatusUnauthorized {
 		t.Fatalf("released lease must not authorize media, got %d", authorization.Code)
 	}
