@@ -71,6 +71,26 @@ describe('same-origin API client', () => {
       message: '观看容量已满，请关闭其他监控画面后重试。',
     })
   })
+
+  it('explains rejected login credentials without signalling session expiry', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      error: { code: 'invalid_credentials', message: 'username or password is incorrect' },
+    }), { status: 401, headers: { 'Content-Type': 'application/json' } })))
+    const expired = vi.fn()
+    window.addEventListener('auth:expired', expired)
+    try {
+      await expect(apiRequest('/api/v1/auth/login', {
+        method: 'POST', body: JSON.stringify({ username: 'teacher', password: 'wrong-test-password' }), csrf: false,
+      })).rejects.toMatchObject({
+        status: 401,
+        code: 'invalid_credentials',
+        message: '用户名或密码不正确，请重新输入。',
+      })
+      expect(expired).not.toHaveBeenCalled()
+    } finally {
+      window.removeEventListener('auth:expired', expired)
+    }
+  })
 })
 
 describe('session state', () => {

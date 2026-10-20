@@ -14,6 +14,8 @@
 
 ## 验收记录
 
+- [x] **T-08 登录失败提示修正** — 修复登录 401 被误显示为会话失效的问题；覆盖 AC-01.4，并回归 AC-01.1。10/10 Vitest、TypeScript/生产构建通过；Edge 在真实 localhost 后端验证错误密码提示、固定测试凭据登录、刷新后保持会话，以及既有待处置事件/授权截图访问。测试密码仅保存在本机私有文件，不入库；登录和账号数据隔离继续使用原认证接口。
+
 | REQ/AC | 检查方法 | 当前证据 | 状态 |
 |---|---|---|---|
 | REQ-01/AC-01.1–01.3 | 组件/API 认证测试与浏览器账号流程 | 9 个 Vitest 用例通过，覆盖 CSRF、401 状态清理、安全回跳和错误映射；生产 TypeScript 检查通过；完整浏览器账号流程待联调 | 部分通过 |
@@ -24,5 +26,5 @@
 ## 环境与执行入口
 
 - 最近执行：隔离副本 `npm ci`、`npm run test`（9/9）、`npm run build`（含 Vue 与 service worker type-check）均通过；Vite 开发进程占用工作区原生 Rolldown 文件，故验证副本未覆盖工作区依赖目录。
-- 现有 `package.json` 未定义 `test` 脚本或测试 runner；T-07 应选择与 Vue/Vite 工程兼容的依赖并更新 lockfile，再执行 `npm test`。
+- 当前 `package.json` 已定义 `test`；2026-10-20 在 Docker Web 构建环境执行 `npm test`，10/10 通过，含登录失败文案回归；生产构建包含 Vue/service worker TypeScript 检查。本次真实浏览器登录相关 4 项检查通过；详细本机记录为仓库外 `E:/视频制作/yunshao-local-runtime/login-smoke-report.json`。
 - 真实 Push 仍需 HTTPS、VAPID 和支持的浏览器；mock/API 测试不替代浏览器推送验收。

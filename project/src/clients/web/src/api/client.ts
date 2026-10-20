@@ -65,7 +65,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     const problem = (await response.json().catch(() => ({}))) as ApiProblem
     const code = problem.error?.code ?? 'request_failed'
     const statusMessage: Record<number, string> = {
-      401: '登录状态已失效，请重新登录。',
+      401: path.endsWith('/auth/login') ? '用户名或密码不正确，请重新输入。' : '登录状态已失效，请重新登录。',
       403: '当前账号无权执行此操作。',
       404: '内容不存在或已不可访问。',
       409: '内容已发生变化，请刷新后重试。',
