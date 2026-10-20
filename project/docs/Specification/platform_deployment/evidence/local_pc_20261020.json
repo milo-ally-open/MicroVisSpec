@@ -1,0 +1,100 @@
+{
+  "tested_at": "2026-10-20T15:36:20.261980+08:00",
+  "source_commit": "b92c21da7ac77ed7e61abdf88bae782b0f2b29a8",
+  "branch": "assistant/local-mvp-integration",
+  "local_source_change": "Normalize shell scripts and enforce LF checkouts with .gitattributes",
+  "environment": {
+    "host": "Windows + Docker Desktop",
+    "docker": "29.8.0",
+    "compose": "5.5.1",
+    "browser": "Microsoft Edge, isolated headless context",
+    "mediamtx": {
+      "version": "v1.21.2",
+      "url": "https://github.com/bluenviron/mediamtx/releases/download/v1.21.2/mediamtx_v1.21.2_windows_amd64.zip",
+      "sha256": "a84224f5a490855684e62ba6fb71e80ea2a5e16aed61883bb58380290e93e467"
+    }
+  },
+  "scope": "Real localhost HTTPS, PostgreSQL and TLS MQTT with explicitly simulated device/events/evidence; no model inference",
+  "checks": [
+    {
+      "check": "HTTPS registration/login and CSRF token",
+      "result": "passed"
+    },
+    {
+      "check": "Unauthenticated access and missing CSRF rejected",
+      "result": "passed"
+    },
+    {
+      "check": "Device registration, activation and real TLS/MQTT heartbeat",
+      "result": "passed"
+    },
+    {
+      "check": "Rule configuration HTTPS -> MQTT -> simulator -> applied ACK",
+      "result": "passed"
+    },
+    {
+      "check": "Disabled classroom rule rejected through real MQTT",
+      "result": "passed"
+    },
+    {
+      "check": "Event acceptance, duplicate suppression, evidence upload/read and 24h expiry timestamp",
+      "result": "passed"
+    },
+    {
+      "check": "Screenshot inaccessible without a browser session",
+      "result": "passed"
+    },
+    {
+      "check": "Event statistics query",
+      "result": "passed"
+    },
+    {
+      "check": "Cross-account device/event/evidence access and event modification denied",
+      "result": "passed"
+    },
+    {
+      "check": "Incorrect event version returns 409 without modifying the event",
+      "result": "passed"
+    },
+    {
+      "check": "Screenshot upload with invalid device credentials rejected",
+      "result": "passed"
+    },
+    {
+      "check": "Protected route redirects, UI login and return to event list",
+      "result": "passed"
+    },
+    {
+      "check": "Device list renders real simulated-device data",
+      "result": "passed"
+    },
+    {
+      "check": "Event detail retrieves authorized screenshot and renders it",
+      "result": "passed"
+    },
+    {
+      "check": "UI event transition pending -> processing -> resolved, audit trail visible",
+      "result": "passed"
+    },
+    {
+      "check": "Analytics renders backend event statistics",
+      "result": "passed"
+    },
+    {
+      "check": "Overview renders device and event summary",
+      "result": "passed"
+    },
+    {
+      "check": "No uncaught browser JavaScript errors",
+      "result": "passed"
+    }
+  ],
+  "passed_checks": 18,
+  "limitations": [
+    "No Atlas, real camera or model inference",
+    "No browser video playback or phone Web Push",
+    "24h expiry timestamp checked; 24h cleanup not waited",
+    "Development CA used; Windows trust store unchanged",
+    "No production deployment, backup/restore or long-duration stability acceptance"
+  ]
+}

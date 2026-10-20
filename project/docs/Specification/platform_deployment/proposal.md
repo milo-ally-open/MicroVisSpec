@@ -7,6 +7,8 @@
 
 ## 背景与问题
 
+2026-10-20 Windows 本机联调发现：默认 Git CRLF 检出使两个只读挂载的 bootstrap shell 脚本在容器启动时退出，错误为 `set: line 2: illegal option -`。本轮在独立联调分支固定 `*.sh` 的 LF 检出规则，保持现有服务、认证、消息和数据合同；使用 localhost 测试凭据及明确标注的模拟设备验证浏览器业务闭环。硬件推理和手机 Push 不属于本轮验收。
+
 首发需要 auth、device、event、media、push 五个 Go 服务，以及 Vue/PWA、PostgreSQL、Mosquitto 和 MediaMTX 协同运行。目前仓库有各服务源码、Dockerfile 与服务内测试，但没有 Compose 编排、Nginx 入口、初始化与操作手册；`docker compose ps` 因找不到 Compose 文件不能列出应用栈。当前服务只具备单体内的 handler/数据库集成测试，尚无可复现的容器整合验收。
 
 这使登录态/CSRF、服务间令牌、MQTT Dynamic Security、私有媒体路由、数据库 schema 权限及证据卷权限无法在真实网络边界下验证。

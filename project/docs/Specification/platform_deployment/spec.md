@@ -80,6 +80,8 @@
 
 ### REQ-06：机密、配置和生命周期操作
 
+- **AC-06.5** Given Windows Git 检出并由 Compose 只读挂载初始化脚本，When PostgreSQL/MQTT bootstrap 容器执行脚本，Then shell 文件保持 LF，不能因 CRLF 产生 `illegal option` 并退出；初始化可在已创建的本机测试卷上重试。
+
 **需求**：服务令牌、数据库密码、MQTT 凭据、加密/签名密钥、VAPID 私钥及 TLS 私钥由 Compose secrets 文件只读提供给明确授权的容器。Go 服务可以通过 `*_FILE` 读取敏感配置；配置缺失或格式不合法时应启动失败并给出不含 secret 内容的错误。生产部署不依赖仓库中的真实 secret 文件。
 
 **验收条件**

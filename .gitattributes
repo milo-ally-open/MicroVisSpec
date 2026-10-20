@@ -1,0 +1,2 @@
+# Linux bootstrap scripts are bind-mounted by Compose, including on Windows.
+*.sh text eol=lf

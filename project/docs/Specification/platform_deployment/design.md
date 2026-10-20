@@ -93,6 +93,8 @@ flowchart LR
 
 ## 变更记录
 
+Windows Git 检出必须保留容器 bootstrap 的 LF 行尾。根目录 `.gitattributes` 使用 `*.sh text eol=lf`，并将已提交的两个初始化脚本归一化为 LF。两个脚本仍由原 Compose 只读挂载，重试使用既有本地测试卷，不改变数据库、broker 或 API 合同。
+
 | 日期 | 变更 |
 |---|---|
 | 2026-10-19 | 初稿，基于现有服务配置、路由与全局部署合同拆出可实施集成拓扑。 |
