@@ -134,7 +134,7 @@ sudo systemctl enable yunshao-agent.service
 
 ### 2. 在板端配置并启动测试流
 
-编辑 `/etc/yunshao/streams_config.json`，只对 `classroom-demo` 打开 `enabled`、`enable_ai` 和 `rtsp_output.enabled`；保留已有的 `source_ref`、8554 端口和 `/classroom-demo` 路径。确认 `/etc/yunshao/alarm_rules.json` 中规则仍全部为 `false`。
+编辑 `/etc/yunshao/streams_config.json`，只对 `classroom-demo` 将 `enabled`、`enable_ai` 和 `rtsp_output.enabled` 设为 `true`；保留已有的 `source_ref`、8554 端口和 `/classroom-demo` 路径。确认 `/etc/yunshao/alarm_rules.json` 中规则仍全部为 `false`。安装的默认配置会关闭这三个开关；只配置环境变量并重启服务不会启用视频流。
 
 编辑 `/etc/yunshao/classroom-runtime.env`，加入本次测试用的来源和 RTSP 登录信息（请使用临时凭据）：
 
@@ -150,26 +150,30 @@ YUNSHAO_RTSP_CLASSROOM_PASSWORD=Test1234
 sudo chown root:yunshao /etc/yunshao/classroom-runtime.env
 sudo chmod 0640 /etc/yunshao/classroom-runtime.env
 sudo systemctl restart yunshao-classroom-runtime.service
+sudo systemctl is-active yunshao-classroom-runtime.service
+sudo ss -lntup | grep -E '(:5000|:8554)'
 sudo journalctl -u yunshao-classroom-runtime.service -n 20 --no-pager
 ```
 
-日志中应看到 `rtsp_output_ready`。服务开始等待 UDP 视频源。
+服务应显示 `active`，并监听 UDP/5000 与 TCP/8554。`rtsp_output_ready` 日志可作辅助信息；当前板端 `journalctl` 可能没有服务日志记录，因此日志为空不能单独说明服务未启动。服务此时只是在等待输入，还没有可播放的视频。
 
 ### 3. 从 Windows 推流并播放
 
-在仓库根目录的一个终端推流：
+必须让 RTSP 播放器先连上，再开始 UDP 推流。RTSP 输出是实时流；推流先结束、播放器后启动时，播放器不会回放之前发过的 UDP 数据。本板端的编码流需要客户端从首个关键帧开始接收参数集；播放器晚加入时可能报 H.264 PPS 错误并一直没有画面。
 
-```text
-ffmpeg -re -stream_loop -1 -i video/classroom_behavior.mp4 -map 0:v:0 -vf "scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2:black,fps=15" -an -c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p -g 30 -bf 0 -b:v 700k -f mpegts "udp://192.168.0.2:5000?pkt_size=1316"
-```
-
-另开一个终端播放（用户名和密码替换为第 2 步设置的值）：
+先在 Windows 终端 A 启动播放器（用户名和密码替换为板端环境文件中的值），保持终端运行：
 
 ```text
 ffplay -rtsp_transport tcp "rtsp://test:Test1234@192.168.0.2:8554/classroom-demo"
 ```
 
-`ffplay` 应持续显示处理后的视频；检测框按模型实际结果显示。按 `Ctrl+C` 停止推流，关闭 `ffplay` 窗口退出播放。
+再在 Windows 终端 B 从仓库根目录开始推流，并保持推流运行：
+
+```text
+ffmpeg -re -stream_loop -1 -i video/classroom_behavior.mp4 -map 0:v:0 -vf "scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2:black,fps=15" -an -c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p -g 30 -bf 0 -b:v 700k -f mpegts "udp://192.168.0.2:5000?pkt_size=1316"
+```
+
+`ffplay` 应显示处理后的视频；检测框按模型实际结果显示。不要在播放器启动前结束推流。确认画面正常后，按 `Ctrl+C` 停止终端 B 的推流，再关闭终端 A 的播放器。
 
 测试结束后，在板端关闭该流的三个开关、从环境文件移除本次测试的三项变量，再运行 `sudo systemctl stop yunshao-classroom-runtime.service`。如果安装前备份过配置，恢复备份即可。不要删除已入库的模型。
 

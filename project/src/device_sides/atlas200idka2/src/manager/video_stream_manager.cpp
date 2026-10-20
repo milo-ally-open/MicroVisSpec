@@ -52,7 +52,7 @@ void VideoStreamManager::run(const StreamProfile& stream, const std::string& inp
         rtsp_server = std::make_unique<RtspServer>(rtsp_server_config);
         std::cout << "rtsp_output_ready stream_id=" << stream.stream_id
                   << " port=" << stream.rtsp_output.port
-                  << " mount_path=" << stream.rtsp_output.mount_path << '\n';
+                  << " mount_path=" << stream.rtsp_output.mount_path << std::endl;
     }
 
     int reconnect_delay_ms = stream.reconnect_initial_delay_ms;
