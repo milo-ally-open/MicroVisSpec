@@ -4,6 +4,7 @@ import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { authApi } from '../api/auth'
 import { ApiError } from '../api/client'
 import { clearSession, authState } from '../state/auth'
+import AppIcon from '../components/AppIcon.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -52,11 +53,11 @@ async function signOut() {
 }
 
 const primaryLinks = [
-  { name: 'overview', label: '运行总览', icon: '◫', desktop: true },
-  { name: 'monitor', label: '实时监控', icon: '◉', desktop: true },
-  { name: 'events', label: '异常事件', icon: '◎', desktop: true },
-  { name: 'analytics', label: '数据分析', icon: '▥', desktop: true },
-  { name: 'devices', label: '边缘设备', icon: '⌘', desktop: true },
+  { name: 'overview', label: '运行总览', icon: 'overview' },
+  { name: 'monitor', label: '实时监控', icon: 'monitor' },
+  { name: 'events', label: '异常事件', icon: 'events' },
+  { name: 'analytics', label: '数据分析', icon: 'analytics' },
+  { name: 'devices', label: '边缘设备', icon: 'devices' },
 ]
 </script>
 
@@ -68,21 +69,21 @@ const primaryLinks = [
         <span><strong>云哨</strong><small>EDGE INTELLIGENCE</small></span>
       </RouterLink>
 
-      <div class="workspace-label">工作空间</div>
+      <div class="workspace-label">工作台 <span>WORKSPACE</span></div>
       <nav class="side-nav" aria-label="主导航">
         <RouterLink v-for="item in primaryLinks" :key="item.name" :to="{ name: item.name }" class="nav-link" :class="{ 'nav-link--active': route.name === item.name || (item.name === 'events' && route.name === 'event-detail') || (item.name === 'devices' && route.name === 'device-detail') }">
-          <span class="nav-icon" aria-hidden="true">{{ item.icon }}</span><span>{{ item.label }}</span>
-          <span v-if="item.name === 'events'" class="nav-dot" aria-hidden="true"></span>
+          <span class="nav-icon"><AppIcon :name="item.icon" /></span><span>{{ item.label }}</span>
+          <AppIcon v-if="route.name === item.name" class="nav-current" name="chevron" :size="15" />
         </RouterLink>
       </nav>
 
       <div class="sidebar-bottom">
-        <div class="connection-card"><span class="connection-dot"></span><div><strong>云边连接</strong><small>由设备状态持续更新</small></div></div>
-        <RouterLink class="nav-link" :to="{ name: 'settings' }" :class="{ 'nav-link--active': route.name === 'settings' }"><span class="nav-icon">⚙</span><span>账号与通知</span></RouterLink>
-        <button class="profile-button" type="button" @click="signOut" :disabled="signingOut">
+        <div class="connection-card"><AppIcon name="layers" :size="23" /><div><strong>课堂行为工作台</strong><small>连接现场，跟进每次响应</small></div></div>
+        <RouterLink class="nav-link" :to="{ name: 'settings' }" :class="{ 'nav-link--active': route.name === 'settings' }"><span class="nav-icon"><AppIcon name="settings" /></span><span>账号与通知</span></RouterLink>
+        <button class="profile-button" type="button" aria-label="退出登录" @click="signOut" :disabled="signingOut">
           <span class="avatar">{{ authState.user?.username.slice(0, 1).toUpperCase() || 'U' }}</span>
           <span class="profile-copy"><strong>{{ authState.user?.username || '当前账号' }}</strong><small>{{ signingOut ? '正在退出…' : '个人工作空间' }}</small></span>
-          <span class="profile-exit" aria-hidden="true">↗</span>
+          <AppIcon class="profile-exit" name="logout" :size="18" />
         </button>
       </div>
     </aside>
@@ -90,14 +91,14 @@ const primaryLinks = [
     <div class="main-column">
       <header class="topbar">
         <div class="breadcrumb"><span>云哨平台</span><span class="crumb-separator">/</span><strong>{{ title }}</strong></div>
-        <div class="topbar-right"><span class="topbar-status"><span class="status-dot status-dot--muted"></span>数据来自实时服务</span><span class="topbar-divider"></span><RouterLink class="topbar-settings" :to="{ name: 'settings' }">{{ authState.user?.username }}</RouterLink></div>
+        <div class="topbar-right"><span class="topbar-status"><AppIcon name="shield" :size="16" />个人工作空间</span><span class="topbar-divider"></span><RouterLink class="topbar-settings" :to="{ name: 'settings' }"><span class="topbar-avatar">{{ authState.user?.username.slice(0, 1).toUpperCase() }}</span>{{ authState.user?.username }}<AppIcon name="chevron" :size="14" /></RouterLink></div>
       </header>
       <main class="page-content"><div v-if="signOutError" class="notice notice--error" role="alert">{{ signOutError }}</div><RouterView /></main>
     </div>
 
     <nav class="mobile-nav" aria-label="手机导航">
-      <RouterLink v-for="item in [{ name: 'overview', label: '总览', icon: '◫' }, { name: 'events', label: '事件', icon: '◎' }, { name: 'devices', label: '设备', icon: '⌘' }, { name: 'settings', label: '我的', icon: '○' }]" :key="item.name" :to="{ name: item.name }" :class="{ 'mobile-nav__active': route.name === item.name || (item.name === 'events' && route.name === 'event-detail') || (item.name === 'devices' && route.name === 'device-detail') }">
-        <span>{{ item.icon }}</span><small>{{ item.label }}</small>
+      <RouterLink v-for="item in [{ name: 'overview', label: '总览' }, { name: 'events', label: '事件' }, { name: 'devices', label: '设备' }, { name: 'settings', label: '我的' }]" :key="item.name" :to="{ name: item.name }" :class="{ 'mobile-nav__active': route.name === item.name || (item.name === 'events' && route.name === 'event-detail') || (item.name === 'devices' && route.name === 'device-detail') }">
+        <AppIcon :name="item.name" :size="21" /><small>{{ item.label }}</small>
       </RouterLink>
     </nav>
   </div>

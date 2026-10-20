@@ -1,0 +1,235 @@
+{
+  "scope": "REQ-06 / AC-06.1–06.4: local desktop and responsive interface refresh",
+  "environment": {
+    "browser": "Microsoft Edge via Playwright",
+    "site": "https://localhost",
+    "backend": "Local Docker services with simulated device/events; no Atlas or live camera"
+  },
+  "visual": {
+    "tested_at": "2026-10-20T08:19:52.251839+00:00",
+    "label": "after",
+    "viewports": [
+      1440,
+      1024,
+      390,
+      360
+    ],
+    "checks": [
+      {
+        "page": "overview",
+        "width": 1440,
+        "horizontal_overflow_px": 0
+      },
+      {
+        "page": "devices",
+        "width": 1440,
+        "horizontal_overflow_px": 0
+      },
+      {
+        "page": "device-detail",
+        "width": 1440,
+        "horizontal_overflow_px": 0
+      },
+      {
+        "page": "events",
+        "width": 1440,
+        "horizontal_overflow_px": 0
+      },
+      {
+        "page": "event-detail",
+        "width": 1440,
+        "horizontal_overflow_px": 0
+      },
+      {
+        "page": "analytics",
+        "width": 1440,
+        "horizontal_overflow_px": 0
+      },
+      {
+        "page": "settings",
+        "width": 1440,
+        "horizontal_overflow_px": 0
+      },
+      {
+        "page": "monitor",
+        "width": 1440,
+        "horizontal_overflow_px": 0
+      },
+      {
+        "page": "overview",
+        "width": 1024,
+        "horizontal_overflow_px": 0
+      },
+      {
+        "page": "devices",
+        "width": 1024,
+        "horizontal_overflow_px": 0
+      },
+      {
+        "page": "device-detail",
+        "width": 1024,
+        "horizontal_overflow_px": 0
+      },
+      {
+        "page": "events",
+        "width": 1024,
+        "horizontal_overflow_px": 0
+      },
+      {
+        "page": "event-detail",
+        "width": 1024,
+        "horizontal_overflow_px": 0
+      },
+      {
+        "page": "analytics",
+        "width": 1024,
+        "horizontal_overflow_px": 0
+      },
+      {
+        "page": "settings",
+        "width": 1024,
+        "horizontal_overflow_px": 0
+      },
+      {
+        "page": "monitor",
+        "width": 1024,
+        "horizontal_overflow_px": 0
+      },
+      {
+        "page": "overview",
+        "width": 390,
+        "horizontal_overflow_px": 0
+      },
+      {
+        "page": "devices",
+        "width": 390,
+        "horizontal_overflow_px": 0
+      },
+      {
+        "page": "device-detail",
+        "width": 390,
+        "horizontal_overflow_px": 0
+      },
+      {
+        "page": "events",
+        "width": 390,
+        "horizontal_overflow_px": 0
+      },
+      {
+        "page": "event-detail",
+        "width": 390,
+        "horizontal_overflow_px": 0
+      },
+      {
+        "page": "analytics",
+        "width": 390,
+        "horizontal_overflow_px": 0
+      },
+      {
+        "page": "settings",
+        "width": 390,
+        "horizontal_overflow_px": 0
+      },
+      {
+        "page": "overview",
+        "width": 360,
+        "horizontal_overflow_px": 0
+      },
+      {
+        "page": "devices",
+        "width": 360,
+        "horizontal_overflow_px": 0
+      },
+      {
+        "page": "device-detail",
+        "width": 360,
+        "horizontal_overflow_px": 0
+      },
+      {
+        "page": "events",
+        "width": 360,
+        "horizontal_overflow_px": 0
+      },
+      {
+        "page": "event-detail",
+        "width": 360,
+        "horizontal_overflow_px": 0
+      },
+      {
+        "page": "analytics",
+        "width": 360,
+        "horizontal_overflow_px": 0
+      },
+      {
+        "page": "settings",
+        "width": 360,
+        "horizontal_overflow_px": 0
+      }
+    ],
+    "page_errors": [],
+    "overflow_failures": []
+  },
+  "interaction": {
+    "tested_at": "2026-10-20T08:19:14.250426+00:00",
+    "test_clock": "2026-10-20 09:30/20:30 Asia/Shanghai, browser clock only",
+    "checks": [
+      {
+        "check": "Password visibility toggles by mouse and keyboard without changing its value",
+        "result": "passed"
+      },
+      {
+        "check": "Overview date and greeting follow Shanghai time and update across time periods",
+        "result": "passed"
+      },
+      {
+        "check": "Overview time range updates both data request and metric heading",
+        "result": "passed"
+      },
+      {
+        "check": "360px device registration form opens, remains usable and closes without submitting",
+        "result": "passed"
+      },
+      {
+        "check": "Narrow-screen event filtering and clearing still use the real backend",
+        "result": "passed"
+      }
+    ]
+  },
+  "login_regression": {
+    "tested_at": "2026-10-20T08:19:55.346658+00:00",
+    "checks": [
+      "Rejected login shows credential error instead of session expiry",
+      "Fixed local demo credentials successfully log in through the browser",
+      "Session survives a normal browser page reload",
+      "Existing pending event and authorized screenshot remain accessible"
+    ],
+    "result": "passed"
+  },
+  "build": {
+    "command": "docker compose up -d --build web",
+    "typescript": "passed",
+    "production_build": "passed"
+  },
+  "unit_tests": {
+    "command": "docker run --rm yunshao-web-check npm test",
+    "result": "10/10 passed",
+    "file": "src/tests/client.spec.ts"
+  },
+  "screenshots": {
+    "location": "Repository-external local runtime frontend-after folder",
+    "reviewed": [
+      "overview-1440.png",
+      "overview-390.png",
+      "login-1440.png",
+      "login-390.png",
+      "event-detail-1440.png",
+      "events-1440.png",
+      "analytics-1440.png",
+      "device-detail-390.png"
+    ]
+  },
+  "limits": [
+    "Responsive checks use desktop Edge viewport emulation, not a physical mobile device.",
+    "Live video, Atlas inference, Push delivery and complete offline/PWA lifecycle are outside this visual refresh."
+  ]
+}

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
+import AppIcon from './AppIcon.vue'
 import { ApiError, csrfHeaders, errorMessage } from '../api/client'
 import { mediaApi, type PlaybackLease } from '../api/media'
 
@@ -174,7 +175,7 @@ onBeforeUnmount(() => { void stop() })
 <template>
   <div class="camera-player">
     <video ref="video" autoplay muted playsinline controls :aria-label="`${cameraName} 实时视频`"></video>
-    <div v-if="state !== 'playing' && state !== 'fallback'" class="camera-player__overlay"><span class="player-state-icon" :class="{ 'player-state-icon--loading': state === 'connecting' }">{{ state === 'connecting' ? '◌' : '!' }}</span><strong>{{ state === 'connecting' ? '正在连接视频' : '视频暂不可用' }}</strong><small>{{ message }}</small><button v-if="state === 'error'" class="button button--secondary" @click="disposed = false; void start()">重新连接</button></div>
+    <div v-if="state !== 'playing' && state !== 'fallback'" class="camera-player__overlay"><span class="player-state-icon" :class="{ 'player-state-icon--loading': state === 'connecting' }"><AppIcon :name="state === 'connecting' ? 'refresh' : 'camera'" :size="30" /></span><strong>{{ state === 'connecting' ? '正在连接视频' : '视频暂不可用' }}</strong><small>{{ message }}</small><button v-if="state === 'error'" class="button button--secondary" @click="disposed = false; void start()">重新连接</button></div>
     <div v-else class="camera-player__badge"><i></i>{{ state === 'fallback' ? 'HLS 回退' : 'WEBRTC' }}</div>
   </div>
 </template>

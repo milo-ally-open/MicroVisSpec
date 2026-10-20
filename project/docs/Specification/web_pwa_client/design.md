@@ -10,6 +10,8 @@
 
 ## 方案
 
+2026-10-20 视觉方案沿用现有页面与业务组件：`style.css` 保留同一套共享组件规则并展开为可读格式，统一字体、间距、边界、深绿导航及浅色内容面板；新 `AppIcon.vue` 提供本地 SVG 图标，`AuthBrandPanel.vue` 供登录/注册共用品牌区。响应式适配 1440/1024/390/360px，移动端保留底部导航和堆叠表单；概览不再显示写死的星期/早上问候，选定范围同时驱动卡片标题。可见性切换只作用于密码框，不持久化凭据。无新依赖和远程视觉资源。
+
 ```mermaid
 flowchart LR
   Browser[Vue Web / PWA] -->|Same-origin HTTPS /api/v1| Nginx[Nginx: 静态资源、CSRF 会话授权]

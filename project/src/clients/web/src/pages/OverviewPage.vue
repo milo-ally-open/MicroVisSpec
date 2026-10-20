@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { deviceApi, type DeviceStats } from '../api/devices'
 import { eventApi, type EventRecord, type EventStats } from '../api/events'
 import { errorMessage } from '../api/client'
 import { behaviorLabel, countLabel, formatDate, statusLabel } from '../lib/format'
+import { authState } from '../state/auth'
+import AppIcon from '../components/AppIcon.vue'
 
 const deviceStats = ref<DeviceStats | null>(null)
 const eventStats = ref<EventStats | null>(null)
@@ -13,6 +15,14 @@ const busy = ref(true)
 const error = ref('')
 const range = ref<'today' | '7d' | '30d'>('today')
 const ranges = [{ key: 'today', label: '今日' }, { key: '7d', label: '近 7 天' }, { key: '30d', label: '近 30 天' }] as const
+const rangeCaption = computed(() => ranges.find((item) => item.key === range.value)?.label ?? '今日')
+const clock = ref(new Date())
+let clockTimer: number | undefined
+const currentDate = computed(() => new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', month: 'long', day: 'numeric', weekday: 'long' }).format(clock.value))
+const greeting = computed(() => {
+  const hour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Shanghai', hour: 'numeric', hour12: false }).format(clock.value))
+  return hour < 6 || hour >= 18 ? '晚上好' : hour < 12 ? '早上好' : '下午好'
+})
 const maxTrend = computed(() => Math.max(1, ...(eventStats.value?.trend.map((item) => item.count) ?? [])))
 const trendPoints = computed(() => {
   const items = eventStats.value?.trend ?? []
@@ -37,21 +47,32 @@ async function setRange(value: typeof range.value) {
   await load()
 }
 
-onMounted(load)
+onMounted(() => {
+  void load()
+  clockTimer = window.setInterval(() => { clock.value = new Date() }, 60000)
+})
+onBeforeUnmount(() => { if (clockTimer !== undefined) window.clearInterval(clockTimer) })
 </script>
 
 <template>
-  <section class="page-heading page-heading--split">
-    <div><span class="eyebrow">MONDAY · CAMPUS OPERATIONS</span><h1>早上好，欢迎回来。</h1><p>这里汇总设备连接状态与需要跟进的课堂异常。</p></div>
-    <RouterLink class="button button--primary" to="/events">查看异常事件 <span aria-hidden="true">→</span></RouterLink>
+  <section class="overview-hero">
+    <div class="overview-hero__copy">
+      <span class="hero-date"><AppIcon name="calendar" :size="16" />{{ currentDate }}<span class="hero-date__divider"></span>课堂运行工作台</span>
+      <h1>{{ greeting }}，{{ authState.user?.username }}<span class="greeting-dot">。</span></h1>
+      <p v-if="busy">正在为你汇总设备状态和课堂事件。</p>
+      <p v-else-if="eventStats">{{ eventStats.open_events > 0 ? `还有 ${countLabel(eventStats.open_events)} 条异常事件需要跟进，现场状态尽在掌握。` : '当前没有待跟进事件，随时掌握设备与课堂动态。' }}</p>
+      <p v-else>在这里查看设备状态，跟进每一条课堂异常。</p>
+      <div class="hero-actions"><RouterLink class="button button--primary" to="/events">查看异常事件 <AppIcon name="arrow" :size="17" /></RouterLink><RouterLink class="button button--hero" to="/devices"><AppIcon name="devices" :size="17" />管理设备</RouterLink></div>
+    </div>
+    <div class="hero-scene" aria-hidden="true"><div class="hero-scene__orbit"></div><div class="hero-scene__core"><AppIcon name="monitor" :size="44" /></div><span class="hero-scene__label">课堂行为检测</span><div class="hero-behaviors"><span><AppIcon name="hand" :size="16" />举手</span><span><AppIcon name="book" :size="16" />阅读</span><span><AppIcon name="pen" :size="16" />书写</span></div></div>
   </section>
   <div v-if="error" class="notice notice--error" role="alert"><span>服务连接暂不可用</span><p>{{ error }}</p><button class="text-button" @click="load">重新加载</button></div>
 
   <section class="stat-grid" aria-label="运行指标">
-    <article class="stat-card"><div class="stat-card__top"><span>已登记设备</span><span class="stat-icon stat-icon--blue">⌘</span></div><strong>{{ busy ? '—' : countLabel(deviceStats?.registered ?? 0) }}</strong><div class="stat-foot"><span class="stat-live"><i></i>{{ deviceStats ? `${countLabel(deviceStats.online)} 台在线` : '等待设备数据' }}</span><small>设备服务 · {{ formatDate(deviceStats?.as_of, false) }}</small></div></article>
-    <article class="stat-card"><div class="stat-card__top"><span>今日异常事件</span><span class="stat-icon stat-icon--orange">◎</span></div><strong>{{ busy ? '—' : countLabel(eventStats?.total_events ?? 0) }}</strong><div class="stat-foot"><span class="stat-muted">仅统计已命中规则的事件</span><small>事件服务 · {{ formatDate(eventStats?.as_of, false) }}</small></div></article>
-    <article class="stat-card"><div class="stat-card__top"><span>待跟进</span><span class="stat-icon stat-icon--gold">↗</span></div><strong>{{ busy ? '—' : countLabel(eventStats?.open_events ?? 0) }}</strong><div class="stat-foot"><span class="stat-muted">待处置与处理中</span><RouterLink class="inline-link" to="/events?status=pending">进入处置 <span aria-hidden="true">→</span></RouterLink></div></article>
-    <article class="stat-card stat-card--model"><div class="stat-card__top"><span>课堂告警规则</span><span class="stat-icon stat-icon--green">◉</span></div><strong>由设备配置</strong><div class="stat-foot"><span class="stat-muted">举手 · 阅读 · 书写</span><RouterLink class="inline-link" to="/devices">查看设备规则 <span aria-hidden="true">→</span></RouterLink></div></article>
+    <article class="stat-card"><div class="stat-card__top"><span>已登记设备</span><span class="stat-icon stat-icon--blue"><AppIcon name="devices" /></span></div><strong>{{ busy ? '—' : countLabel(deviceStats?.registered ?? 0) }}<small>台</small></strong><div class="stat-foot"><span class="stat-live" :class="{ 'stat-live--idle': !deviceStats?.online }"><i></i>{{ deviceStats ? `${countLabel(deviceStats.online)} 台在线` : '等待设备数据' }}</span><small>{{ formatDate(deviceStats?.as_of, false) }} 更新</small></div></article>
+    <article class="stat-card"><div class="stat-card__top"><span>{{ rangeCaption }}异常事件</span><span class="stat-icon stat-icon--orange"><AppIcon name="events" /></span></div><strong>{{ busy ? '—' : countLabel(eventStats?.total_events ?? 0) }}<small>条</small></strong><div class="stat-foot"><span class="stat-muted">已命中规则的事件</span><small>{{ formatDate(eventStats?.as_of, false) }} 更新</small></div></article>
+    <article class="stat-card stat-card--attention"><div class="stat-card__top"><span>待跟进事件</span><span class="stat-icon stat-icon--gold"><AppIcon name="arrowUp" /></span></div><strong>{{ busy ? '—' : countLabel(eventStats?.open_events ?? 0) }}<small>条</small></strong><div class="stat-foot"><span class="stat-muted">待处置与处理中</span><RouterLink class="inline-link" to="/events?status=pending">进入处置 <AppIcon name="arrow" :size="14" /></RouterLink></div></article>
+    <article class="stat-card stat-card--model"><div class="stat-card__top"><span>课堂告警规则</span><span class="stat-icon stat-icon--green"><AppIcon name="shield" /></span></div><strong>按设备配置</strong><div class="stat-foot"><span class="stat-muted">举手 · 阅读 · 书写</span><RouterLink class="inline-link" to="/devices">管理规则 <AppIcon name="arrow" :size="14" /></RouterLink></div></article>
   </section>
 
   <section class="overview-grid">
@@ -64,10 +85,10 @@ onMounted(load)
 
     <article class="panel recent-panel"><div class="panel-heading"><div><span class="eyebrow">FOLLOW UP</span><h2>最近异常</h2></div><RouterLink class="inline-link" to="/events">全部事件 <span aria-hidden="true">→</span></RouterLink></div>
       <div v-if="busy" class="loading-row">正在读取事件服务…</div>
-      <div v-else-if="!recentEvents.length" class="empty-state empty-state--compact"><span class="empty-state__icon">○</span><strong>暂时没有待跟进事件</strong><p>普通课堂检测不会出现在告警列表。</p></div>
+      <div v-else-if="!recentEvents.length" class="empty-state empty-state--compact"><span class="empty-state__icon"><AppIcon name="events" /></span><strong>暂时没有异常事件</strong><p>规则命中后，新的事件会显示在这里。</p></div>
       <RouterLink v-for="item in recentEvents" :key="item.event_id" class="event-row" :to="`/events/${item.event_id}`"><span class="event-row__severity" :class="`severity-${item.severity}`"></span><span class="event-row__main"><strong>{{ behaviorLabel(item.event_type) }}</strong><small>{{ item.location }} · {{ item.device_name }}</small></span><span class="event-row__side"><small>{{ formatDate(item.occurred_at, false) }}</small><em :class="`status-${item.status}`">{{ statusLabel(item.status) }}</em></span></RouterLink>
     </article>
   </section>
 
-  <section class="bottom-banner"><div><span class="bottom-banner__mark">⌘</span><div><strong>边缘状态以设备实报为准</strong><p>设备在线、视频连接、模型运行和规则配置分别监测，状态异常时不会显示为已就绪。</p></div></div><RouterLink to="/devices">管理边缘设备 <span aria-hidden="true">→</span></RouterLink></section>
+  <section class="bottom-banner"><div><span class="bottom-banner__mark"><AppIcon name="shield" :size="23" /></span><div><strong>从设备连接，到每一次现场响应</strong><p>设备在线、视频连接、模型运行与规则应用状态，均可在设备详情中分别查看。</p></div></div><RouterLink to="/devices">管理边缘设备 <AppIcon name="arrow" :size="16" /></RouterLink></section>
 </template>

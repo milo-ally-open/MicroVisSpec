@@ -5,11 +5,14 @@ import { authApi } from '../api/auth'
 import { errorMessage } from '../api/client'
 import { setSession } from '../state/auth'
 import { safeInAppPath } from '../lib/navigation'
+import AuthBrandPanel from '../components/AuthBrandPanel.vue'
+import AppIcon from '../components/AppIcon.vue'
 
 const route = useRoute()
 const router = useRouter()
 const username = ref('')
 const password = ref('')
+const showPassword = ref(false)
 const busy = ref(false)
 const error = ref('')
 
@@ -30,11 +33,11 @@ async function submit() {
 
 <template>
   <main class="auth-page">
-    <section class="auth-aside"><RouterLink class="brand brand--light" to="/"><span class="brand-mark">Y</span><span><strong>云哨</strong><small>EDGE INTELLIGENCE</small></span></RouterLink><div class="auth-aside__copy"><span class="eyebrow eyebrow--light">CLOUD · EDGE · CAMPUS</span><h1>让课堂异常<br>清晰可见。</h1><p>从边缘设备到告警处置，在一个工作台里掌握现场状态。</p></div><div class="auth-aside__foot">云边协同 · 实时感知 · 有据可查</div></section>
+    <AuthBrandPanel />
     <section class="auth-panel"><div class="auth-card"><div class="auth-mobile-brand"><span class="brand-mark">Y</span><strong>云哨</strong></div><span class="eyebrow">欢迎回来</span><h2>登录工作台</h2><p class="auth-description">输入你的账号信息，继续查看设备与课堂事件。</p>
       <form class="form-stack" @submit.prevent="submit">
         <label class="field"><span>用户名</span><input v-model="username" name="username" autocomplete="username" required minlength="3" maxlength="32" placeholder="输入用户名"></label>
-        <label class="field"><span>密码</span><input v-model="password" name="password" type="password" autocomplete="current-password" required minlength="12" placeholder="至少 12 位"></label>
+        <div class="field"><label for="login-password">密码</label><div class="password-field"><input id="login-password" v-model="password" name="password" :type="showPassword ? 'text' : 'password'" autocomplete="current-password" required minlength="12" placeholder="请输入密码"><button class="password-toggle" type="button" :aria-label="showPassword ? '隐藏密码' : '显示密码'" :aria-pressed="showPassword" @click="showPassword = !showPassword"><AppIcon :name="showPassword ? 'eyeOff' : 'eye'" /></button></div></div>
         <p v-if="error" class="form-error" role="alert">{{ error }}</p>
         <button class="button button--primary button--wide" type="submit" :disabled="busy">{{ busy ? '正在登录…' : '登录' }} <span aria-hidden="true">→</span></button>
       </form>
