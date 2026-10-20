@@ -20,7 +20,16 @@
       "input_timeout_ms": 5000,
       "reconnect_initial_delay_ms": 1000,
       "reconnect_max_delay_ms": 30000,
-      "rtsp_transport": "tcp"
+      "rtsp_transport": "tcp",
+      "rtsp_output": {
+        "enabled": false,
+        "listen_address": "0.0.0.0",
+        "port": 8554,
+        "mount_path": "/classroom-demo",
+        "max_queue_ms": 1000,
+        "username_ref": "YUNSHAO_RTSP_CLASSROOM_USERNAME",
+        "password_ref": "YUNSHAO_RTSP_CLASSROOM_PASSWORD"
+      }
     }
   ]
 }

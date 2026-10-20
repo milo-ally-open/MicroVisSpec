@@ -19,6 +19,10 @@ int main() {
     assert(config.require_stream("room-a").live_source);
     assert(config.require_stream("room-a").input_timeout_ms == 5000);
     assert(config.require_stream("room-a").output_bitrate_kbps == 1500);
+    assert(config.require_stream("room-a").rtsp_output.enabled);
+    assert(config.require_stream("room-a").rtsp_output.mount_path == "/room-a");
+    assert(config.require_stream("room-a").rtsp_output.max_queue_ms == 1000);
+    assert(config.require_stream("room-a").rtsp_output.username_ref == "RTSP_ROOM_A_USERNAME");
     assert(config.find_rule("model_classroom_behavior_detection", "hand-raising") != nullptr);
     assert(!config.find_rule("model_classroom_behavior_detection", "hand-raising")->enabled);
 
@@ -81,6 +85,27 @@ int main() {
     rejected = false;
     invalid_streams = test_fixture::streams();
     invalid_streams["streams"][0]["rtsp_transport"] = "invalid";
+    try { (void)EdgeAppConfig::parse(test_fixture::models(), invalid_streams, test_fixture::alarm_rules(false)); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    assert(rejected);
+
+    rejected = false;
+    invalid_streams = test_fixture::streams();
+    invalid_streams["streams"][0]["rtsp_output"]["max_queue_ms"] = 0;
+    try { (void)EdgeAppConfig::parse(test_fixture::models(), invalid_streams, test_fixture::alarm_rules(false)); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    assert(rejected);
+
+    rejected = false;
+    invalid_streams = test_fixture::streams();
+    invalid_streams["streams"][0]["rtsp_output"]["mount_path"] = "/../private";
+    try { (void)EdgeAppConfig::parse(test_fixture::models(), invalid_streams, test_fixture::alarm_rules(false)); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    assert(rejected);
+
+    rejected = false;
+    invalid_streams = test_fixture::streams();
+    invalid_streams["streams"][0]["rtsp_output"]["password_ref"] = "secret-value";
     try { (void)EdgeAppConfig::parse(test_fixture::models(), invalid_streams, test_fixture::alarm_rules(false)); }
     catch (const std::invalid_argument&) { rejected = true; }
     assert(rejected);

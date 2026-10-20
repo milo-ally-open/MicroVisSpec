@@ -19,6 +19,7 @@ find_package(OpenCV 4 REQUIRED COMPONENTS core imgproc dnn)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(MOSQUITTO REQUIRED IMPORTED_TARGET libmosquitto)
 pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET libavformat libavcodec libavutil)
+pkg_check_modules(GSTREAMER REQUIRED IMPORTED_TARGET gstreamer-1.0 gstreamer-app-1.0 gstreamer-rtsp-server-1.0)
 find_path(NLOHMANN_JSON_INCLUDE_DIR nlohmann/json.hpp REQUIRED)
 find_path(ACL_INCLUDE_DIR acl/acl.h PATHS "${ASCEND_TOOLKIT_HOME}/aarch64-linux/include" REQUIRED)
 set(ACL_DVPP_INCLUDE_DIR "${ACL_INCLUDE_DIR}/acl/dvpp")
@@ -57,10 +58,11 @@ add_executable(yunshao-classroom-runtime
   src/manager/alarm_filter.cpp
   src/manager/video_stream_manager.cpp
   src/media/media_pipeline.cpp
+  src/media/rtsp_server.cpp
   src/media/region_osd.cpp)
 target_include_directories(yunshao-classroom-runtime PRIVATE include "${NLOHMANN_JSON_INCLUDE_DIR}" "${ACL_INCLUDE_DIR}" "${ACL_DVPP_INCLUDE_DIR}" "${ACL_MEDIA_INCLUDE_DIR}" ${OpenCV_INCLUDE_DIRS})
 target_compile_definitions(yunshao-classroom-runtime PRIVATE ENABLE_DVPP_INTERFACE)
-target_link_libraries(yunshao-classroom-runtime PRIVATE edge_core dl pthread "${ASCENDCL_LIBRARY}" "${ASCEND_DVPP_MPI_LIBRARY}" "${ASCEND_VPSS_MPI_LIBRARY}" "${ASCEND_DVPP_LIBRARY}" ${OpenCV_LIBS} PkgConfig::FFMPEG)
+target_link_libraries(yunshao-classroom-runtime PRIVATE edge_core dl pthread "${ASCENDCL_LIBRARY}" "${ASCEND_DVPP_MPI_LIBRARY}" "${ASCEND_VPSS_MPI_LIBRARY}" "${ASCEND_DVPP_LIBRARY}" ${OpenCV_LIBS} PkgConfig::FFMPEG PkgConfig::GSTREAMER)
 target_compile_options(yunshao-classroom-runtime PRIVATE -O3 -Wall -Wextra -Wpedantic)
 set_target_properties(yunshao-classroom-runtime PROPERTIES BUILD_RPATH "${ASCEND_TOOLKIT_HOME}/aarch64-linux/lib64")
 

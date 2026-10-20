@@ -33,6 +33,16 @@ struct ModelProfile {
     int max_detections = 300;
 };
 
+struct RtspOutputProfile {
+    bool enabled = false;
+    std::string listen_address;
+    int port = 8554;
+    std::string mount_path;
+    int max_queue_ms = 1000;
+    std::string username_ref;
+    std::string password_ref;
+};
+
 struct StreamProfile {
     std::string stream_id;
     std::string camera_id;
@@ -50,6 +60,7 @@ struct StreamProfile {
     int reconnect_initial_delay_ms = 1000;
     int reconnect_max_delay_ms = 30000;
     std::string rtsp_transport = "tcp";
+    RtspOutputProfile rtsp_output;
     std::optional<double> confidence_threshold;
     std::optional<double> nms_threshold;
 };

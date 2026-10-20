@@ -41,9 +41,13 @@
 
 ### 3. 绑定视频流和告警规则
 
-在 `config/streams_config.json` 新增 stream，填 `stream_id`、`camera_id`、环境变量形式的 `source_ref`、profile 的 `model_id`、`live_source`、输出尺寸/帧率/目标码率、AI 帧率、输入读取超时、重连初始/最大退避和 RTSP 传输方式。视频 URL/密码通过 systemd 环境文件注入，不能写入 JSON。live 输入超时或断开后会记录不含来源凭据的错误并按 profile 退避重连；本地文件 profile 可将 `live_source` 设为 false，EOF 后正常退出。示例流默认关闭。
+在 `config/streams_config.json` 新增 stream，填 `stream_id`、`camera_id`、环境变量形式的 `source_ref`、profile 的 `model_id`、`live_source`、输出尺寸/帧率/目标码率、AI 帧率、输入读取超时、重连初始/最大退避和 RTSP 输入传输方式。视频输入 URL/密码及 RTSP 输出认证凭据均通过 systemd 环境文件注入，不能写入 JSON。live 输入超时或断开后会记录不含来源凭据的错误并按 profile 退避重连；本地文件 profile 可将 `live_source` 设为 false，EOF 后正常退出。示例流默认关闭。
 
 课堂默认预览参数为 1280×720、15 fps、1500 kbps；runtime 从每路 stream profile 读取目标码率，`MediaPipeline` 不再固化编码码率。`input_timeout_ms` 控制 FFmpeg 网络读取上限；`reconnect_initial_delay_ms` / `reconnect_max_delay_ms` 控制断流重试退避；RTSP 可选择 TCP 或 UDP transport。
+
+需要提供云端预览时，将该 stream 的 `rtsp_output.enabled` 设为 `true`，配置 `listen_address`、`port`、`mount_path` 和 `max_queue_ms`。服务启动时从 `username_ref` / `password_ref` 指向的 systemd 环境变量读取 RTSP 输出凭据，并以 TCP interleaved RTSP 服务处理后的 H.264；客户端未连接时不排队，慢客户端超过缓冲上限时丢弃预览帧，不阻塞推理。RTSP 模式不持续写本地 H.264 文件；显式传入 `--output <path>` 才保存诊断视频。生产环境应限制 RTSP 监听端口只允许 media-service 所在网络访问。
+
+Atlas RTSP 输出地址需由 media-service 所在网络实际可达。以板卡地址 `192.168.0.2` 和默认 stream 为例，RTSP 来源 URL 是 `rtsp://192.168.0.2:8554/classroom-demo`；通过 media-service 摄像头来源接口提交该 URL 与独立的 RTSP 用户名/密码，MediaMTX 按 `sourceOnDemand` 拉流。URL 不嵌入凭据，浏览器只能取得受保护的 WHEP/HLS 播放地址。此地址示例只有在云端容器能路由到板卡 LAN 时有效。
 
 在 `config/alarm_rules.json` 为需要告警的 model/class 添加 `event_type`、类别属性名、等级、置信度阈值、最短持续时间和冷却时间。新增规则必须先设为 `enabled: false`；未配置或禁用时仍可推理/OSD，但不写事件 outbox。只有明确启用且满足规则时才生成业务事件。
 
@@ -76,7 +80,7 @@ sudo -u yunshao /usr/local/bin/yunshao-agent model status model_classroom_behavi
 
 ### 5. 构建和验证
 
-在已安装 Atlas CANN、OpenCV、FFmpeg、SQLite、OpenSSL、Mosquitto 开发依赖的 Atlas/Linux 构建环境执行：
+在已安装 Atlas CANN、OpenCV、FFmpeg、SQLite、OpenSSL、Mosquitto、GStreamer RTSP Server、GStreamer App 开发依赖及 `rtph264pay` 插件的 Atlas/Linux 构建环境执行：
 
 ```bash
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
@@ -86,7 +90,9 @@ cmake --build build -j2
 ctest --test-dir build --output-on-failure
 ```
 
-先用 `yunshao-classroom-runtime --check-config` 验证三份配置，再以授权 H.264 样例源运行指定 `--stream-id`。当前 pipeline 产出本地 H.264 文件；MediaMTX 实时发布尚未由此 runtime 验收，不能据此宣称云端预览链路已经完成。模型文件大小/哈希和 Atlas 是否能加载可以由安装结果确认；完整 ONNX/OM 测试集精度对比按需运行 `model_val/`，不作为模型注册的前置步骤。
+先用 `yunshao-classroom-runtime --check-config` 验证三份配置，再以授权 H.264 样例源运行指定 `--stream-id`。开启 `rtsp_output` 后，先通过 `ffprobe` 或 GStreamer RTSP 客户端确认认证成功、画面可解码，再由 media-service 注册为 MediaMTX 按需来源；未接入真实相机和云端播放前不得宣称端到端验收完成。模型文件大小/哈希和 Atlas 是否能加载可以由安装结果确认；完整 ONNX/OM 测试集精度对比按需运行 `model_val/`，不作为模型注册的前置步骤。
+
+开发依赖包（Debian/Ubuntu）包括 `libgstreamer1.0-dev`、`libgstreamer-plugins-base1.0-dev`、`libgstrtspserver-1.0-dev` 和 `gstreamer1.0-plugins-good`。运行镜像/板卡至少需提供 GStreamer core、app、RTSP server 库以及 `appsrc`、`rtph264pay` 插件。
 
 ## 部署与配置边界
 

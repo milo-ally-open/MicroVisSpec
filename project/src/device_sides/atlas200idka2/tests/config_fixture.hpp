@@ -49,14 +49,24 @@ inline Json streams() {
                          {"output_height", 720}, {"output_fps", 15}, {"ai_fps", 15},
                          {"output_bitrate_kbps", 1500}, {"input_timeout_ms", 5000},
                          {"reconnect_initial_delay_ms", 1000}, {"reconnect_max_delay_ms", 30000},
-                         {"rtsp_transport", "tcp"}},
+                         {"rtsp_transport", "tcp"},
+                         {"rtsp_output", Json{{"enabled", true}, {"listen_address", "0.0.0.0"},
+                                                {"port", 8554}, {"mount_path", "/room-a"},
+                                                {"max_queue_ms", 1000},
+                                                {"username_ref", "RTSP_ROOM_A_USERNAME"},
+                                                {"password_ref", "RTSP_ROOM_A_PASSWORD"}}}},
                     Json{{"stream_id", "room-b"}, {"camera_id", "camera-b"},
                          {"source_ref", "CAMERA_ROOM_B_URL"}, {"model_id", "model_room_occupancy_detection"},
                          {"enabled", true}, {"enable_ai", true}, {"live_source", true}, {"output_width", 1280},
                          {"output_height", 720}, {"output_fps", 15}, {"ai_fps", 15},
                          {"output_bitrate_kbps", 1500}, {"input_timeout_ms", 5000},
                          {"reconnect_initial_delay_ms", 1000}, {"reconnect_max_delay_ms", 30000},
-                         {"rtsp_transport", "tcp"}}})}};
+                         {"rtsp_transport", "tcp"},
+                         {"rtsp_output", Json{{"enabled", false}, {"listen_address", "0.0.0.0"},
+                                                {"port", 8555}, {"mount_path", "/room-b"},
+                                                {"max_queue_ms", 1000},
+                                                {"username_ref", "RTSP_ROOM_B_USERNAME"},
+                                                {"password_ref", "RTSP_ROOM_B_PASSWORD"}}}}})}};
 }
 
 inline Json alarm_rules(bool enabled) {

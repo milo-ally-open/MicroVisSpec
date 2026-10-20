@@ -232,7 +232,7 @@ EdgeAppConfig EdgeAppConfig::parse(const Json& models_json,
         require_keys(value, {"stream_id", "camera_id", "source_ref", "model_id", "enabled", "enable_ai",
                              "live_source", "output_width", "output_height", "ai_fps", "output_bitrate_kbps",
                              "input_timeout_ms", "reconnect_initial_delay_ms", "reconnect_max_delay_ms",
-                             "rtsp_transport"}, "stream profile");
+                             "rtsp_transport", "rtsp_output"}, "stream profile");
         StreamProfile stream;
         stream.stream_id = value.at("stream_id").get<std::string>();
         stream.camera_id = value.at("camera_id").get<std::string>();
@@ -250,13 +250,43 @@ EdgeAppConfig EdgeAppConfig::parse(const Json& models_json,
         stream.reconnect_initial_delay_ms = value.at("reconnect_initial_delay_ms").get<int>();
         stream.reconnect_max_delay_ms = value.at("reconnect_max_delay_ms").get<int>();
         stream.rtsp_transport = value.at("rtsp_transport").get<std::string>();
+        const Json& rtsp_output = value.at("rtsp_output");
+        require_keys(rtsp_output, {"enabled", "listen_address", "port", "mount_path", "max_queue_ms",
+                                   "username_ref", "password_ref"}, "stream profile rtsp_output");
+        stream.rtsp_output.enabled = rtsp_output.at("enabled").get<bool>();
+        stream.rtsp_output.listen_address = rtsp_output.at("listen_address").get<std::string>();
+        stream.rtsp_output.port = rtsp_output.at("port").get<int>();
+        stream.rtsp_output.mount_path = rtsp_output.at("mount_path").get<std::string>();
+        stream.rtsp_output.max_queue_ms = rtsp_output.at("max_queue_ms").get<int>();
+        stream.rtsp_output.username_ref = rtsp_output.at("username_ref").get<std::string>();
+        stream.rtsp_output.password_ref = rtsp_output.at("password_ref").get<std::string>();
         if (!valid_component(stream.stream_id) || !stream_ids.insert(stream.stream_id).second ||
             stream.camera_id.empty() || stream.camera_id.size() > 128) {
             throw std::invalid_argument("stream ID is invalid/duplicated or camera_id is invalid");
         }
         static const std::regex env_name("^[A-Z][A-Z0-9_]{2,127}$");
+        static const std::regex mount_path("^/[A-Za-z0-9._/-]{1,127}$");
+        const auto ends_with = [](const std::string& value, const std::string& suffix) {
+            return value.size() >= suffix.size() &&
+                   value.compare(value.size() - suffix.size(), suffix.size(), suffix) == 0;
+        };
         if (!std::regex_match(stream.source_ref, env_name)) {
             throw std::invalid_argument("stream source_ref must name an injected environment variable");
+        }
+        if (stream.rtsp_output.listen_address.empty() || stream.rtsp_output.listen_address.size() > 255 ||
+            stream.rtsp_output.listen_address.find_first_of("/ \t\r\n") != std::string::npos ||
+            stream.rtsp_output.port < 1024 || stream.rtsp_output.port > 65535 ||
+            stream.rtsp_output.max_queue_ms < 100 || stream.rtsp_output.max_queue_ms > 5000 ||
+            !std::regex_match(stream.rtsp_output.mount_path, mount_path) ||
+            stream.rtsp_output.mount_path.find("//") != std::string::npos ||
+            stream.rtsp_output.mount_path.find("/../") != std::string::npos || ends_with(stream.rtsp_output.mount_path, "/..") ||
+            stream.rtsp_output.mount_path.find("/./") != std::string::npos || ends_with(stream.rtsp_output.mount_path, "/.") ||
+            !std::regex_match(stream.rtsp_output.username_ref, env_name) ||
+            !std::regex_match(stream.rtsp_output.password_ref, env_name)) {
+            throw std::invalid_argument("stream RTSP output settings or environment references are invalid");
+        }
+        if (stream.rtsp_output.enabled && !stream.live_source) {
+            throw std::invalid_argument("RTSP output requires a live source");
         }
         if (stream.output_width < 64 || stream.output_width > 7680 || stream.output_width % 2 != 0 ||
             stream.output_height < 64 || stream.output_height > 4320 || stream.output_height % 2 != 0 ||

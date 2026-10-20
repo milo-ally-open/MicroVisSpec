@@ -22,21 +22,26 @@ extern "C" {
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 class MediaPipeline::Impl {
 public:
     Impl(const std::string& input, const std::string& output, int output_fps,
          int infer_width, int infer_height, int output_width, int output_height,
-         int input_timeout_ms, int output_bitrate_kbps, const std::string& rtsp_transport)
+         int input_timeout_ms, int output_bitrate_kbps, const std::string& rtsp_transport,
+         yunshao::RtspServer* rtsp_server)
         : infer_width_(infer_width), infer_height_(infer_height),
           output_width_(align16(output_width)), output_height_(align16(output_height)),
           fps_(output_fps), input_timeout_ms_(input_timeout_ms),
           output_bitrate_kbps_(output_bitrate_kbps), rtsp_transport_(rtsp_transport),
-          output_(output, std::ios::binary) {
+          rtsp_server_(rtsp_server) {
         if (infer_width_ < 2 || infer_height_ < 2 || output_width < 2 || output_height < 2 || fps_ < 1) {
             throw std::invalid_argument("configured inference/output dimensions and frame rate must be positive");
         }
-        if (!output_) throw std::runtime_error("cannot create H.264 output: " + output);
+        if (!output.empty()) {
+            output_.open(output, std::ios::binary);
+            if (!output_) throw std::runtime_error("cannot create H.264 output: " + output);
+        }
         try {
             if (input_timeout_ms_ < 1 || output_bitrate_kbps_ < 1) {
                 throw std::invalid_argument("input timeout and output bitrate must be positive");
@@ -108,16 +113,28 @@ public:
         stream.pack = packs.data();
         stream.pack_cnt = static_cast<hi_u32>(packs.size());
         require(hi_mpi_venc_get_stream(venc_channel_, &stream, 1500), "hi_mpi_venc_get_stream");
-        for (hi_u32 i = 0; i < stream.pack_cnt; ++i) {
-            const hi_venc_pack& pack = stream.pack[i];
-            if (pack.addr == nullptr || pack.len <= pack.offset) continue;
-            output_.write(reinterpret_cast<const char*>(pack.addr + pack.offset), pack.len - pack.offset);
-            if (!output_) {
-                hi_mpi_venc_release_stream(venc_channel_, &stream);
-                throw std::runtime_error("writing H.264 output failed");
+        std::vector<std::uint8_t> access_unit;
+        try {
+            for (hi_u32 i = 0; i < stream.pack_cnt; ++i) {
+                const hi_venc_pack& pack = stream.pack[i];
+                if (pack.addr == nullptr || pack.len <= pack.offset) continue;
+                access_unit.insert(access_unit.end(), pack.addr + pack.offset, pack.addr + pack.len);
             }
+            if (output_.is_open() && !access_unit.empty()) {
+                output_.write(reinterpret_cast<const char*>(access_unit.data()),
+                              static_cast<std::streamsize>(access_unit.size()));
+                if (!output_) throw std::runtime_error("writing H.264 output failed");
+            }
+        } catch (...) {
+            hi_mpi_venc_release_stream(venc_channel_, &stream);
+            throw;
         }
         require(hi_mpi_venc_release_stream(venc_channel_, &stream), "hi_mpi_venc_release_stream");
+        if (rtsp_server_ != nullptr && !access_unit.empty()) {
+            const std::uint64_t duration = GST_SECOND / static_cast<std::uint64_t>(fps_);
+            rtsp_server_->push_access_unit(access_unit.data(), access_unit.size(), duration);
+            if (rtsp_server_->failed()) throw std::runtime_error("RTSP media pipeline failed to configure");
+        }
         ++encoded_frames_;
     }
 
@@ -407,6 +424,7 @@ private:
     std::string rtsp_transport_ = "tcp";
     std::atomic<std::int64_t> input_deadline_ns_{0};
     std::ofstream output_;
+    yunshao::RtspServer* rtsp_server_ = nullptr;
     size_t encoded_frames_ = 0;
     bool sys_initialized_ = false;
     bool group_created_ = false;
@@ -423,10 +441,11 @@ private:
 
 MediaPipeline::MediaPipeline(const std::string& input, const std::string& output, int output_fps,
                              int infer_width, int infer_height, int output_width, int output_height,
-                             int input_timeout_ms, int output_bitrate_kbps, const std::string& rtsp_transport)
+                             int input_timeout_ms, int output_bitrate_kbps, const std::string& rtsp_transport,
+                             yunshao::RtspServer* rtsp_server)
     : impl_(std::make_unique<Impl>(input, output, output_fps, infer_width, infer_height,
                                    output_width, output_height, input_timeout_ms, output_bitrate_kbps,
-                                   rtsp_transport)) {}
+                                   rtsp_transport, rtsp_server)) {}
 
 MediaPipeline::~MediaPipeline() = default;
 

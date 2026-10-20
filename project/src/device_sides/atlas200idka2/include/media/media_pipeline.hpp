@@ -1,5 +1,7 @@
 #pragma once
 
+#include "media/rtsp_server.hpp"
+
 #include <acl/dvpp/hi_dvpp_vdec.h>
 
 #include <cstddef>
@@ -16,7 +18,8 @@ class MediaPipeline {
 public:
     MediaPipeline(const std::string& input, const std::string& output, int output_fps,
                   int infer_width, int infer_height, int output_width, int output_height,
-                  int input_timeout_ms, int output_bitrate_kbps, const std::string& rtsp_transport);
+                  int input_timeout_ms, int output_bitrate_kbps, const std::string& rtsp_transport,
+                  yunshao::RtspServer* rtsp_server);
     MediaPipeline(const MediaPipeline&) = delete;
     MediaPipeline& operator=(const MediaPipeline&) = delete;
     ~MediaPipeline();

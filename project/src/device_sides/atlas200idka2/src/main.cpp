@@ -31,6 +31,7 @@ using yunshao::EventOutbox;
 using yunshao::InferenceManager;
 using yunshao::Json;
 using yunshao::ModelCatalog;
+using yunshao::RtspServerConfig;
 using yunshao::StreamProfile;
 using yunshao::VideoStreamManager;
 
@@ -177,7 +178,12 @@ void print_config(const EdgeAppConfig& config) {
                                {"output_fps", stream.output_fps}, {"output_bitrate_kbps", stream.output_bitrate_kbps},
                                {"reconnect_initial_delay_ms", stream.reconnect_initial_delay_ms},
                                {"reconnect_max_delay_ms", stream.reconnect_max_delay_ms},
-                               {"rtsp_transport", stream.rtsp_transport}});
+                               {"rtsp_transport", stream.rtsp_transport},
+                               {"rtsp_output", Json{{"enabled", stream.rtsp_output.enabled},
+                                                     {"listen_address", stream.rtsp_output.listen_address},
+                                                     {"port", stream.rtsp_output.port},
+                                                     {"mount_path", stream.rtsp_output.mount_path},
+                                                     {"max_queue_ms", stream.rtsp_output.max_queue_ms}}}});
     }
     Json alarms = Json::array();
     for (const auto& rule : config.alarm_rules) {
@@ -225,16 +231,35 @@ int main(int argc, char** argv) {
         }
         const std::string model_version = model_state.value("model_version", "unknown");
         if (options.output.empty()) {
-            options.output = std::filesystem::path("/var/lib/yunshao/preview") / (stream.stream_id + ".h264");
+            if (!stream.rtsp_output.enabled) {
+                options.output = std::filesystem::path("/var/lib/yunshao/preview") / (stream.stream_id + ".h264");
+            }
         }
         if (!options.output.parent_path().empty()) std::filesystem::create_directories(options.output.parent_path());
+        RtspServerConfig rtsp_server_config;
+        rtsp_server_config.enabled = stream.rtsp_output.enabled;
+        if (rtsp_server_config.enabled) {
+            rtsp_server_config.listen_address = stream.rtsp_output.listen_address;
+            rtsp_server_config.port = stream.rtsp_output.port;
+            rtsp_server_config.mount_path = stream.rtsp_output.mount_path;
+            rtsp_server_config.fps = stream.output_fps;
+            rtsp_server_config.bitrate_kbps = stream.output_bitrate_kbps;
+            rtsp_server_config.max_queue_ms = stream.rtsp_output.max_queue_ms;
+            rtsp_server_config.username = env(stream.rtsp_output.username_ref.c_str());
+            rtsp_server_config.password = env(stream.rtsp_output.password_ref.c_str());
+            if (rtsp_server_config.username.empty() || rtsp_server_config.password.empty()) {
+                throw std::runtime_error("RTSP server credentials are missing from the runtime environment");
+            }
+        }
         InferenceManager inference(config.max_loaded_models, config.npu_device_id,
                                    options.model_root, options.plugin_dir);
         VideoStreamManager stream_manager(config, inference,
             [&](const AlarmTrigger& trigger) { publish_alarm(trigger, stream, model, model_version, options.socket_path); });
-        stream_manager.run(stream, input_uri, options.output);
+        stream_manager.run(stream, input_uri, options.output, rtsp_server_config);
         std::cout << "Processed stream " << stream.stream_id << " with model " << stream.model_id
-                  << '@' << model_version << "; annotated H.264 saved to " << options.output.string() << '\n';
+                  << '@' << model_version;
+        if (!options.output.empty()) std::cout << "; annotated H.264 saved to " << options.output.string();
+        std::cout << '\n';
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "classroom-runtime failed: " << error.what() << '\n';

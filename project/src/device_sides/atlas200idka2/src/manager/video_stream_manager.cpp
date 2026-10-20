@@ -9,6 +9,7 @@
 #include <chrono>
 #include <cmath>
 #include <iostream>
+#include <memory>
 #include <stdexcept>
 #include <thread>
 #include <utility>
@@ -36,12 +37,23 @@ VideoStreamManager::VideoStreamManager(const EdgeAppConfig& config, InferenceMan
     : config_(config), inference_(inference), alarms_(config.alarm_rules, config.alarm_config_version), on_alarm_(std::move(on_alarm)) {}
 
 void VideoStreamManager::run(const StreamProfile& stream, const std::string& input_uri,
-                             const std::filesystem::path& output_h264) {
+                             const std::filesystem::path& output_h264,
+                             const RtspServerConfig& rtsp_server_config) {
     if (!stream.enabled || !stream.enable_ai) throw std::invalid_argument("stream is disabled");
     const auto& model_profile = config_.require_model(stream.model_id);
     inference_.load(model_profile);
     const double confidence_threshold = stream.confidence_threshold.value_or(model_profile.confidence_threshold);
     const double nms_threshold = stream.nms_threshold.value_or(model_profile.nms_threshold);
+    if (stream.rtsp_output.enabled != rtsp_server_config.enabled) {
+        throw std::invalid_argument("RTSP server runtime options do not match the stream profile");
+    }
+    std::unique_ptr<RtspServer> rtsp_server;
+    if (rtsp_server_config.enabled) {
+        rtsp_server = std::make_unique<RtspServer>(rtsp_server_config);
+        std::cout << "rtsp_output_ready stream_id=" << stream.stream_id
+                  << " port=" << stream.rtsp_output.port
+                  << " mount_path=" << stream.rtsp_output.mount_path << '\n';
+    }
 
     int reconnect_delay_ms = stream.reconnect_initial_delay_ms;
     while (true) {
@@ -49,7 +61,7 @@ void VideoStreamManager::run(const StreamProfile& stream, const std::string& inp
             MediaPipeline pipeline(input_uri, output_h264.string(), stream.output_fps,
                                    model_profile.input_width, model_profile.input_height,
                                    stream.output_width, stream.output_height, stream.input_timeout_ms,
-                                   stream.output_bitrate_kbps, stream.rtsp_transport);
+                                   stream.output_bitrate_kbps, stream.rtsp_transport, rtsp_server.get());
             RegionOsd region(pipeline.group(), pipeline.output_channel(), pipeline.output_width(), pipeline.output_height());
             std::vector<Detection> detections;
             std::vector<RegionOsdDetection> overlay;

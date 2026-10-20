@@ -3,6 +3,7 @@
 #include "common/config.hpp"
 #include "manager/alarm_filter.hpp"
 #include "manager/inference_manager.hpp"
+#include "media/rtsp_server.hpp"
 
 #include <filesystem>
 #include <functional>
@@ -17,7 +18,8 @@ public:
     VideoStreamManager(const EdgeAppConfig& config, InferenceManager& inference,
                        AlarmCallback on_alarm = {});
     void run(const StreamProfile& stream, const std::string& input_uri,
-             const std::filesystem::path& output_h264);
+             const std::filesystem::path& output_h264,
+             const RtspServerConfig& rtsp_server_config);
 
 private:
     const EdgeAppConfig& config_;
