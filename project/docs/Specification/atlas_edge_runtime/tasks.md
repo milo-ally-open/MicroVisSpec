@@ -20,7 +20,7 @@
 | AC-01.3、AC-03.8 | Atlas ARM64 CMake build；`model_config_test` 校验 model_id/库名并拒绝错配；`model_plugin_identity_test` 动态加载插件核对 ABI 名称；runtime `--check-config`；JSON 引用和 OM SHA-256 交叉检查 | 完整源码副本 CMake 构建成功、3/3 CTest 通过；插件生成 `libmodel_classroom_behavior_detection.so` 并完成 OM AscendCL 初始化探针；runtime `--check-config` 成功；stream、告警规则、manifest 与 profile 使用同一 ID，告警默认关闭 | 通过 |
 | AC-03.9 | 检查 media 头源路径与基名配对，并通过 Atlas ARM64 CMake build | Atlas 200I DK A2 完整源码副本构建成功；`include/media` 与 `src/media` 两对同基名文件通过结构检查，产品树不含 `common/media`；CTest 3/3 通过 | 通过 |
 | AC-03.10 | 检查 common 公共头与实现同基名，并通过 Atlas ARM64 CMake build | `core.hpp/core.cpp`、`config.hpp/config.cpp` 在完整源码副本上构建成功；Atlas CTest 3/3 通过；源码无旧头文件名引用 | 通过 |
-| AC-06.1、AC-06.2 | 最小环境 `ldd` 检查、systemd agent 与 CANN 环境文件权限/状态 | agent/runtime 的动态依赖均解析；`/etc/yunshao/cann.env` 为 `root:yunshao 0640`；agent 以 `yunshao` active 并持续 MQTT/TLS 心跳 | 通过 |
+| AC-06.1、AC-06.2 | 最小环境 `ldd` 检查、systemd agent 与 CANN 环境文件权限/状态；无继承环境下的模型 CLI | agent/runtime 动态依赖均解析；`/etc/yunshao/cann.env` 为 `root:yunshao 0640`；agent 以 `yunshao` active 并持续 MQTT/TLS 心跳。更新安装 RPATH 与 CANN 文件加载后，Atlas 上 `sudo -u yunshao env -i PATH=/usr/bin:/bin /usr/local/bin/yunshao-agent model status model_classroom_behavior_detection` 输出 `model_state=installed`；同一干净环境下 runtime `--check-config` 成功 | 通过 |
 | AC-06.3 | 检查 udev 规则与节点权限；以 `yunshao` 服务身份完成 Atlas RGN/VPSS/VDEC/VENC 帧处理 | udev 将 `/dev/rgn` 应用为 `root:HwHiAiUser 0660`；systemd 两单元含所需硬件组；非 root runtime 合成 H.264 75/75 帧成功 | 通过 |
 | AC-06.4 | 通过部署后的持久化 systemd runtime unit 执行合成 H.264；检查 CANN ACL 初始化、文件系统选项、服务退出状态与编码帧数 | 完整 Atlas 工程重部署并构建/安装后，`/etc/systemd/system/yunshao-classroom-runtime.service` 使用本项目 unit；临时 drop-in 仅覆盖测试配置、输入/输出路径和日志，未覆盖 unit 安全属性。`NoNewPrivileges=yes`，`ProtectSystem=no`、`ProtectHome=no`、`PrivateTmp=no`、`ReadWritePaths` 为空；非 root 服务以 0 退出、重启数 0，输出 1280×720 H.264 共 75 帧 | 通过（Atlas CANN 7.0.RC1 当前版本；真实摄像头仍待验收） |
 | AC-05.1（Atlas RTSP 文件源链路） | Windows FFmpeg 将仓库中的[课堂测试视频](../../../video/classroom_behavior_test.webm)实时转 H.264/UDP 输入 Atlas；Windows `ffprobe`/`ffplay` 以鉴权 RTSP 访问板端输出，并尝试匿名访问 | 真实课堂片段循环推流约 3 分 20 秒；板端发布的 RTSP 可解码为 H.264、1280×720，Windows `ffplay` 实际播放出教室画面；匿名 `ffprobe` 收到 401 Unauthorized。测试素材来源及限制见 [`project/video/README.md`](../../../video/README.md) | 通过：文件→Atlas runtime→鉴权 RTSP→Windows 播放；真实摄像头及 MediaMTX/WHEP 链路仍待验收 |
@@ -33,6 +33,7 @@
 |---|---|---|---|
 | 2026-10-18 | 板端没有 Go，未发现 libmosquitto pkg-config；SQLite/FFmpeg/OpenCV/CANN 已安装 | 固定 C++ 双进程候选；MQTT 依赖加入 T-01 核验 | Atlas 环境只读检查 |
 | 2026-10-19 | 产品边缘目录已有 agent/model catalog，但没有课堂 AscendCL 推理运行时代码；原代码仍只在 preparation Demo | T-03 补多模型 profiles/按 ID 激活，T-07 增加多模型隔离与推理测试 | 用户评审指出正式工程缺少 AI 推理代码和多模型 JSON |
+| 2026-10-20 | `sudo -u yunshao` 直接运行模型 CLI 时，动态加载器找不到 `libascendcl.so` 的间接依赖；CMake 还把 JSON 装到了程序默认 `/etc/yunshao` 之外 | CMake 从 `/etc/yunshao/cann.env` 读取 CANN 路径并为安装目标写入传递式 `DT_RPATH`；CLI 自动加载同一环境文件；产品 JSON 安装到 `/etc/yunshao`。Atlas 重建 3/3 CTest，干净环境下模型状态和 runtime 配置检查通过 | 用户要求直接从现有配置工作，减少手工环境命令；Atlas 实机复测 |
 
 ## 完成摘要
 

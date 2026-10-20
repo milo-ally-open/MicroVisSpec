@@ -5,6 +5,16 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+set(YUNSHAO_CANN_ENV_FILE "/etc/yunshao/cann.env" CACHE FILEPATH
+  "CANN runtime environment file shared with systemd services")
+if(NOT DEFINED ASCEND_TOOLKIT_HOME AND EXISTS "${YUNSHAO_CANN_ENV_FILE}")
+  file(STRINGS "${YUNSHAO_CANN_ENV_FILE}" _cann_toolkit_home_line
+    REGEX "^ASCEND_TOOLKIT_HOME=")
+  if(_cann_toolkit_home_line)
+    string(REGEX REPLACE "^ASCEND_TOOLKIT_HOME=" "" ASCEND_TOOLKIT_HOME
+      "${_cann_toolkit_home_line}")
+  endif()
+endif()
 if(NOT DEFINED ASCEND_TOOLKIT_HOME)
   if(DEFINED ENV{ASCEND_HOME_PATH})
     set(ASCEND_TOOLKIT_HOME "$ENV{ASCEND_HOME_PATH}")
@@ -29,6 +39,45 @@ find_library(ASCEND_DVPP_MPI_LIBRARY acl_dvpp_mpi PATHS "${ASCEND_TOOLKIT_HOME}/
 find_library(ASCEND_VPSS_MPI_LIBRARY acl_vpss_mpi PATHS "${ASCEND_TOOLKIT_HOME}/aarch64-linux/lib64" REQUIRED)
 find_library(ASCEND_DVPP_LIBRARY acl_dvpp PATHS "${ASCEND_TOOLKIT_HOME}/aarch64-linux/lib64" REQUIRED)
 
+# Keep installed CLI/service binaries runnable without relying on an interactive
+# shell. Include the toolkit and driver paths supplied by the board's CANN setup.
+set(YUNSHAO_ASCEND_RUNTIME_LIB_DIRS
+  "${ASCEND_TOOLKIT_HOME}/aarch64-linux/lib64"
+  "${ASCEND_TOOLKIT_HOME}/lib64")
+set(_cann_configured_ld_library_path "")
+if(EXISTS "${YUNSHAO_CANN_ENV_FILE}")
+  file(STRINGS "${YUNSHAO_CANN_ENV_FILE}" _cann_ld_library_path_line
+    REGEX "^LD_LIBRARY_PATH=")
+  if(_cann_ld_library_path_line)
+    string(REGEX REPLACE "^LD_LIBRARY_PATH=" "" _cann_configured_ld_library_path
+      "${_cann_ld_library_path_line}")
+  endif()
+endif()
+if(_cann_configured_ld_library_path)
+  string(REPLACE ":" ";" _ascend_env_library_dirs "${_cann_configured_ld_library_path}")
+elseif(DEFINED ENV{LD_LIBRARY_PATH})
+  string(REPLACE ":" ";" _ascend_env_library_dirs "$ENV{LD_LIBRARY_PATH}")
+else()
+  set(_ascend_env_library_dirs "")
+endif()
+if(_ascend_env_library_dirs)
+  foreach(_library_dir IN LISTS _ascend_env_library_dirs)
+    string(FIND "${_library_dir}" "${ASCEND_TOOLKIT_HOME}/" _toolkit_path_position)
+    if(_toolkit_path_position EQUAL 0 OR _library_dir MATCHES "/davinci/driver/lib64")
+      list(APPEND YUNSHAO_ASCEND_RUNTIME_LIB_DIRS "${_library_dir}")
+    endif()
+  endforeach()
+endif()
+list(REMOVE_DUPLICATES YUNSHAO_ASCEND_RUNTIME_LIB_DIRS)
+
+function(configure_ascend_runtime_rpath target_name)
+  set_target_properties(${target_name} PROPERTIES
+    BUILD_RPATH "${YUNSHAO_ASCEND_RUNTIME_LIB_DIRS}"
+    INSTALL_RPATH "${YUNSHAO_ASCEND_RUNTIME_LIB_DIRS}"
+    INSTALL_RPATH_USE_LINK_PATH TRUE)
+  target_link_options(${target_name} PRIVATE -Wl,--disable-new-dtags)
+endfunction()
+
 add_library(edge_core
   src/common/core.cpp
   src/common/config.cpp)
@@ -40,7 +89,7 @@ add_executable(yunshao-agent src/agent/agent.cpp)
 target_include_directories(yunshao-agent PRIVATE include "${NLOHMANN_JSON_INCLUDE_DIR}" "${ACL_INCLUDE_DIR}")
 target_link_libraries(yunshao-agent PRIVATE edge_core PkgConfig::MOSQUITTO)
 target_compile_options(yunshao-agent PRIVATE -Wall -Wextra -Wpedantic)
-set_target_properties(yunshao-agent PROPERTIES BUILD_RPATH "${ASCEND_TOOLKIT_HOME}/aarch64-linux/lib64")
+configure_ascend_runtime_rpath(yunshao-agent)
 
 add_library(model_classroom_behavior_detection SHARED plugins/model_classroom_behavior_detection.cpp)
 target_include_directories(model_classroom_behavior_detection PRIVATE include "${NLOHMANN_JSON_INCLUDE_DIR}" "${ACL_INCLUDE_DIR}" ${OpenCV_INCLUDE_DIRS})
@@ -48,7 +97,10 @@ target_link_libraries(model_classroom_behavior_detection PRIVATE "${ASCENDCL_LIB
 target_compile_options(model_classroom_behavior_detection PRIVATE -O3 -Wall -Wextra -Wpedantic)
 set_target_properties(model_classroom_behavior_detection PROPERTIES
   LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/plugins"
-  BUILD_RPATH "${ASCEND_TOOLKIT_HOME}/aarch64-linux/lib64")
+  BUILD_RPATH "${YUNSHAO_ASCEND_RUNTIME_LIB_DIRS}"
+  INSTALL_RPATH "${YUNSHAO_ASCEND_RUNTIME_LIB_DIRS}"
+  INSTALL_RPATH_USE_LINK_PATH TRUE)
+target_link_options(model_classroom_behavior_detection PRIVATE -Wl,--disable-new-dtags)
 
 add_executable(yunshao-classroom-runtime
   src/main.cpp
@@ -64,11 +116,11 @@ target_include_directories(yunshao-classroom-runtime PRIVATE include "${NLOHMANN
 target_compile_definitions(yunshao-classroom-runtime PRIVATE ENABLE_DVPP_INTERFACE)
 target_link_libraries(yunshao-classroom-runtime PRIVATE edge_core dl pthread "${ASCENDCL_LIBRARY}" "${ASCEND_DVPP_MPI_LIBRARY}" "${ASCEND_VPSS_MPI_LIBRARY}" "${ASCEND_DVPP_LIBRARY}" ${OpenCV_LIBS} PkgConfig::FFMPEG PkgConfig::GSTREAMER)
 target_compile_options(yunshao-classroom-runtime PRIVATE -O3 -Wall -Wextra -Wpedantic)
-set_target_properties(yunshao-classroom-runtime PROPERTIES BUILD_RPATH "${ASCEND_TOOLKIT_HOME}/aarch64-linux/lib64")
+configure_ascend_runtime_rpath(yunshao-classroom-runtime)
 
 install(TARGETS yunshao-agent yunshao-classroom-runtime RUNTIME DESTINATION bin)
 install(TARGETS model_classroom_behavior_detection LIBRARY DESTINATION lib/yunshao/plugins)
-install(DIRECTORY config/ DESTINATION etc/yunshao)
+install(DIRECTORY config/ DESTINATION /etc/yunshao)
 install(FILES systemd/yunshao-agent.service systemd/yunshao-classroom-runtime.service DESTINATION lib/systemd/system)
 install(FILES udev/99-yunshao-rgn.rules DESTINATION /etc/udev/rules.d)
 
@@ -77,16 +129,19 @@ if(BUILD_TESTING)
   add_executable(edge_core_test tests/edge_core_test.cpp)
   target_include_directories(edge_core_test PRIVATE include "${NLOHMANN_JSON_INCLUDE_DIR}" "${ACL_INCLUDE_DIR}")
   target_link_libraries(edge_core_test PRIVATE edge_core)
+  configure_ascend_runtime_rpath(edge_core_test)
   add_test(NAME edge_core_test COMMAND edge_core_test)
 
   add_executable(model_config_test tests/model_config_test.cpp)
   target_include_directories(model_config_test PRIVATE include "${NLOHMANN_JSON_INCLUDE_DIR}")
   target_link_libraries(model_config_test PRIVATE edge_core)
+  configure_ascend_runtime_rpath(model_config_test)
   add_test(NAME model_config_test COMMAND model_config_test)
 
   add_executable(model_plugin_identity_test tests/model_plugin_identity_test.cpp)
   target_include_directories(model_plugin_identity_test PRIVATE include "${NLOHMANN_JSON_INCLUDE_DIR}")
   target_link_libraries(model_plugin_identity_test PRIVATE edge_core dl)
+  configure_ascend_runtime_rpath(model_plugin_identity_test)
   add_test(NAME model_plugin_identity_test
     COMMAND model_plugin_identity_test $<TARGET_FILE:model_classroom_behavior_detection>)
 endif()

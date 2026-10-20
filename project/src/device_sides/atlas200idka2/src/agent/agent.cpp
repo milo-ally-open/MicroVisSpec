@@ -10,6 +10,7 @@
 
 #include <csignal>
 #include <atomic>
+#include <cctype>
 #include <ctime>
 #include <cerrno>
 #include <chrono>
@@ -36,6 +37,57 @@ std::atomic_bool stopping{false};
 std::string env(const char* name, const std::string& fallback = "") {
     const char* value = std::getenv(name);
     return value && *value ? value : fallback;
+}
+
+std::string trim(std::string value) {
+    const auto first = value.find_first_not_of(" \t\r\n");
+    if (first == std::string::npos) return {};
+    const auto last = value.find_last_not_of(" \t\r\n");
+    return value.substr(first, last - first + 1);
+}
+
+void load_cann_environment() {
+    const std::string path = env("YUNSHAO_CANN_ENV_FILE", "/etc/yunshao/cann.env");
+    std::ifstream input(path);
+    if (!input) throw std::runtime_error("cannot open CANN environment file: " + path);
+
+    bool has_library_path = false;
+    bool has_toolkit_path = false;
+    bool has_opp_path = false;
+    std::string line;
+    while (std::getline(input, line)) {
+        line = trim(std::move(line));
+        if (line.empty() || line.front() == '#') continue;
+        const auto separator = line.find('=');
+        if (separator == std::string::npos) {
+            throw std::runtime_error("invalid CANN environment assignment in " + path);
+        }
+        const std::string name = trim(line.substr(0, separator));
+        std::string value = trim(line.substr(separator + 1));
+        if (name.empty() || !((name.front() >= 'A' && name.front() <= 'Z') ||
+                              (name.front() >= 'a' && name.front() <= 'z') || name.front() == '_')) {
+            throw std::runtime_error("invalid CANN environment variable name in " + path);
+        }
+        for (const unsigned char character : name) {
+            if (!std::isalnum(character) && character != '_') {
+                throw std::runtime_error("invalid CANN environment variable name in " + path);
+            }
+        }
+        if (value.size() >= 2 && ((value.front() == '"' && value.back() == '"') ||
+                                  (value.front() == '\'' && value.back() == '\''))) {
+            value = value.substr(1, value.size() - 2);
+        }
+        if (::setenv(name.c_str(), value.c_str(), 1) != 0) {
+            throw std::runtime_error("cannot load CANN environment variable: " + name);
+        }
+        if (name == "LD_LIBRARY_PATH") has_library_path = !value.empty();
+        if (name == "ASCEND_HOME_PATH" || name == "ASCEND_TOOLKIT_HOME") has_toolkit_path = !value.empty();
+        if (name == "ASCEND_OPP_PATH") has_opp_path = !value.empty();
+    }
+    if (!input.eof()) throw std::runtime_error("cannot read CANN environment file: " + path);
+    if (!has_library_path || !has_toolkit_path || !has_opp_path) {
+        throw std::runtime_error("CANN environment file must define LD_LIBRARY_PATH, ASCEND_HOME_PATH, and ASCEND_OPP_PATH");
+    }
 }
 
 void stop_signal(int) { stopping.store(true); }
@@ -291,7 +343,10 @@ int model_command(int argc, char** argv) {
 
 int main(int argc, char** argv) {
     try {
-        if (argc >= 2 && std::string(argv[1]) == "model") return model_command(argc, argv);
+        if (argc >= 2 && std::string(argv[1]) == "model") {
+            load_cann_environment();
+            return model_command(argc, argv);
+        }
         const std::string device_id = env("YUNSHAO_DEVICE_ID");
         const std::filesystem::path db_path = env("YUNSHAO_AGENT_DB", "/var/lib/yunshao/agent.db");
         const std::filesystem::path model_root = env("YUNSHAO_MODEL_ROOT", "/var/lib/yunshao/models");

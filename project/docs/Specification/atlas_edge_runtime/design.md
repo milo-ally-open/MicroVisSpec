@@ -75,6 +75,7 @@ The layout mirrors the reference project’s plugin/manager/config responsibilit
 - MQTT aarch64 TLS client library 需由边缘构建打包提供；板端当前未发现 `libmosquitto` pkg-config，因此依赖交付为先决条件，不能用明文 MQTT 替代。
 - TLS 证书/凭据由激活/部署流程安全注入；设备服务重置不重新使用泄露或撤销身份。
 - 两个 systemd 单元均强制加载 `/etc/yunshao/cann.env`。该权限受限文件由运维基于板上 `/usr/local/Ascend/ascend-toolkit/set_env.sh` 准备，至少包含 `LD_LIBRARY_PATH` 及 CANN 算子/运行环境变量；服务不得依赖登录 shell、Conda 或运行时手工 `source`。
+- CANN 启动路径同样适用于直接调用的模型目录 CLI：CMake 从 `/etc/yunshao/cann.env` 读取 toolkit 与驱动库路径，为安装目标写入传递式 ELF `DT_RPATH`，以覆盖 AscendCL 的间接共享库依赖；`yunshao-agent model` 在 ACL 操作前加载同一环境文件。CMake 将产品 JSON 安装到程序默认读取的 `/etc/yunshao`，systemd 仍通过 `EnvironmentFile` 加载服务环境，不要求调用者在 shell 中拼接环境变量。
 - 两个 systemd 单元以 `yunshao` 非 root 身份运行，并显式加入 `video`、`HwHiAiUser`、`HwBaseUser` 设备组。产品 udev 规则将 `/dev/rgn` 授权给 `HwHiAiUser`，MODE 为 `0660`；不得放宽为任何用户可访问。该节点由设备驱动重建，部署须重新加载 udev 规则并对现有节点触发规则。
 - Atlas 310B4 实测表明 CANN/ACL 初始化依赖进程可见的主机文件系统与共享临时目录：在正式 runtime 的 systemd unit 中启用 `ProtectHome`、`PrivateTmp`、`ProtectSystem=full/strict` 或 `ReadWritePaths` 会导致 `aclInit` 返回 507008；保留 `NoNewPrivileges=true`、非 root 用户及硬件组，同时移除这些文件系统隔离设置后，service 成功处理固定 H.264 视频 75/75 帧。正式 runtime unit 不使用上述未兼容选项；未来若 CANN/驱动版本改变，需先在目标板验证再调整。
 - 2026-10-20 的 30 分钟 Atlas systemd 合成实时 UDP 测试保持 runtime active、0 次重启、RSS 约 375 MiB；来源发送端到时退出后，runtime 仍挂起等待。该结果证明长时进程 RSS 稳定，但暴露实时源读超时/服务恢复缺口；AC-05.2 要求为修复门禁。
