@@ -94,6 +94,118 @@ ctest --test-dir build --output-on-failure
 
 开发依赖包（Debian/Ubuntu）包括 `libgstreamer1.0-dev`、`libgstreamer-plugins-base1.0-dev`、`libgstrtspserver-1.0-dev` 和 `gstreamer1.0-plugins-good`。运行镜像/板卡至少需提供 GStreamer core、app、RTSP server 库以及 `appsrc`、`rtph264pay` 插件。
 
+## 端到端推流播放测试 SOP（Atlas → Windows）
+
+本流程把仓库测试视频实时编码为 H.264/UDP，送入 Atlas runtime；runtime 执行配置的课堂模型并通过鉴权 RTSP 输出处理后画面，最后由 Windows `ffplay` 播放。告警规则保持关闭。该流程验证视频传输和解码播放，不是模型精度测试；测试素材为低清晰度课堂片段，细节见 [`project/video/README.md`](../../../video/README.md)。
+
+### 前置条件
+
+- Atlas `192.168.0.2` 已安装 CANN、运行依赖、systemd 单元，且 `/etc/yunshao/cann.env` 可被 `yunshao` 服务账号读取。
+- `model_classroom_behavior_detection` 的 OM 已安装并激活；在板端可用 `sudo -u yunshao /usr/local/bin/yunshao-agent model status model_classroom_behavior_detection` 检查。
+- Windows 仓库根目录下有 `project/video/classroom_behavior_test.webm`，并已安装 FFmpeg。Windows 命令在 CMD.exe 运行，路径按 WinGet 链接目录示例；若 `ffmpeg.exe`、`ffprobe.exe`、`ffplay.exe` 已在 `PATH`，可直接使用命令名。
+
+### 1. 上传工程、构建并安装
+
+在 Windows 仓库根目录打开终端，将完整 Atlas 工程复制到板端：
+
+```text
+scp -r project/src/device_sides/atlas200idka2 root@192.168.0.2:/root/
+```
+
+SSH 登录 Atlas 后构建、运行单元测试并安装二进制、插件和 systemd 单元：
+
+```bash
+cd /root/atlas200idka2
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j2
+ctest --test-dir build --output-on-failure
+cmake --install build --prefix /usr/local
+systemctl daemon-reload
+systemctl enable --now yunshao-agent.service
+sudo -u yunshao /usr/local/bin/yunshao-agent model status model_classroom_behavior_detection
+```
+
+模型状态应显示已安装且有活动版本。此 SOP 使用 `/var/lib/yunshao/models` 中的既有模型，不会把权重打进工程或安装包。首次部署还需按上文“部署与配置边界”准备 CANN 环境、权限和模型文件。
+
+### 2. 准备隔离的测试配置和 RTSP 凭据
+
+测试配置单独放在 `/var/lib/yunshao/classroom-rtsp-test/config`，不改 `/etc/yunshao` 下的产品配置。板端执行：
+
+```bash
+install -d -o root -g yunshao -m 0750 /var/lib/yunshao/classroom-rtsp-test/config
+install -o root -g yunshao -m 0640 config/models.json /var/lib/yunshao/classroom-rtsp-test/config/models.json
+install -o root -g yunshao -m 0640 config/streams_config.json /var/lib/yunshao/classroom-rtsp-test/config/streams_config.json
+install -o root -g yunshao -m 0640 config/alarm_rules.json /var/lib/yunshao/classroom-rtsp-test/config/alarm_rules.json
+install -o root -g yunshao -m 0640 /dev/null /etc/yunshao/classroom-runtime-test.env
+vi /etc/yunshao/classroom-runtime-test.env
+```
+
+在环境文件中填入本次测试专用的用户名和密码（不要复用生产凭据）：
+
+```text
+YUNSHAO_CAMERA_CLASSROOM_DEMO_URL=udp://0.0.0.0:5000
+YUNSHAO_RTSP_CLASSROOM_USERNAME=替换为测试用户名
+YUNSHAO_RTSP_CLASSROOM_PASSWORD=替换为测试密码
+```
+
+编辑隔离配置 `/var/lib/yunshao/classroom-rtsp-test/config/streams_config.json`，仅对 `classroom-demo` 将 `enabled`、`enable_ai` 和 `rtsp_output.enabled` 设为 `true`；保持 `source_ref` 为 `YUNSHAO_CAMERA_CLASSROOM_DEMO_URL`，RTSP 端口、挂载点沿用 `8554`、`/classroom-demo`。`alarm_rules.json` 中所有规则继续保持 `enabled: false`。设置凭据文件权限，并创建 runtime 专用 systemd drop-in：
+
+```bash
+chown root:yunshao /etc/yunshao/classroom-runtime-test.env
+chmod 0640 /etc/yunshao/classroom-runtime-test.env
+install -d -m 0755 /etc/systemd/system/yunshao-classroom-runtime.service.d
+cat > /etc/systemd/system/yunshao-classroom-runtime.service.d/99-classroom-rtsp-test.conf <<'EOF'
+[Service]
+EnvironmentFile=/etc/yunshao/classroom-runtime-test.env
+ExecStart=
+ExecStart=/usr/local/bin/yunshao-classroom-runtime --config-dir /var/lib/yunshao/classroom-rtsp-test/config --stream-id classroom-demo
+EOF
+systemctl daemon-reload
+/usr/local/bin/yunshao-classroom-runtime --config-dir /var/lib/yunshao/classroom-rtsp-test/config --check-config
+```
+
+`--check-config` 应成功输出该 stream 已启用、AI 已启用且 RTSP 输出已启用。开始前记下 runtime 的原运行状态。确认板端 UDP/5000、RTSP/8554 对 Windows 所在网络可达，再启动 runtime：
+
+```bash
+systemctl restart yunshao-classroom-runtime.service
+systemctl is-active yunshao-agent.service yunshao-classroom-runtime.service
+journalctl -u yunshao-classroom-runtime.service -n 30 --no-pager
+```
+
+日志应出现 `rtsp_output_ready stream_id=classroom-demo port=8554 mount_path=/classroom-demo`，且服务处于 `active`。runtime 启动后会等待 UDP 视频源。
+
+### 3. Windows 推流并播放
+
+在 Windows 仓库根目录的第一个终端运行 FFmpeg；此命令循环播放测试视频、按实时速度转为 640×360/15 fps H.264，再以 MPEG-TS/UDP 发给板卡：
+
+```text
+"%LOCALAPPDATA%\Microsoft\WinGet\Links\ffmpeg.exe" -hide_banner -loglevel info -re -stream_loop -1 -i project/video/classroom_behavior_test.webm -map 0:v:0 -vf "scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2:black,fps=15" -an -c:v libx264 -preset ultrafast -tune zerolatency -profile:v baseline -pix_fmt yuv420p -g 30 -bf 0 -b:v 700k -f mpegts "udp://192.168.0.2:5000?pkt_size=1316"
+```
+
+保持推流终端运行，打开第二个 Windows 终端。先用 `ffprobe` 确认 RTSP 输出可解码，再启动 `ffplay`；将 URL 中的用户名、密码替换为上一步设置的测试凭据。若密码含 `@`、`:`、`/` 等 URL 保留字符，先进行百分号编码。
+
+```text
+"%LOCALAPPDATA%\Microsoft\WinGet\Links\ffprobe.exe" -v error -rtsp_transport tcp -select_streams v:0 -show_entries stream=codec_name,width,height -of default=noprint_wrappers=1 "rtsp://测试用户名:测试密码@192.168.0.2:8554/classroom-demo"
+"%LOCALAPPDATA%\Microsoft\WinGet\Links\ffplay.exe" -rtsp_transport tcp "rtsp://测试用户名:测试密码@192.168.0.2:8554/classroom-demo"
+```
+
+`ffprobe` 预期报告 `codec_name=h264`、`width=1280`、`height=720`；`ffplay` 窗口应持续显示课堂视频。该素材源为 320×240，所以画面左右补黑边且清晰度有限。是否出现检测框取决于当前模型对该片段的检测结果；没有框不代表 RTSP 播放链路失败。推流窗口按 `Ctrl+C` 停止，`ffplay` 窗口按 `q` 退出。
+
+### 4. 清理测试配置
+
+先停止 Windows 推流和播放，再在 Atlas 执行：
+
+```bash
+systemctl stop yunshao-classroom-runtime.service
+rm /etc/systemd/system/yunshao-classroom-runtime.service.d/99-classroom-rtsp-test.conf
+rm /etc/yunshao/classroom-runtime-test.env
+systemctl daemon-reload
+rm -r /var/lib/yunshao/classroom-rtsp-test
+```
+
+如果测试前 runtime 原本处于运行状态，清理后执行 `systemctl restart yunshao-classroom-runtime.service` 以恢复其默认配置；如果测试前处于停止状态，保持停止。不要删除 `/var/lib/yunshao/models` 下的已安装模型。
+
 ## 部署与配置边界
 
 - systemd 单元在 `systemd/`；CANN 运行库与算子路径由必需的 `/etc/yunshao/cann.env` 提供，主机身份、MQTT TLS 参数和视频源 URL 分别由 `/etc/yunshao/agent.env`、`/etc/yunshao/classroom-runtime.env` 注入。`cann.env` 必须从目标板已安装的 CANN 环境生成，权限设为 `root:yunshao 0640`；不要依赖登录 shell、Conda 或服务启动前手工 `source`。Atlas CANN/ACL 当前不能与 runtime unit 的 `ProtectHome`、`PrivateTmp`、`ProtectSystem`、`ReadWritePaths` 文件系统隔离选项共同工作；这些选项须先在目标板通过 CANN 初始化及固定视频处理验收。unit 仍以非 root `yunshao` 运行，保留 `NoNewPrivileges=true` 并加入 `video`、`HwHiAiUser`、`HwBaseUser` 组。安装包提供 `udev/99-yunshao-rgn.rules`，将 `/dev/rgn` 设为 `root:HwHiAiUser 0660`；安装后重载 udev 规则并触发现有 `rgn` 节点，然后重启服务。`agent.env` 中的 `YUNSHAO_MQTT_CLIENT_ID` 必须使用 device-service 激活响应的原值，不能从 device_id 本地派生；MQTT 用户名、密码和 CA 同样来自激活/部署流程。
