@@ -9,10 +9,9 @@
 从 WSL/Linux 仓库根目录执行；板端 SSH/SCP 会交互式询问认证信息：
 
 ```bash
-BOARD=root@192.168.0.2
-ssh "$BOARD" 'mkdir -p /root/model_library/model_warehouse_detection/model_convert /root/model_library/model_warehouse_detection/model_export/artifacts /root/model_library/model_warehouse_detection/model_deployment'
-scp project/preparation/model_warehouse_detection/model_convert/convert_atc.sh project/preparation/model_warehouse_detection/model_convert/aipp_nv21.cfg "$BOARD:/root/model_library/model_warehouse_detection/model_convert/"
-scp project/preparation/model_warehouse_detection/model_export/artifacts/yolo11n_warehouse_detection_best.onnx "$BOARD:/root/model_library/model_warehouse_detection/model_export/artifacts/"
+ssh root@192.168.0.2 'mkdir -p /root/model_library/model_warehouse_detection/model_convert /root/model_library/model_warehouse_detection/model_export/artifacts /root/model_library/model_warehouse_detection/model_deployment'
+scp project/preparation/model_warehouse_detection/model_convert/convert_atc.sh project/preparation/model_warehouse_detection/model_convert/aipp_nv21.cfg root@192.168.0.2:/root/model_library/model_warehouse_detection/model_convert/
+scp project/preparation/model_warehouse_detection/model_export/artifacts/yolo11n_warehouse_detection_best.onnx root@192.168.0.2:/root/model_library/model_warehouse_detection/model_export/artifacts/
 ```
 
 确认所传 ONNX 与 model_export/artifacts/export_manifest.json 内的 SHA-256 一致。

@@ -9,10 +9,9 @@
 从 WSL/Linux 仓库根目录运行。只上传转换脚本、AIPP 配置和当前 ONNX：
 
 ```bash
-BOARD=root@192.168.0.2
-ssh "$BOARD" 'mkdir -p /root/model_library/model_vehicle_detection/model_convert /root/model_library/model_vehicle_detection/model_export/artifacts /root/model_library/model_vehicle_detection/model_deployment'
-scp project/preparation/model_vehicle_detection/model_convert/convert_atc.sh project/preparation/model_vehicle_detection/model_convert/aipp_nv21.cfg "$BOARD:/root/model_library/model_vehicle_detection/model_convert/"
-scp project/preparation/model_vehicle_detection/model_export/artifacts/yolo11n_vehicle_detection_best.onnx "$BOARD:/root/model_library/model_vehicle_detection/model_export/artifacts/"
+ssh root@192.168.0.2 'mkdir -p /root/model_library/model_vehicle_detection/model_convert /root/model_library/model_vehicle_detection/model_export/artifacts /root/model_library/model_vehicle_detection/model_deployment'
+scp project/preparation/model_vehicle_detection/model_convert/convert_atc.sh project/preparation/model_vehicle_detection/model_convert/aipp_nv21.cfg root@192.168.0.2:/root/model_library/model_vehicle_detection/model_convert/
+scp project/preparation/model_vehicle_detection/model_export/artifacts/yolo11n_vehicle_detection_best.onnx root@192.168.0.2:/root/model_library/model_vehicle_detection/model_export/artifacts/
 ```
 
 先核对 export_manifest.json 中的 ONNX 文件名和 SHA-256，确保这里上传的是本次导出产物。

@@ -9,10 +9,9 @@
 从 WSL/Linux 仓库根目录上传转换配置和 ONNX。以下操作不传数据集或凭据：
 
 ```bash
-BOARD=root@192.168.0.2
-ssh "$BOARD" 'mkdir -p /root/model_library/model_classroom_behavior/model_convert /root/model_library/model_classroom_behavior/model_export/artifacts /root/model_library/model_classroom_behavior/model_deployment'
-scp project/preparation/model_classroom_behavior/model_convert/convert_atc.sh project/preparation/model_classroom_behavior/model_convert/aipp_nv21.cfg "$BOARD:/root/model_library/model_classroom_behavior/model_convert/"
-scp project/preparation/model_classroom_behavior/model_export/artifacts/yolo11n_classroom_behavior_best.onnx "$BOARD:/root/model_library/model_classroom_behavior/model_export/artifacts/"
+ssh root@192.168.0.2 'mkdir -p /root/model_library/model_classroom_behavior/model_convert /root/model_library/model_classroom_behavior/model_export/artifacts /root/model_library/model_classroom_behavior/model_deployment'
+scp project/preparation/model_classroom_behavior/model_convert/convert_atc.sh project/preparation/model_classroom_behavior/model_convert/aipp_nv21.cfg root@192.168.0.2:/root/model_library/model_classroom_behavior/model_convert/
+scp project/preparation/model_classroom_behavior/model_export/artifacts/yolo11n_classroom_behavior_best.onnx root@192.168.0.2:/root/model_library/model_classroom_behavior/model_export/artifacts/
 ```
 
 以上输入必须来自当前实验的 export_manifest.json 所记录的权重和 ONNX 哈希。
