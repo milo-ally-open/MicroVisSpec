@@ -250,6 +250,7 @@ section { padding: 110px 0; }
 .platform-grid { display: grid; grid-template-columns: 0.92fr 1.08fr; gap: 72px; align-items: center; }
 .platform-img { position: relative; border-radius: 4px; overflow: hidden; aspect-ratio: 5 / 4; }
 .platform-img img { width: 100%; height: 100%; object-fit: cover; filter: saturate(0.8); }
+.platform-img .hardware-product-img { object-fit: contain; background: #fff; }
 .platform-text p { font-size: 1.12rem; line-height: 1.8; color: var(--ink-soft); margin-bottom: 22px; }
 .platform-text p strong { color: var(--ink); font-weight: 500; }
 .platform-text p:last-child { margin-bottom: 0; }
@@ -486,12 +487,12 @@ footer { padding: 40px 0; border-top: 1px solid var(--line); }
       <div class="right reveal reveal-delay-2">不绑定某一种算法或场景，把"感知—汇聚—响应"做成可复用的底座。</div>
     </div>
     <div class="platform-grid">
-      <div class="platform-img reveal">
-        <img src="assets/traffic-detection-alert.png" alt="道路车辆检测示例：正常目标青绿色框，告警车辆红色框" />
-      </div>
+      <a class="platform-img reveal" href="https://www.hiascend.com/doc_center/source/zh/Atlas200IDKA2DeveloperKit/23.0.RC2/pd/%E4%BA%A7%E5%93%81%E4%BB%8B%E7%BB%8D.pdf" target="_blank" rel="noopener noreferrer" aria-label="打开华为 Atlas 200I DK A2 官方产品介绍">
+        <img class="hardware-product-img" src="assets/atlas-200i-dk-a2-official.png" alt="华为 Atlas 200I DK A2 开发者套件实物图" />
+      </a>
       <div class="platform-text reveal reveal-delay-1">
         <p>云哨·边缘智枢是一套面向公共场所的<strong>云边端协同智能平台</strong>，集异常事件感知、智能数据分析、告警消息推送与对外 MCP 服务于一体。</p>
-        <p>团队自研垂直领域计算机视觉算法，首发部署于华为 <strong>Atlas 200I DK A2</strong> 开发者套件。通过分析摄像头采集的实时视频流，平台能够感知异常事件。</p>
+        <p>团队自研垂直领域计算机视觉算法，首发部署于华为 <strong>Atlas 200I DK A2</strong> 开发者套件。<a href="https://www.hiascend.com/doc_center/source/zh/Atlas200IDKA2DeveloperKit/23.0.RC2/pd/%E4%BA%A7%E5%93%81%E4%BB%8B%E7%BB%8D.pdf" target="_blank" rel="noopener noreferrer"><strong>查看华为官方产品介绍 ↗</strong></a>。通过分析摄像头采集的实时视频流，平台能够感知异常事件。</p>
         <p>边缘设备集群既可以把算法处理后的视频流实时传输至监控大屏，也可以将检测到的异常事件上传至平台数据库——<strong>媒体走流，事件走库</strong>，各走各的通道。</p>
         <div class="platform-pills">
           <span>异常事件感知</span>
