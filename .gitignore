@@ -1,6 +1,9 @@
 # Local credentials and assistant state
 .token
-.assistant/
+.assistant/*
+!.assistant/skills/
+.assistant/skills/*
+!.assistant/skills/huawei-cloud-publish-work-to-gallery/
 .playwright-cli/
 .weights/
 .codeartsdoer/
