@@ -1,14 +1,22 @@
-# Local and personal files
+# Local credentials and assistant state
 .token
 .assistant/
 .playwright-cli/
 .weights/
 .codeartsdoer/
 
-# Vendored repositories
-/project/repos/ascend-samples/
+# Operating system and editor files
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~
+.idea/
+.vscode/*
+!.vscode/settings.json
 
-# Frontend build artifacts and local dependencies
+# Node.js dependencies, build output, and test artifacts
 node_modules/
 dist/
 dist-ssr/
@@ -20,13 +28,29 @@ coverage/
 playwright-report/
 test-results/
 *.local
-logs/
-*.log
 npm-debug.log*
 yarn-debug.log*
-yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+
+# Go, CMake, and native build output
+build/
+cmake-build-*/
+bin/
+obj/
+*.test
+*.out
+*.o
+*.a
+*.so
+*.dll
+*.dylib
+
+# Logs and temporary files
+logs/
+*.log
+*.tmp
+*.temp
 
 # Python caches and virtual environments
 __pycache__/
@@ -34,33 +58,54 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.tox/
 .venv/
 venv/
+.ipynb_checkpoints/
 
 # Local environment settings; keep shareable examples in version control
 .env
 .env.*
 !.env.example
 !.env.*.example
+**/.secret-*
 
-# Downloaded training data and generated analysis output
-/project/preparation/model_warehouse_detection/model_train/datasets/
-/project/preparation/model_warehouse_detection/model_train/runs/
-/project/preparation/model_warehouse_detection/model_val/reports/
-/project/preparation/model_warehouse_detection/model_convert/artifacts/
-/project/preparation/model_vehicle_detection/model_train/datasets/
-/project/preparation/model_vehicle_detection/model_train/runs/
-/project/preparation/model_vehicle_detection/model_val/reports/
-/project/preparation/model_vehicle_detection/model_convert/artifacts/
+# Local databases and backups
+*.sqlite
+*.sqlite3
+*.db
+*.dump
+*.dump.gz
+backups/
 
-# Local source-tree deployment configuration, secrets, and database backups
+# Downloaded datasets and generated model workflow output
+**/model_train/datasets/
+**/model_train/dataset_analysis/
+**/model_train/runs/
+**/model_train/runs_*/
+**/model_train/train_result/
+**/model_train/train_result_*/
+!project/preparation/model_classroom_behavior/model_train/train_result_grouped/
+!project/preparation/model_classroom_behavior/model_train/train_result_grouped/**
+**/model_export/artifacts/
+**/model_convert/artifacts/
+**/model_deployment/build/
+**/model_deployment/build-*/
+**/model_val/reports/
+!project/preparation/model_classroom_behavior/model_val/reports/
+!project/preparation/model_classroom_behavior/model_val/reports/release_20261018/
+!project/preparation/model_classroom_behavior/model_val/reports/release_20261018/**
+!project/preparation/model_classroom_behavior/model_val/reports/release_20261020/
+!project/preparation/model_classroom_behavior/model_val/reports/release_20261020/**
+
+# Vendored repositories and local deployment configuration
+/project/repos/ascend-samples/
 /project/src/services/.env
 /project/src/services/*-service/.secret-*
 /project/src/services/media-service/mediamtx
 /project/src/services/media-service/mediamtx.exe
 /project/src/services/media-service/mediamtx.yml
-/project/src/services/auth-service/*.dump
 /project/src/clients/web/.secret-*
 
-# Local vendor SDK archives
-readme/assets/Ascend-hdk-310b-sdk-soc_23.0.rc3.zip
+# Local proof-of-concept SDK archive
+/readme/assets/Ascend-hdk-310b-sdk-soc_23.0.rc3.zip

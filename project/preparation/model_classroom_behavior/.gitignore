@@ -11,6 +11,7 @@
 !/model_train/train_result_grouped/yolo11m_classroom4aux_headonly_v1_classroom_behavior_training.json
 /model_export/artifacts/
 /model_deployment/*.om
+!/model_deployment/yolo11n_classroom_behavior_best.om
 /model_deployment/build/
 /model_val/runs_*/
 /model_val/reports/*
