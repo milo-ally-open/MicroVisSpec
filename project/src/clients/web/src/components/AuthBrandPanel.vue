@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
 import AppIcon from './AppIcon.vue'
+import BrandLockup from './BrandLockup.vue'
 </script>
 
 <template>
   <section class="auth-aside">
     <RouterLink class="brand brand--light" to="/" aria-label="云哨首页">
-      <span class="brand-mark">Y</span>
-      <span><strong>云哨</strong><small>EDGE INTELLIGENCE</small></span>
+      <BrandLockup inverse />
     </RouterLink>
     <div class="auth-aside__copy">
       <span class="eyebrow eyebrow--light">云边协同 · 智能感知</span>

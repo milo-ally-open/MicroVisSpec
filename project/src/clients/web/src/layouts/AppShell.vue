@@ -5,6 +5,7 @@ import { authApi } from '../api/auth'
 import { ApiError } from '../api/client'
 import { clearSession, authState } from '../state/auth'
 import AppIcon from '../components/AppIcon.vue'
+import BrandLockup from '../components/BrandLockup.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -65,8 +66,7 @@ const primaryLinks = [
   <div class="app-shell">
     <aside class="sidebar">
       <RouterLink class="brand" :to="{ name: 'overview' }" aria-label="云哨首页">
-        <span class="brand-mark">Y</span>
-        <span><strong>云哨</strong><small>EDGE INTELLIGENCE</small></span>
+        <BrandLockup inverse />
       </RouterLink>
 
       <div class="workspace-label">工作台 <span>WORKSPACE</span></div>
@@ -90,8 +90,9 @@ const primaryLinks = [
 
     <div class="main-column">
       <header class="topbar">
+        <BrandLockup class="topbar-brand" compact />
         <div class="breadcrumb"><span>云哨平台</span><span class="crumb-separator">/</span><strong>{{ title }}</strong></div>
-        <div class="topbar-right"><span class="topbar-status"><AppIcon name="shield" :size="16" />个人工作空间</span><span class="topbar-divider"></span><RouterLink class="topbar-settings" :to="{ name: 'settings' }"><span class="topbar-avatar">{{ authState.user?.username.slice(0, 1).toUpperCase() }}</span>{{ authState.user?.username }}<AppIcon name="chevron" :size="14" /></RouterLink></div>
+        <div class="topbar-right"><span class="topbar-status"><AppIcon name="shield" :size="16" />个人工作空间</span><span class="topbar-divider"></span><RouterLink class="topbar-settings" :to="{ name: 'settings' }"><span class="topbar-avatar">{{ authState.user?.username.slice(0, 1).toUpperCase() }}</span><span class="topbar-username">{{ authState.user?.username }}</span><AppIcon name="chevron" :size="14" /></RouterLink></div>
       </header>
       <main class="page-content"><div v-if="signOutError" class="notice notice--error" role="alert">{{ signOutError }}</div><RouterView /></main>
     </div>
