@@ -92,7 +92,7 @@ ul { list-style: none; }
   align-items: baseline;
   gap: 8px;
 }
-.brand .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); display: inline-block; transform: translateY(-1px); }
+.brand .brand-logo { width: 28px; height: 28px; object-fit: contain; display: inline-block; }
 .brand .sub { font-family: var(--sans); font-size: 0.78rem; font-weight: 400; color: var(--ink-mute); letter-spacing: 0.04em; }
 .nav-links { display: flex; gap: 34px; align-items: center; }
 .nav-links a {
@@ -430,7 +430,7 @@ footer { padding: 40px 0; border-top: 1px solid var(--line); }
 <!-- === Navigation === -->
 <nav class="nav" id="nav">
   <div class="wrap nav-inner">
-    <a href="#" class="brand"><span class="dot"></span>云哨<span class="sub">· 边缘智枢</span></a>
+    <a href="#" class="brand"><img class="brand-logo" src="assets/logo.png" alt="云哨 Logo" />云哨<span class="sub">· 边缘智枢</span></a>
     <div class="nav-links">
       <a href="#platform">平台</a>
       <a href="#highlights">亮点</a>
@@ -448,7 +448,7 @@ footer { padding: 40px 0; border-top: 1px solid var(--line); }
   <div class="wrap hero-grid">
     <div class="hero-left">
       <span class="eyebrow reveal">云边端协同智能视觉平台 · Apache 2.0</span>
-      <h1 class="reveal reveal-delay-1">边缘感知，<br><em>云端</em>处置。</h1>
+      <h1 class="reveal reveal-delay-1">边缘智能识别，<br><em>云端统一处置</em></h1>
       <p class="hero-sub reveal reveal-delay-2">云哨·边缘智枢面向园区、工厂、企业与校园，把摄像头里的异常，变成可查看、可推送、可处置的事件——从边缘感知、云端汇聚到终端响应，一条完整链路。</p>
       <div class="hero-actions reveal reveal-delay-3">
         <a href="#platform" class="btn-primary">
@@ -465,7 +465,7 @@ footer { padding: 40px 0; border-top: 1px solid var(--line); }
     </div>
     <div class="hero-right reveal reveal-delay-2">
       <div class="hero-visual">
-        <img src="https://picsum.photos/seed/yunshao-edge-cloud/720/900" alt="云边端协同概念视觉" />
+        <img src="assets/classroom-behavior-detection.png" alt="教室行为检测示例：举手、阅读和书写类别及目标框" />
       </div>
       <div class="hero-badge">
         <span class="num">云哨</span>边缘智枢
@@ -487,7 +487,7 @@ footer { padding: 40px 0; border-top: 1px solid var(--line); }
     </div>
     <div class="platform-grid">
       <div class="platform-img reveal">
-        <img src="https://picsum.photos/seed/yunshao-platform/900/720" alt="园区监控与边缘设备场景" />
+        <img src="assets/traffic-detection-alert.png" alt="道路车辆检测示例：正常目标青绿色框，告警车辆红色框" />
       </div>
       <div class="platform-text reveal reveal-delay-1">
         <p>云哨·边缘智枢是一套面向公共场所的<strong>云边端协同智能平台</strong>，集异常事件感知、智能数据分析、告警消息推送与对外 MCP 服务于一体。</p>
@@ -519,7 +519,7 @@ footer { padding: 40px 0; border-top: 1px solid var(--line); }
       <!-- Highlight 01 -->
       <article class="hl-item reveal">
         <div class="hl-img">
-          <img src="https://picsum.photos/seed/yunshao-edge-collab/960/720" alt="云边端协同示意" />
+          <img src="assets/multi-scene-monitoring.png" alt="教室、道路与仓储多场景目标检测监控" />
           <span class="tag">edge · cloud · terminal</span>
         </div>
         <div class="hl-info">
@@ -537,7 +537,7 @@ footer { padding: 40px 0; border-top: 1px solid var(--line); }
       <!-- Highlight 02 -->
       <article class="hl-item reveal">
         <div class="hl-img">
-          <img src="https://picsum.photos/seed/yunshao-dashboard/960/720" alt="监控大屏与告警界面" />
+          <img src="assets/alert-review.png" alt="道路监控中的汽车检测框与红色卡车告警框" />
           <span class="tag">web · pwa · native</span>
         </div>
         <div class="hl-info">
@@ -555,7 +555,7 @@ footer { padding: 40px 0; border-top: 1px solid var(--line); }
       <!-- Highlight 03 -->
       <article class="hl-item reveal">
         <div class="hl-img">
-          <img src="https://picsum.photos/seed/yunshao-ai-agent/960/720" alt="AI Agent 协同示意" />
+          <img src="assets/warehouse-detection.png" alt="仓储场景中的叉车、人员、托盘与货箱检测框" />
           <span class="tag">mcp · ai agent</span>
         </div>
         <div class="hl-info">
@@ -807,9 +807,9 @@ footer { padding: 40px 0; border-top: 1px solid var(--line); }
     <div class="cta-side reveal reveal-delay-1">
       <p class="lead">从空白部署机到浏览器端到端验证，部署指南按实际顺序写好了每一步。</p>
       <div class="cta-actions">
-        <a href="../DEPLOY.md"><span>阅读部署指南</span><span class="mono">DEPLOY.md</span></a>
-        <a href="https://atomgit.com/milo-ally-stu/Yunshao"><span>查看源码仓库</span><span class="mono">git clone</span></a>
-        <a href="../project/docs/Analysis/SPEC.md"><span>了解首发验收范围</span><span class="mono">SPEC.md</span></a>
+        <a href="https://atomgit.com/milo-ally-stu/Yunshao/blob/main/DEPLOY.md"><span>阅读部署指南</span><span class="mono">DEPLOY.md</span></a>
+        <a href="https://atomgit.com/milo-ally-stu/Yunshao/tree/main"><span>查看源码仓库</span><span class="mono">git clone</span></a>
+        <a href="https://atomgit.com/milo-ally-stu/Yunshao/blob/main/project/docs/Analysis/SPEC.md"><span>了解首发验收范围</span><span class="mono">SPEC.md</span></a>
       </div>
     </div>
   </div>
@@ -820,10 +820,10 @@ footer { padding: 40px 0; border-top: 1px solid var(--line); }
   <div class="wrap footer-inner">
     <span class="copy">© 2026 云哨 · 边缘智枢 · <span class="mono">Apache 2.0</span></span>
     <div class="socials">
-      <a href="../DEPLOY.md">部署指南</a>
-      <a href="https://atomgit.com/milo-ally-stu/Yunshao">源码</a>
-      <a href="../project/docs/Design/STRUCTURE.md">架构文档</a>
-      <a href="../LICENSE">License</a>
+      <a href="https://atomgit.com/milo-ally-stu/Yunshao/blob/main/DEPLOY.md">部署指南</a>
+      <a href="https://atomgit.com/milo-ally-stu/Yunshao/tree/main">源码</a>
+      <a href="https://atomgit.com/milo-ally-stu/Yunshao/blob/main/project/docs/Design/STRUCTURE.md">架构文档</a>
+      <a href="https://atomgit.com/milo-ally-stu/Yunshao/blob/main/LICENSE">License</a>
     </div>
   </div>
 </footer>

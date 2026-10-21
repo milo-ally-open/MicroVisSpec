@@ -24,9 +24,9 @@
 
 平台不仅注重用户体验，也面向现代 AI 应用提供支持。内置的 MCP 服务可接入各类成熟的 AI Agent 客户端。用户可以在 AI Agent 客户端中设置定时任务，让 Agent 通过 MCP 分析当日异常事件的分布情况，并根据分析建议采取后续措施，降低类似事件再次发生的概率，或为系统底层算法的优化提供参考。
 
-## 网络拓扑
+产品介绍页：[云哨·边缘智枢展示页](https://atomgit.com/milo-ally-stu/Yunshao/blob/main/readme/yunshao-exhibit.html)。
 
-可在[项目展示页](readme/yunshao-exhibit.html)浏览产品介绍。
+## 网络拓扑
 
 现状图展示首发单园区部署中的网络边界，以及浏览器、云端服务、Atlas 边缘设备和摄像头之间的主要通信链路。
 
