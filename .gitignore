@@ -6,7 +6,10 @@
 !.assistant/skills/huawei-cloud-publish-work-to-gallery/
 .playwright-cli/
 .weights/
-.codeartsdoer/
+.codeartsdoer/*
+!.codeartsdoer/skills/
+.codeartsdoer/skills/*
+!.codeartsdoer/skills/huawei-cloud-publish-work-to-gallery/
 
 # Operating system and editor files
 .DS_Store
