@@ -85,26 +85,25 @@ WEB_HTTPS_PORT=19080
 
 ### 3.1 生成试点证书
 
-在 WSL/Linux 上生成同时覆盖 Web 和 MQTT 主机地址的本地证书：
+在 WSL/Linux 上首次部署时生成证书。mkcert 会创建本机 CA；下面直接把 Web 和 MQTT 的服务器证书及私钥生成到 Compose 使用的目标文件，不需要预先准备密钥，也不经过 `/tmp`：
 
 ```sh
+umask 077
 mkcert -install
-mkcert -cert-file /tmp/yunshao-server.pem -key-file /tmp/yunshao-server-key.pem 192.168.0.1
-```
-
-把证书放到 Compose 约定的位置：
-
-```sh
-cp /tmp/yunshao-server.pem project/src/clients/web/.secret-nginx-tls-certificate.pem
-cp /tmp/yunshao-server-key.pem project/src/clients/web/.secret-nginx-tls-private-key.pem
-cp /tmp/yunshao-server.pem project/src/services/device-service/.secret-mqtt-tls-certificate.pem
-cp /tmp/yunshao-server-key.pem project/src/services/device-service/.secret-mqtt-tls-private-key.pem
+mkcert \
+  -cert-file project/src/clients/web/.secret-nginx-tls-certificate.pem \
+  -key-file project/src/clients/web/.secret-nginx-tls-private-key.pem \
+  192.168.0.1
+mkcert \
+  -cert-file project/src/services/device-service/.secret-mqtt-tls-certificate.pem \
+  -key-file project/src/services/device-service/.secret-mqtt-tls-private-key.pem \
+  192.168.0.1
 cp "$(mkcert -CAROOT)/rootCA.pem" project/src/services/device-service/.secret-mqtt-ca-certificate.pem
 chmod 600 project/src/clients/web/.secret-nginx-tls-private-key.pem
 chmod 600 project/src/services/device-service/.secret-mqtt-tls-private-key.pem
 ```
 
-mkcert 只会把 CA 安装到运行它的系统。让 Windows 浏览器信任此试点 CA 时，将 `rootCA.pem` 复制到 Windows，再在命令提示符中导入当前用户的受信任根证书存储：
+上面从 mkcert CA 目录复制的 `rootCA.pem` 是供客户端验证服务器证书的公开 CA 证书，不是私钥。mkcert 只会把 CA 安装到运行它的系统。让 Windows 浏览器信任此试点 CA 时，将这份 CA 证书复制到 Windows，再在命令提示符中导入当前用户的受信任根证书存储：
 
 ```sh
 cp "$(mkcert -CAROOT)/rootCA.pem" /mnt/c/Users/Administrator/Downloads/yunshao-rootCA.pem
