@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>云哨 · 边缘智枢 — 云边端协同智能视觉平台</title>
+<meta name="description" content="云哨·边缘智枢，面向园区、工厂、企业与校园的云边端协同智能平台，集异常事件感知、智能数据分析、告警消息推送与对外 MCP 服务于一体。" />
+
+<!-- === Fonts === -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600&family=Outfit:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+<style>
+/* === Design Tokens === */
+:root {
+  --bg: #faf8f4;          /* warm paper */
+  --bg-alt: #f1ede4;      /* deeper paper */
+  --bg-deep: #1c1917;     /* ink panel */
+  --ink: #1c1917;         /* near black, warm */
+  --ink-soft: #5c544b;    /* secondary text */
+  --ink-mute: #9b9388;    /* muted text */
+  --line: #e4dfd5;        /* hairline */
+  --line-soft: #ebe6db;
+  --accent: #1f4d3a;      /* forest green */
+  --accent-soft: #2f6b52; /* lighter green */
+  --on-deep: #f5f1e8;     /* text on dark panel */
+  --on-deep-mute: #a8a094;
+
+  --serif: 'Fraunces', 'Songti SC', Georgia, serif;
+  --sans: 'Outfit', -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
+
+  --maxw: 1240px;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* === Reset === */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--ink);
+  font-weight: 400;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
+img { display: block; max-width: 100%; height: auto; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+ul { list-style: none; }
+
+/* === Layout Helpers === */
+.wrap { width: 100%; max-width: var(--maxw); margin: 0 auto; padding: 0 32px; }
+.eyebrow {
+  font-family: var(--sans);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+.mono { font-family: var(--mono); }
+.serif { font-family: var(--serif); font-weight: 400; }
+
+/* === Navigation === */
+.nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 50;
+  padding: 22px 0;
+  transition: padding 0.4s var(--ease), background 0.4s var(--ease), border-color 0.4s var(--ease);
+  border-bottom: 1px solid transparent;
+}
+.nav.scrolled {
+  padding: 14px 0;
+  background: rgba(250, 248, 244, 0.82);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom-color: var(--line);
+}
+.nav-inner { display: flex; align-items: center; justify-content: space-between; }
+.brand {
+  font-family: var(--serif);
+  font-size: 1.3rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.brand .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); display: inline-block; transform: translateY(-1px); }
+.brand .sub { font-family: var(--sans); font-size: 0.78rem; font-weight: 400; color: var(--ink-mute); letter-spacing: 0.04em; }
+.nav-links { display: flex; gap: 34px; align-items: center; }
+.nav-links a {
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+  position: relative;
+  transition: color 0.3s var(--ease);
+}
+.nav-links a::after {
+  content: '';
+  position: absolute;
+  left: 0; bottom: -4px;
+  width: 0; height: 1px;
+  background: var(--accent);
+  transition: width 0.3s var(--ease);
+}
+.nav-links a:hover { color: var(--ink); }
+.nav-links a:hover::after { width: 100%; }
+.nav-cta {
+  font-size: 0.86rem;
+  padding: 9px 18px;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  transition: background 0.3s var(--ease), color 0.3s var(--ease), transform 0.2s var(--ease);
+}
+.nav-cta:hover { background: var(--ink); color: var(--bg); }
+.nav-cta:active { transform: scale(0.97); }
+.menu-btn { display: none; font-size: 0.9rem; }
+
+/* === Hero === */
+.hero {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  padding: 140px 0 80px;
+  position: relative;
+}
+.hero-grid {
+  display: grid;
+  grid-template-columns: 1.18fr 0.82fr;
+  gap: 64px;
+  align-items: center;
+  width: 100%;
+}
+.hero-left .eyebrow { margin-bottom: 28px; display: inline-flex; align-items: center; gap: 12px; }
+.hero-left .eyebrow::before { content: ''; width: 28px; height: 1px; background: var(--ink-mute); }
+.hero h1 {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: clamp(2.8rem, 6.4vw, 5rem);
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  margin-bottom: 30px;
+}
+.hero h1 em { font-style: italic; color: var(--accent); font-weight: 400; }
+.hero-sub {
+  font-size: 1.1rem;
+  color: var(--ink-soft);
+  max-width: 48ch;
+  line-height: 1.7;
+  margin-bottom: 42px;
+}
+.hero-actions { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 26px;
+  background: var(--ink);
+  color: var(--bg);
+  border-radius: 999px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  transition: background 0.3s var(--ease), transform 0.2s var(--ease);
+}
+.btn-primary svg { width: 16px; height: 16px; transition: transform 0.3s var(--ease); }
+.btn-primary:hover { background: var(--accent); }
+.btn-primary:hover svg { transform: translateX(4px); }
+.btn-primary:active { transform: scale(0.97); }
+.btn-ghost {
+  font-size: 0.95rem;
+  color: var(--ink-soft);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: color 0.3s var(--ease);
+}
+.btn-ghost::after { content: '→'; transition: transform 0.3s var(--ease); }
+.btn-ghost:hover { color: var(--ink); }
+.btn-ghost:hover::after { transform: translateX(4px); }
+
+/* Hero visual */
+.hero-right { position: relative; }
+.hero-visual {
+  position: relative;
+  border-radius: 4px;
+  overflow: hidden;
+  aspect-ratio: 4 / 5;
+  background: var(--bg-alt);
+}
+.hero-visual img { width: 100%; height: 100%; object-fit: cover; filter: saturate(0.82) contrast(1.03); }
+.hero-visual::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, transparent 55%, rgba(28,25,23,0.22));
+  pointer-events: none;
+}
+.hero-badge {
+  position: absolute;
+  left: -10px; bottom: -10px;
+  background: var(--bg);
+  padding: 12px 18px;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  letter-spacing: 0.02em;
+  line-height: 1.5;
+}
+.hero-badge .num { font-family: var(--serif); color: var(--accent); margin-right: 8px; }
+.hero-badge .mono { font-size: 0.72rem; color: var(--ink-mute); display: block; margin-top: 2px; }
+
+/* Hero meta strip */
+.hero-meta {
+  display: flex;
+  gap: 48px;
+  margin-top: 56px;
+  padding-top: 28px;
+  border-top: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+.meta-item .k { font-size: 0.72rem; color: var(--ink-mute); letter-spacing: 0.1em; text-transform: uppercase; display: block; margin-bottom: 6px; }
+.meta-item .v { font-family: var(--serif); font-size: 1.12rem; color: var(--ink); }
+.meta-item .v .mono { font-family: var(--mono); font-size: 0.92rem; color: var(--ink-soft); }
+
+/* === Section Frame === */
+section { padding: 110px 0; }
+.section-head { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 64px; gap: 32px; flex-wrap: wrap; }
+.section-head .left { max-width: 58ch; }
+.section-head .eyebrow { margin-bottom: 18px; display: block; }
+.section-head h2 {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: clamp(2rem, 4.2vw, 3.1rem);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+.section-head h2 em { font-style: italic; color: var(--accent); }
+.section-head .right { font-size: 0.94rem; color: var(--ink-soft); max-width: 34ch; line-height: 1.7; }
+.section-num { font-family: var(--mono); font-size: 0.78rem; color: var(--accent); letter-spacing: 0.06em; }
+
+/* === 01 Platform / About === */
+.platform { background: var(--bg-alt); }
+.platform-grid { display: grid; grid-template-columns: 0.92fr 1.08fr; gap: 72px; align-items: center; }
+.platform-img { position: relative; border-radius: 4px; overflow: hidden; aspect-ratio: 5 / 4; }
+.platform-img img { width: 100%; height: 100%; object-fit: cover; filter: saturate(0.8); }
+.platform-text p { font-size: 1.12rem; line-height: 1.8; color: var(--ink-soft); margin-bottom: 22px; }
+.platform-text p strong { color: var(--ink); font-weight: 500; }
+.platform-text p:last-child { margin-bottom: 0; }
+.platform-pills { margin-top: 36px; display: flex; gap: 10px; flex-wrap: wrap; }
+.platform-pills span { font-family: var(--mono); font-size: 0.78rem; color: var(--ink); padding: 7px 14px; border: 1px solid var(--line); background: var(--bg); border-radius: 999px; }
+
+/* === 02 Highlights (asymmetric) === */
+.highlights-list { display: flex; flex-direction: column; gap: 88px; }
+.hl-item { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 56px; align-items: center; }
+.hl-item:nth-child(even) { grid-template-columns: 0.95fr 1.05fr; }
+.hl-item:nth-child(even) .hl-img { order: 2; }
+.hl-img { position: relative; border-radius: 4px; overflow: hidden; aspect-ratio: 4 / 3; background: var(--bg-alt); }
+.hl-img img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.8s var(--ease); }
+.hl-item:hover .hl-img img { transform: scale(1.04); }
+.hl-img .tag {
+  position: absolute; top: 16px; left: 16px;
+  background: rgba(250,248,244,0.92);
+  backdrop-filter: blur(6px);
+  padding: 6px 12px;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+  border-radius: 2px;
+}
+.hl-info .idx { font-family: var(--serif); font-size: 0.95rem; color: var(--accent); margin-bottom: 14px; display: block; }
+.hl-info h3 { font-family: var(--serif); font-weight: 400; font-size: clamp(1.7rem, 3.2vw, 2.3rem); line-height: 1.15; letter-spacing: -0.01em; margin-bottom: 18px; }
+.hl-info p { font-size: 1rem; color: var(--ink-soft); line-height: 1.75; margin-bottom: 22px; max-width: 46ch; }
+.hl-flow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-top: 18px; border-top: 1px solid var(--line); }
+.hl-flow .step { font-family: var(--mono); font-size: 0.78rem; color: var(--ink); padding: 5px 11px; background: var(--bg-alt); border-radius: 2px; }
+.hl-flow .arr { color: var(--ink-mute); font-size: 0.85rem; }
+
+/* === 03 Architecture (dark panel) === */
+.arch { background: var(--bg-deep); color: var(--on-deep); }
+.arch .section-head .eyebrow { color: var(--on-deep-mute); }
+.arch .section-head h2 { color: var(--on-deep); }
+.arch .section-head h2 em { color: var(--accent-soft); }
+.arch .section-head .right { color: var(--on-deep-mute); }
+.arch .section-num { color: var(--accent-soft); }
+
+.arch-stack { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0; position: relative; }
+.arch-layer { padding: 32px 28px; border: 1px solid #3a3530; position: relative; }
+.arch-layer:first-child { border-right: none; }
+.arch-layer:last-child { border-left: none; }
+.arch-layer.mid { background: rgba(255,255,255,0.015); }
+.arch-layer .layer-tag { font-family: var(--mono); font-size: 0.72rem; color: var(--accent-soft); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; display: block; }
+.arch-layer .layer-name { font-family: var(--serif); font-size: 1.5rem; color: var(--on-deep); margin-bottom: 22px; letter-spacing: -0.01em; }
+.arch-layer ul { display: flex; flex-direction: column; gap: 12px; }
+.arch-layer li { font-size: 0.9rem; color: var(--on-deep-mute); line-height: 1.5; padding-left: 16px; position: relative; }
+.arch-layer li::before { content: ''; position: absolute; left: 0; top: 9px; width: 6px; height: 1px; background: var(--accent-soft); }
+.arch-layer li strong { color: var(--on-deep); font-weight: 500; }
+.arch-layer li .mono { font-family: var(--mono); font-size: 0.82rem; color: var(--on-deep); }
+
+/* layer connectors */
+.arch-flow { display: flex; justify-content: space-between; margin: 24px 0 0; padding: 0 6px; }
+.arch-flow .seg { flex: 1; display: flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: 0.74rem; color: var(--on-deep-mute); letter-spacing: 0.04em; }
+.arch-flow .seg .line { flex: 1; height: 1px; background: linear-gradient(90deg, var(--accent-soft), transparent); }
+.arch-flow .seg:last-child .line { background: linear-gradient(90deg, transparent, var(--accent-soft)); }
+
+.arch-note { margin-top: 40px; padding-top: 24px; border-top: 1px solid #3a3530; display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
+.arch-note div .k { font-family: var(--mono); font-size: 0.72rem; color: var(--on-deep-mute); letter-spacing: 0.08em; text-transform: uppercase; display: block; margin-bottom: 8px; }
+.arch-note div .v { font-size: 0.92rem; color: var(--on-deep); line-height: 1.6; }
+.arch-note div .v .mono { font-family: var(--mono); font-size: 0.84rem; color: var(--accent-soft); }
+
+/* === 04 Capabilities === */
+.cap-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border-top: 1px solid var(--line); }
+.cap-row { display: grid; grid-template-columns: 0.34fr 1fr; gap: 32px; padding: 40px 0; border-bottom: 1px solid var(--line); align-items: baseline; }
+.cap-row .num { font-family: var(--serif); font-size: 1.2rem; color: var(--ink-mute); }
+.cap-row h4 { font-family: var(--serif); font-weight: 400; font-size: 1.55rem; margin-bottom: 12px; letter-spacing: -0.01em; }
+.cap-row p { font-size: 0.98rem; color: var(--ink-soft); line-height: 1.75; max-width: 50ch; }
+.cap-row .kw { margin-top: 16px; display: flex; gap: 8px; flex-wrap: wrap; }
+.cap-row .kw span { font-family: var(--mono); font-size: 0.74rem; color: var(--ink-mute); padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; }
+.cap-grid > .cap-col { display: flex; flex-direction: column; }
+.cap-grid > .cap-col:first-child { border-right: 1px solid var(--line); padding-right: 48px; }
+.cap-grid > .cap-col:last-child { padding-left: 48px; }
+
+/* === 05 Tech Stack === */
+.tech { background: var(--bg-alt); }
+.tech-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; }
+.tech-card { background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 28px 24px; transition: border-color 0.3s var(--ease), transform 0.3s var(--ease); }
+.tech-card:hover { border-color: var(--accent); transform: translateY(-3px); }
+.tech-card .layer { font-family: var(--mono); font-size: 0.72rem; color: var(--accent); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 14px; }
+.tech-card h4 { font-family: var(--serif); font-weight: 400; font-size: 1.3rem; margin-bottom: 18px; letter-spacing: -0.01em; }
+.tech-card ul { display: flex; flex-direction: column; gap: 9px; }
+.tech-card li { font-family: var(--mono); font-size: 0.82rem; color: var(--ink-soft); line-height: 1.5; }
+.tech-card li strong { color: var(--ink); font-weight: 500; }
+
+/* === 06 Loop (business closed loop) === */
+.loop-steps { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0; position: relative; }
+.loop-step { padding: 0 18px; position: relative; }
+.loop-step:not(:last-child)::after {
+  content: '→';
+  position: absolute;
+  right: -6px; top: 14px;
+  color: var(--ink-mute);
+  font-size: 1rem;
+}
+.loop-step .n { font-family: var(--serif); font-size: 2.2rem; color: var(--accent); line-height: 1; margin-bottom: 18px; display: block; }
+.loop-step h4 { font-family: var(--serif); font-weight: 400; font-size: 1.2rem; margin-bottom: 12px; letter-spacing: -0.01em; }
+.loop-step p { font-size: 0.9rem; color: var(--ink-soft); line-height: 1.65; }
+.loop-caption { margin-top: 56px; padding: 28px 32px; background: var(--bg-alt); border-left: 3px solid var(--accent); border-radius: 0 4px 4px 0; }
+.loop-caption p { font-family: var(--serif); font-size: 1.15rem; color: var(--ink); line-height: 1.6; font-style: italic; }
+.loop-caption p .mono { font-family: var(--mono); font-style: normal; font-size: 0.9rem; color: var(--accent); }
+
+/* === CTA === */
+.cta { padding: 130px 0; }
+.cta-inner { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 64px; align-items: end; }
+.cta h2 { font-family: var(--serif); font-weight: 400; font-size: clamp(2.4rem, 5.5vw, 4.2rem); line-height: 1.05; letter-spacing: -0.02em; max-width: 18ch; }
+.cta h2 em { font-style: italic; color: var(--accent); }
+.cta-side .lead { font-size: 1rem; color: var(--ink-soft); line-height: 1.7; margin-bottom: 28px; }
+.cta-actions { display: flex; flex-direction: column; gap: 14px; }
+.cta-actions a { display: flex; justify-content: space-between; align-items: center; gap: 16px; font-size: 0.95rem; color: var(--ink); padding: 16px 0; border-bottom: 1px solid var(--line); transition: color 0.3s var(--ease), border-color 0.3s var(--ease); }
+.cta-actions a .mono { font-family: var(--mono); font-size: 0.76rem; color: var(--ink-mute); letter-spacing: 0.06em; }
+.cta-actions a::after { content: '→'; color: var(--ink-mute); transition: transform 0.3s var(--ease), color 0.3s var(--ease); }
+.cta-actions a:hover { color: var(--accent); border-color: var(--accent); }
+.cta-actions a:hover::after { transform: translateX(4px); color: var(--accent); }
+
+/* === Footer === */
+footer { padding: 40px 0; border-top: 1px solid var(--line); }
+.footer-inner { display: flex; justify-content: space-between; align-items: center; gap: 24px; flex-wrap: wrap; }
+.footer-inner .copy { font-size: 0.82rem; color: var(--ink-mute); }
+.footer-inner .copy .mono { font-family: var(--mono); }
+.footer-inner .socials { display: flex; gap: 24px; }
+.footer-inner .socials a { font-size: 0.82rem; color: var(--ink-soft); transition: color 0.3s var(--ease); }
+.footer-inner .socials a:hover { color: var(--accent); }
+
+/* === Reveal Animation === */
+.reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.9s var(--ease), transform 0.9s var(--ease); }
+.reveal.in { opacity: 1; transform: none; }
+.reveal-delay-1 { transition-delay: 0.1s; }
+.reveal-delay-2 { transition-delay: 0.2s; }
+.reveal-delay-3 { transition-delay: 0.3s; }
+
+/* === Responsive === */
+@media (max-width: 1024px) {
+  .hero-grid { grid-template-columns: 1fr; gap: 48px; }
+  .hero-right { max-width: 440px; }
+  .platform-grid { grid-template-columns: 1fr; gap: 48px; }
+  .hl-item, .hl-item:nth-child(even) { grid-template-columns: 1fr; gap: 32px; }
+  .hl-item:nth-child(even) .hl-img { order: 0; }
+  .arch-stack { grid-template-columns: 1fr; }
+  .arch-layer { border: 1px solid #3a3530; }
+  .arch-layer:first-child { border-right: 1px solid #3a3530; }
+  .arch-layer:last-child { border-left: 1px solid #3a3530; }
+  .arch-note { grid-template-columns: 1fr; gap: 18px; }
+  .cap-grid { grid-template-columns: 1fr; }
+  .cap-grid > .cap-col:first-child { border-right: none; padding-right: 0; border-bottom: 1px solid var(--line); }
+  .cap-grid > .cap-col:last-child { padding-left: 0; }
+  .tech-grid { grid-template-columns: repeat(2, 1fr); }
+  .loop-steps { grid-template-columns: 1fr; gap: 32px; }
+  .loop-step { padding: 0; }
+  .loop-step:not(:last-child)::after { content: '↓'; right: auto; top: auto; bottom: -20px; left: 0; }
+  .cta-inner { grid-template-columns: 1fr; gap: 40px; }
+}
+@media (max-width: 768px) {
+  .wrap { padding: 0 22px; }
+  section { padding: 80px 0; }
+  .hero { padding: 120px 0 60px; }
+  .nav-links { display: none; }
+  .menu-btn { display: block; }
+  .nav-cta { display: none; }
+  .hero-meta { gap: 28px; }
+  .section-head { flex-direction: column; align-items: flex-start; margin-bottom: 44px; }
+  .cap-row { grid-template-columns: 1fr; gap: 8px; }
+  .tech-grid { grid-template-columns: 1fr; }
+  .cta { padding: 90px 0; }
+  .footer-inner { flex-direction: column; align-items: flex-start; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .reveal { opacity: 1; transform: none; }
+  html { scroll-behavior: auto; }
+}
+</style>
+</head>
+<body>
+
+<!-- === Navigation === -->
+<nav class="nav" id="nav">
+  <div class="wrap nav-inner">
+    <a href="#" class="brand"><span class="dot"></span>云哨<span class="sub">· 边缘智枢</span></a>
+    <div class="nav-links">
+      <a href="#platform">平台</a>
+      <a href="#highlights">亮点</a>
+      <a href="#arch">架构</a>
+      <a href="#tech">技术</a>
+      <a href="#contact">联系</a>
+    </div>
+    <a href="#contact" class="nav-cta">部署指南</a>
+    <button class="menu-btn" aria-label="菜单">菜单</button>
+  </div>
+</nav>
+
+<!-- === Hero === -->
+<header class="hero">
+  <div class="wrap hero-grid">
+    <div class="hero-left">
+      <span class="eyebrow reveal">云边端协同智能视觉平台 · Apache 2.0</span>
+      <h1 class="reveal reveal-delay-1">边缘感知，<br><em>云端</em>处置。</h1>
+      <p class="hero-sub reveal reveal-delay-2">云哨·边缘智枢面向园区、工厂、企业与校园，把摄像头里的异常，变成可查看、可推送、可处置的事件——从边缘感知、云端汇聚到终端响应，一条完整链路。</p>
+      <div class="hero-actions reveal reveal-delay-3">
+        <a href="#platform" class="btn-primary">
+          了解平台
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
+        <a href="#arch" class="btn-ghost">查看架构</a>
+      </div>
+      <div class="hero-meta reveal reveal-delay-3">
+        <div class="meta-item"><span class="k">边缘硬件</span><span class="v">Atlas 200I DK A2</span></div>
+        <div class="meta-item"><span class="k">云端服务</span><span class="v">5 个 Go 业务服务</span></div>
+        <div class="meta-item"><span class="k">并发视频</span><span class="v"><span class="mono">≤ 12</span> 路</span></div>
+      </div>
+    </div>
+    <div class="hero-right reveal reveal-delay-2">
+      <div class="hero-visual">
+        <img src="https://picsum.photos/seed/yunshao-edge-cloud/720/900" alt="云边端协同概念视觉" />
+      </div>
+      <div class="hero-badge">
+        <span class="num">云哨</span>边缘智枢
+        <span class="mono">edge · cloud · terminal</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- === 01 Platform === -->
+<section class="platform" id="platform">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="left">
+        <span class="eyebrow reveal"><span class="section-num">01 /</span> 平台定位</span>
+        <h2 class="reveal reveal-delay-1">一套平台，<em>三层</em>协同。</h2>
+      </div>
+      <div class="right reveal reveal-delay-2">不绑定某一种算法或场景，把"感知—汇聚—响应"做成可复用的底座。</div>
+    </div>
+    <div class="platform-grid">
+      <div class="platform-img reveal">
+        <img src="https://picsum.photos/seed/yunshao-platform/900/720" alt="园区监控与边缘设备场景" />
+      </div>
+      <div class="platform-text reveal reveal-delay-1">
+        <p>云哨·边缘智枢是一套面向公共场所的<strong>云边端协同智能平台</strong>，集异常事件感知、智能数据分析、告警消息推送与对外 MCP 服务于一体。</p>
+        <p>团队自研垂直领域计算机视觉算法，首发部署于华为 <strong>Atlas 200I DK A2</strong> 开发者套件。通过分析摄像头采集的实时视频流，平台能够感知异常事件。</p>
+        <p>边缘设备集群既可以把算法处理后的视频流实时传输至监控大屏，也可以将检测到的异常事件上传至平台数据库——<strong>媒体走流，事件走库</strong>，各走各的通道。</p>
+        <div class="platform-pills">
+          <span>异常事件感知</span>
+          <span>智能数据分析</span>
+          <span>告警消息推送</span>
+          <span>MCP 服务</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- === 02 Highlights === -->
+<section class="highlights" id="highlights">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="left">
+        <span class="eyebrow reveal"><span class="section-num">02 /</span> 三大亮点</span>
+        <h2 class="reveal reveal-delay-1">从感知到响应，<br><em>闭环</em>而非片段。</h2>
+      </div>
+      <div class="right reveal reveal-delay-2">每一层都解决一个具体问题，合起来才是一条能用的链路。</div>
+    </div>
+
+    <div class="highlights-list">
+      <!-- Highlight 01 -->
+      <article class="hl-item reveal">
+        <div class="hl-img">
+          <img src="https://picsum.photos/seed/yunshao-edge-collab/960/720" alt="云边端协同示意" />
+          <span class="tag">edge · cloud · terminal</span>
+        </div>
+        <div class="hl-info">
+          <span class="idx">— 亮点 01</span>
+          <h3>云边端协同</h3>
+          <p>边缘设备连接摄像头，在本地运行视觉算法，实时分析视频流并识别异常；云端平台统一管理设备状态与位置，汇聚并存储异常事件；监控大屏与手机客户端展示画面与告警，支持查看与处置。</p>
+          <div class="hl-flow">
+            <span class="step">边缘感知</span><span class="arr">→</span>
+            <span class="step">云端汇聚</span><span class="arr">→</span>
+            <span class="step">终端响应</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- Highlight 02 -->
+      <article class="hl-item reveal">
+        <div class="hl-img">
+          <img src="https://picsum.photos/seed/yunshao-dashboard/960/720" alt="监控大屏与告警界面" />
+          <span class="tag">web · pwa · native</span>
+        </div>
+        <div class="hl-info">
+          <span class="idx">— 亮点 02</span>
+          <h3>用户友好</h3>
+          <p>平台围绕实时监控、历史告警与智能数据分析构建三类主要界面，覆盖实时查看、单个事件追溯与整体情况研判。告警可推送至 PWA 与原生 App，用户点击通知即进入事件详情，无需持续盯守监控画面。</p>
+          <div class="hl-flow">
+            <span class="step">实时监控</span><span class="arr">·</span>
+            <span class="step">历史告警</span><span class="arr">·</span>
+            <span class="step">数据分析</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- Highlight 03 -->
+      <article class="hl-item reveal">
+        <div class="hl-img">
+          <img src="https://picsum.photos/seed/yunshao-ai-agent/960/720" alt="AI Agent 协同示意" />
+          <span class="tag">mcp · ai agent</span>
+        </div>
+        <div class="hl-info">
+          <span class="idx">— 亮点 03</span>
+          <h3>AI 友好</h3>
+          <p>平台内置 MCP 服务，可接入各类成熟的 AI Agent 客户端。用户可在 Agent 中设置定时任务，让其分析异常事件的发生时段与高发点位，并结合分析结果提出巡查、处置或算法优化建议。</p>
+          <div class="hl-flow">
+            <span class="step">MCP 服务</span><span class="arr">→</span>
+            <span class="step">AI Agent</span><span class="arr">→</span>
+            <span class="step">处置建议</span>
+          </div>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- === 03 Architecture (dark) === -->
+<section class="arch" id="arch">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="left">
+        <span class="eyebrow reveal"><span class="section-num">03 /</span> 系统架构</span>
+        <h2 class="reveal reveal-delay-1">从摄像头到告警，<br><em>一条</em>链路。</h2>
+      </div>
+      <div class="right reveal reveal-delay-2">边缘、云端、终端各司其职；媒体、事件、命令分走适合自己的通道。</div>
+    </div>
+
+    <div class="arch-stack reveal">
+      <div class="arch-layer">
+        <span class="layer-tag">Layer 01 · Edge</span>
+        <div class="layer-name">边缘层</div>
+        <ul>
+          <li><strong>授权摄像头</strong> · <span class="mono">H.264</span> 视频源</li>
+          <li><strong>Atlas 200I DK A2</strong> · <span class="mono">Ascend 310B4</span></li>
+          <li>C++ 推理运行时 · <span class="mono">AscendCL</span></li>
+          <li>团队自研垂直领域视觉算法</li>
+          <li>SQLite 事件 outbox · <span class="mono">systemd</span></li>
+        </ul>
+      </div>
+      <div class="arch-layer mid">
+        <span class="layer-tag">Layer 02 · Cloud</span>
+        <div class="layer-name">云端层</div>
+        <ul>
+          <li><strong>Nginx</strong> · HTTPS / API 路由 / 鉴权</li>
+          <li>5 个 Go 服务 · <span class="mono">Gin + GORM</span></li>
+          <li><span class="mono">auth · device · event · media · push</span></li>
+          <li>PostgreSQL · 服务独立 schema</li>
+          <li>Mosquitto · <span class="mono">MQTT/TLS/QoS1</span></li>
+          <li>MediaMTX · <span class="mono">WebRTC/HLS</span></li>
+        </ul>
+      </div>
+      <div class="arch-layer">
+        <span class="layer-tag">Layer 03 · Terminal</span>
+        <div class="layer-name">终端层</div>
+        <ul>
+          <li><strong>桌面监控大屏</strong> · 最多 12 分屏</li>
+          <li>PWA + 原生 App · Web Push 通知</li>
+          <li>历史告警 · 详情 · 截图查看</li>
+          <li>智能数据分析大屏</li>
+          <li>AI Agent · <span class="mono">MCP</span>（后续启用）</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="arch-flow reveal reveal-delay-1">
+      <div class="seg"><span>MQTT 心跳/事件</span><span class="line"></span></div>
+      <div class="seg"><span class="line"></span><span>HTTPS 截图上传</span><span class="line"></span></div>
+      <div class="seg"><span class="line"></span><span>RTSP → WebRTC 视频</span></div>
+    </div>
+
+    <div class="arch-note reveal reveal-delay-2">
+      <div>
+        <span class="k">媒体通道</span>
+        <span class="v">边缘 <span class="mono">RTSP</span> → MediaMTX → 浏览器 <span class="mono">WebRTC</span>，失败回退 <span class="mono">HLS</span>。</span>
+      </div>
+      <div>
+        <span class="k">事件通道</span>
+        <span class="v">边缘 <span class="mono">MQTT</span> 上报 → 云端幂等落库 → outbox → Web Push。</span>
+      </div>
+      <div>
+        <span class="k">数据边界</span>
+        <span class="v">按账号隔离，服务独占写入自身 schema，跨服务走 API 或可靠事件。</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- === 04 Capabilities === -->
+<section class="capabilities" id="capabilities">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="left">
+        <span class="eyebrow reveal"><span class="section-num">04 /</span> 核心能力</span>
+        <h2 class="reveal reveal-delay-1">平台能做的<em>四件事</em>。</h2>
+      </div>
+      <div class="right reveal reveal-delay-2">能力不绑定具体场景，由边缘算法与告警规则共同决定感知什么。</div>
+    </div>
+    <div class="cap-grid">
+      <div class="cap-col">
+        <div class="cap-row reveal">
+          <span class="num">01</span>
+          <div>
+            <h4>异常事件感知</h4>
+            <p>边缘端实时分析视频流，运行视觉算法识别异常；命中规则的事件经幂等校验后上报云端，附带单帧截图作为证据。</p>
+            <div class="kw"><span>实时视频流</span><span>边缘推理</span><span>事件上报</span></div>
+          </div>
+        </div>
+        <div class="cap-row reveal">
+          <span class="num">02</span>
+          <div>
+            <h4>智能数据分析</h4>
+            <p>汇总分析已发生的异常事件，呈现事件分布与变化情况，帮助管理者发现高发点位与时段，为巡查安排与后续改进提供依据。</p>
+            <div class="kw"><span>事件趋势</span><span>高发点位</span><span>处置状态</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="cap-col">
+        <div class="cap-row reveal">
+          <span class="num">03</span>
+          <div>
+            <h4>告警消息推送</h4>
+            <p>事件经规则校验后进入 outbox，由 push-service 经 Web Push 投递至 PWA 与原生 App；点击通知先鉴权再打开详情。</p>
+            <div class="kw"><span>规则校验</span><span>Web Push</span><span>多端通知</span></div>
+          </div>
+        </div>
+        <div class="cap-row reveal">
+          <span class="num">04</span>
+          <div>
+            <h4>对外 MCP 服务</h4>
+            <p>内置受控业务能力入口，可接入各类 AI Agent 客户端；Agent 可定时分析事件分布，结合建议采取后续措施，或为算法优化提供参考。</p>
+            <div class="kw"><span>MCP</span><span>AI Agent</span><span>定时分析</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- === 05 Tech Stack === -->
+<section class="tech" id="tech">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="left">
+        <span class="eyebrow reveal"><span class="section-num">05 /</span> 技术栈</span>
+        <h2 class="reveal reveal-delay-1">每一层，<em>选熟不选新</em>。</h2>
+      </div>
+      <div class="right reveal reveal-delay-2">优先成熟、可维护、社区活跃的方案，把复杂度留给业务本身。</div>
+    </div>
+    <div class="tech-grid">
+      <div class="tech-card reveal">
+        <span class="layer">Edge · 边缘</span>
+        <h4>Atlas 200I DK A2</h4>
+        <ul>
+          <li><strong>Ascend 310B4</strong> NPU</li>
+          <li><strong>AscendCL</strong> 推理</li>
+          <li>C++ 运行时 · systemd</li>
+          <li>YOLO11n · 640 输入</li>
+          <li>PyTorch → ONNX → OM</li>
+        </ul>
+      </div>
+      <div class="tech-card reveal reveal-delay-1">
+        <span class="layer">Cloud · 云端</span>
+        <h4>Go + Gin</h4>
+        <ul>
+          <li>5 个独立 <strong>Go/Gin</strong> 服务</li>
+          <li><strong>GORM</strong> · PostgreSQL</li>
+          <li>Mosquitto · MQTT/TLS</li>
+          <li>MediaMTX · WebRTC/HLS</li>
+          <li>Nginx · Docker Compose</li>
+        </ul>
+      </div>
+      <div class="tech-card reveal reveal-delay-2">
+        <span class="layer">Terminal · 终端</span>
+        <h4>Vue 3 + TS</h4>
+        <ul>
+          <li><strong>Vue 3</strong> · TypeScript</li>
+          <li>PWA · Service Worker</li>
+          <li>WebRTC 优先 · HLS 回退</li>
+          <li>Web Push 通知</li>
+          <li>桌面监控大屏</li>
+        </ul>
+      </div>
+      <div class="tech-card reveal reveal-delay-3">
+        <span class="layer">AI · 协同</span>
+        <h4>MCP 服务</h4>
+        <ul>
+          <li>受控业务能力入口</li>
+          <li>接入 AI Agent 客户端</li>
+          <li>定时分析任务</li>
+          <li>处置 / 优化建议</li>
+          <li>后续阶段启用</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- === 06 Business Loop === -->
+<section class="loop" id="loop">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="left">
+        <span class="eyebrow reveal"><span class="section-num">06 /</span> 业务闭环</span>
+        <h2 class="reveal reveal-delay-1">五步走完<em>一个圈</em>。</h2>
+      </div>
+      <div class="right reveal reveal-delay-2">从登记一台设备开始，到通知触达与统计回看，每一步都可观测。</div>
+    </div>
+    <div class="loop-steps reveal">
+      <div class="loop-step">
+        <span class="n">01</span>
+        <h4>接入点位</h4>
+        <p>登记边缘设备、摄像头与所在位置，完成一次性激活。</p>
+      </div>
+      <div class="loop-step">
+        <span class="n">02</span>
+        <h4>边缘推理</h4>
+        <p>本地运行视觉算法，实时输出结果与处理后的画面。</p>
+      </div>
+      <div class="loop-step">
+        <span class="n">03</span>
+        <h4>告警规则</h4>
+        <p>显式启用并配置规则，只有满足条件的事件才上报。</p>
+      </div>
+      <div class="loop-step">
+        <span class="n">04</span>
+        <h4>查询处置</h4>
+        <p>云端按账号隔离保存，可查询、查看截图、记录处置结果。</p>
+      </div>
+      <div class="loop-step">
+        <span class="n">05</span>
+        <h4>通知统计</h4>
+        <p>事件触发多端推送，汇聚基础统计辅助整体研判。</p>
+      </div>
+    </div>
+    <div class="loop-caption reveal reveal-delay-1">
+      <p>单帧检测本身不自动等于告警——<span class="mono">detect ≠ alert</span>。只有用户显式启用规则，边缘端才将满足条件的行为作为异常事件上报。</p>
+    </div>
+  </div>
+</section>
+
+<!-- === CTA === -->
+<section class="cta" id="contact">
+  <div class="wrap cta-inner">
+    <div class="reveal">
+      <span class="eyebrow">联系 / 部署</span>
+      <h2 style="margin-top:24px">想在自己的<br>园区<em>跑起来</em>？</h2>
+    </div>
+    <div class="cta-side reveal reveal-delay-1">
+      <p class="lead">从空白部署机到浏览器端到端验证，部署指南按实际顺序写好了每一步。</p>
+      <div class="cta-actions">
+        <a href="../DEPLOY.md"><span>阅读部署指南</span><span class="mono">DEPLOY.md</span></a>
+        <a href="https://atomgit.com/milo-ally-stu/Yunshao"><span>查看源码仓库</span><span class="mono">git clone</span></a>
+        <a href="../project/docs/Analysis/SPEC.md"><span>了解首发验收范围</span><span class="mono">SPEC.md</span></a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- === Footer === -->
+<footer>
+  <div class="wrap footer-inner">
+    <span class="copy">© 2026 云哨 · 边缘智枢 · <span class="mono">Apache 2.0</span></span>
+    <div class="socials">
+      <a href="../DEPLOY.md">部署指南</a>
+      <a href="https://atomgit.com/milo-ally-stu/Yunshao">源码</a>
+      <a href="../project/docs/Design/STRUCTURE.md">架构文档</a>
+      <a href="../LICENSE">License</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+/* === Nav scroll state === */
+(function () {
+  var nav = document.getElementById('nav');
+  function onScroll() {
+    if (window.scrollY > 24) nav.classList.add('scrolled');
+    else nav.classList.remove('scrolled');
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+})();
+
+/* === Reveal on scroll === */
+(function () {
+  var els = document.querySelectorAll('.reveal');
+  if (!('IntersectionObserver' in window)) {
+    els.forEach(function (el) { el.classList.add('in'); });
+    return;
+  }
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('in');
+        io.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.12, rootMargin: '0px 0px -8% 0px' });
+  els.forEach(function (el) { io.observe(el); });
+})();
+
+/* === Mobile menu === */
+(function () {
+  var btn = document.querySelector('.menu-btn');
+  var links = document.querySelector('.nav-links');
+  if (!btn || !links) return;
+  btn.addEventListener('click', function () {
+    var open = links.style.display === 'flex';
+    if (open) {
+      links.style.display = '';
+      btn.textContent = '菜单';
+    } else {
+      links.style.display = 'flex';
+      links.style.flexDirection = 'column';
+      links.style.position = 'absolute';
+      links.style.top = '64px';
+      links.style.right = '22px';
+      links.style.background = 'var(--bg)';
+      links.style.padding = '18px 24px';
+      links.style.border = '1px solid var(--line)';
+      links.style.borderRadius = '4px';
+      btn.textContent = '关闭';
+    }
+  });
+})();
+</script>
+</body>
+</html>

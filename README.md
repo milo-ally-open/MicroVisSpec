@@ -24,6 +24,22 @@
 
 平台不仅注重用户体验，也面向现代 AI 应用提供支持。内置的 MCP 服务可接入各类成熟的 AI Agent 客户端。用户可以在 AI Agent 客户端中设置定时任务，让 Agent 通过 MCP 分析当日异常事件的分布情况，并根据分析建议采取后续措施，降低类似事件再次发生的概率，或为系统底层算法的优化提供参考。
 
+## 网络拓扑
+
+可在[项目展示页](readme/yunshao-exhibit.html)浏览产品介绍。
+
+现状图展示首发单园区部署中的网络边界，以及浏览器、云端服务、Atlas 边缘设备和摄像头之间的主要通信链路。
+
+![首发单园区网络拓扑](readme/assets/system-network-current.svg)
+
+可编辑源文件：[首发单园区网络拓扑（draw.io）](readme/assets/system-network-current.drawio)。
+
+下图是公有云上线规划，当前尚未部署。跨园区边缘接入建议通过 VPN；公网 WebRTC 和中继端口需经网络评审，评审通过前可按 HTTPS HLS 方案规划。
+
+![公有云部署拓扑规划](readme/assets/system-network-online-proposed.svg)
+
+可编辑源文件：[公有云部署拓扑规划（draw.io）](readme/assets/system-network-online-proposed.drawio)。
+
 ## 项目亮点
 
 1. **云边端协同**：边缘设备连接摄像头，在本地运行计算机视觉算法，实时分析视频流并识别异常；云端平台统一管理设备状态与位置，汇聚并存储异常事件；监控大屏和手机客户端展示设备画面与告警信息，支持查看和处置，形成从边缘感知、云端汇聚到终端响应的协同链路。
