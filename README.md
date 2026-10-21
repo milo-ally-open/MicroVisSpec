@@ -8,7 +8,7 @@
 
 <h1 align="center">云哨 边缘智枢</h1>
 
-<p align="center"><em>让边缘看见异常，让协同抵达现场，让智能推动改进。</em></p>
+<p align="center"><em>边缘智能识别，云端统一处置</em></p>
 
 ## 介绍
 
