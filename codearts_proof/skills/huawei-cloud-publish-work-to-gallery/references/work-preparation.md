@@ -99,7 +99,7 @@ Capture work screenshot
 └── Option 3: No frontend → generate representative image
 
 Generate PPT-style cover
-├── Use playwright / assistant-slides / ppt-mcp-server
+├── Use playwright / ppt-mcp-server
 ├── Include work screenshot in a presentation slide
 ├── Add work name + tagline
 ├── Apply tech-oriented color tone
@@ -327,7 +327,6 @@ Compose the work screenshot into a presentation-style cover image. **优先使�
 | Tool | Approach | 推荐度 |
 | ---- | -------- | ------ |
 | **playwright** | Generate an HTML page with the screenshot embedded in a styled layout, then capture it as a PNG via Playwright | ⭐ 首选 |
-| **assistant-slides** | Create a slide deck with the screenshot as a slide element, export as image | 可用 |
 | **ppt-mcp-server** | Generate a PPT with the screenshot included, convert to image | 可用 |
 
 > **⚠️ 禁止用 PIL (Pillow) `Image.resize()` 生成封面。** 两个根因问题：

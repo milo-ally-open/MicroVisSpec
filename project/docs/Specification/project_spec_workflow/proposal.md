@@ -2,7 +2,7 @@
 
 > 状态：已完成<br>
 > 路径：标准功能<br>
-> 负责人：项目开发者与 assistant<br>
+> 负责人：项目开发者与代码助手<br>
 > 相关基线：`project/docs/Specification/WORKFLOW.md`、`README.md`、`COMPARISON.md`；`codearts_proof/skills/project-spec-workflow/`
 
 ## 背景与问题

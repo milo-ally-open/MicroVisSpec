@@ -1,7 +1,6 @@
 {
   "tested_at": "2026-10-20T15:36:20.261980+08:00",
   "source_commit": "b92c21da7ac77ed7e61abdf88bae782b0f2b29a8",
-  "branch": "assistant/local-mvp-integration",
   "local_source_change": "Normalize shell scripts and enforce LF checkouts with .gitattributes",
   "environment": {
     "host": "Windows + Docker Desktop",

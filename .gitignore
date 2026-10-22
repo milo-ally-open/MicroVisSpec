@@ -1,6 +1,5 @@
-# Local credentials and assistant state
+# Local credentials and developer-only state
 .token
-/.assistant/
 /.codeartsproof/
 .playwright-cli/
 .weights/

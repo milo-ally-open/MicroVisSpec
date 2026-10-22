@@ -1,7 +1,6 @@
 {
   "tested_at": "2026-10-22T19:33:32.031251+08:00",
   "base_commit": "28384dd",
-  "branch": "assistant/lan-deployment",
   "origin": "https://172.20.10.4:19080",
   "atlas": "172.20.10.2",
   "scope": "Real Atlas NPU inference on repository classroom test video; authenticated LAN HTTPS, MQTT TLS, video, rule commands, events, evidence and disposition. Browser push subscription and provider acceptance checked separately from notification display.",

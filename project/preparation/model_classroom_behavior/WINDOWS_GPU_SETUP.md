@@ -10,7 +10,7 @@ uv pip install --python .venv\Scripts\python.exe --index-url https://download.py
 uv pip install --python .venv\Scripts\python.exe -r requirements-windows-cu124-lock.txt
 ```
 
-Roboflow API key 保存在本机用户级 `ROBOFLOW_API_KEY` 环境变量中，不写进仓库或脚本。新启动的 PowerShell 才会自动继承该变量；如果 assistant 已经打开，则先从用户级变量载入当前进程，再执行下载：
+Roboflow API key 保存在本机用户级 `ROBOFLOW_API_KEY` 环境变量中，不写进仓库或脚本。新启动的 PowerShell 才会自动继承该变量；如果终端或开发工具已经打开，则先从用户级变量载入当前进程，再执行下载：
 
 ```powershell
 $env:ROBOFLOW_API_KEY = [Environment]::GetEnvironmentVariable('ROBOFLOW_API_KEY', 'User')

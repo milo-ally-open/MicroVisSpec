@@ -1,5 +1,4 @@
 .git
-.assistant
 **/node_modules
 **/dist
 **/coverage

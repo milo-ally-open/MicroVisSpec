@@ -3,7 +3,7 @@
 ## Git 工作流
 
 1. **保护 `main`**：`main` 保持可用、可交付；日常开发在任务分支进行，通过 Pull Request 合并，不直接向 `main` 推送。
-2. **按任务建分支**：一个分支聚焦一项任务，使用小写短名称，例如 `feature/event-alert`、`fix/stream-reconnect`、`docs/readme`。assistant 创建的任务分支使用 `assistant/<任务名>`。
+2. **按任务建分支**：一个分支聚焦一项任务，使用小写短名称，例如 `feature/event-alert`、`fix/stream-reconnect`、`docs/readme`。
 3. **开始前同步**：从最新的 `main` 创建任务分支：
 
    ```bash

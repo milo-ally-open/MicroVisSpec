@@ -563,7 +563,7 @@ sudo journalctl -u yunshao-classroom-runtime.service -n 50 --no-pager
 
 ## 9. 当前局域网演示部署（2026-10-22）
 
-本机平台入口为 `https://172.20.10.4:19080/`，Atlas 为 `172.20.10.2`，演示网段为 `172.20.10.0/28`。浏览器使用 HTTPS；HTTP `18080` 跳转到 HTTPS `19080`。演示账号为 `lan_demo`，密码保存在部署机本地、已被 Git 忽略的 `.secret-lan-access.json` 中。客户端首次访问时需信任 `.assistant/lan-20261022/yunshao-lan-ca.crt`；只分发公开 CA 证书，不分发私钥。
+本机平台入口为 `https://172.20.10.4:19080/`，Atlas 为 `172.20.10.2`，演示网段为 `172.20.10.0/28`。浏览器使用 HTTPS；HTTP `18080` 跳转到 HTTPS `19080`。演示账号为 `lan_demo`，密码保存在部署机本地、已被 Git 忽略的 `.secret-lan-access.json` 中。客户端首次访问时需信任部署机本地配置目录中的 `yunshao-lan-ca.crt`；只分发公开 CA 证书，不分发私钥。将环境变量 `YUNSHAO_LAN_CONFIG_DIR` 设置为该本地配置目录。
 
 当前运行组件与数据位置：
 
@@ -613,7 +613,7 @@ netsh advfirewall firewall delete rule name="Yunshao LAN WebRTC 20261022"
 
 ```text
 cd /d E:\Yunshao-dev\project\src\services
-docker compose -f docker-compose.yaml -f E:\workspace\Yunshao\.assistant\lan-20261022\lan-push.compose.yaml up -d --no-build
+docker compose -f docker-compose.yaml -f "%YUNSHAO_LAN_CONFIG_DIR%\lan-push.compose.yaml" up -d --no-build
 ```
 
 再启动 Web，并重启 Web 容器使其重新解析后端地址：
@@ -649,7 +649,7 @@ Atlas 服务已配置为随板卡启动；需停止时在 Atlas 上执行 `sudo 
 docker exec yunshao-local-postgres-1 psql -U yunshao_bootstrap -d yunshao -At -c "select distinct substring(endpoint from '^https://([^/]+)') from push.subscriptions where disabled_at is null;"
 ```
 
-对标准推送域名（`notify.windows.com`、`fcm.googleapis.com`、`push.services.mozilla.com`、`web.push.apple.com`）使用可信的 HTTPS DNS 查询服务取得公网 A 记录，并手动更新 `.assistant/lan-20261022/lan-push.compose.yaml`。格式如下，地址应替换成当时查到的公网 IPv4：
+对标准推送域名（`notify.windows.com`、`fcm.googleapis.com`、`push.services.mozilla.com`、`web.push.apple.com`）使用可信的 HTTPS DNS 查询服务取得公网 A 记录，并手动更新 `%YUNSHAO_LAN_CONFIG_DIR%\lan-push.compose.yaml`。格式如下，地址应替换成当时查到的公网 IPv4：
 
 ```yaml
 services:
@@ -662,7 +662,7 @@ services:
 
 ```text
 cd /d E:\Yunshao-dev\project\src\services
-docker compose -f docker-compose.yaml -f E:\workspace\Yunshao\.assistant\lan-20261022\lan-push.compose.yaml up -d --no-build --no-deps push-service
+docker compose -f docker-compose.yaml -f "%YUNSHAO_LAN_CONFIG_DIR%\lan-push.compose.yaml" up -d --no-build --no-deps push-service
 ```
 
 这些地址是 DNS 快照，服务商变更地址后需重新查询。长期部署应让容器使用能返回真实公网地址的 DNS。当前演示验收证据见 `project/docs/Specification/platform_deployment/evidence/lan_20261022.json`；本机截图与本地凭据不提交仓库。
