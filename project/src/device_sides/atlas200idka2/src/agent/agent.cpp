@@ -1,6 +1,9 @@
 #include "common/core.hpp"
+#include "common/cloud_config.hpp"
 
 #include <mosquitto.h>
+#include <curl/curl.h>
+#include <cstdio>
 
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -148,6 +151,7 @@ public:
     }
 
     Json status() {
+        std::lock_guard<std::mutex> config_lock(config_mutex_);
         const Json model = models_.status();
         const Json counts = outbox_.counts();
         std::string model_state = "model_missing";
@@ -158,12 +162,40 @@ public:
             else if (state == "installed") found_installed = true;
         }
         if (found_installed && model_state == "model_missing") model_state = "installed_not_loaded";
+        Json algorithms = Json::array();
+        Json cameras = Json::array();
+        bool runtime_running = false;
+        Json cloud = Json::object();
+        try { cloud = yunshao::read_json_file(config_directory() / "alarm_rules.json").value("cloud_command", Json::object()); }
+        catch (...) {}
+        for (const auto& profile : config_.models) {
+            const auto installed = models_.status(profile.model_id);
+            if (!profile.enabled || installed.value("model_state", "") != "installed") continue;
+            Json runtime = Json::object();
+            for (const auto& stream : config_.streams) {
+                if (stream.model_id != profile.model_id) continue;
+                const auto state = runtime_state(stream);
+                cameras.push_back(Json{{"camera_key", stream.camera_key},
+                    {"camera_state", state.empty() ? "unknown" : "streaming"},
+                    {"stream_state", state.empty() ? "unavailable" : "running"}});
+                if (!state.empty()) runtime = state;
+            }
+            runtime_running = runtime_running || !runtime.empty();
+            const bool applied = !runtime.empty() && !cloud.empty() &&
+                runtime.value("cloud_command_id", "") == cloud.value("command_id", "");
+            algorithms.push_back(Json{{"algorithm_key", profile.algorithm_key},
+                {"algorithm_version", installed.value("model_version", "")},
+                {"runtime_state", runtime.empty() ? "installed_not_loaded" : "running"},
+                {"capabilities", Json{{"classes", profile.classes}, {"parameters", Json::object()}}},
+                {"reported_parameters", applied ? cloud.at("parameters") : yunshao::cloud_rule_parameters(config_, profile.model_id)},
+                {"reported_config_version", applied ? cloud.at("expected_version").get<int>() : 0}});
+        }
         return Json{{"schema_version", 1}, {"device_id", device_id_}, {"device_online", true},
-                    {"camera_state", "unknown"}, {"npu_state", "not_ready"},
-                    {"model_catalog", model}, {"model_state", model_state},
-                    {"stream_state", "not_configured"}, {"mqtt_state", connected_.load() ? "connected" : "disconnected"},
+                    {"camera_state", runtime_running ? "streaming" : "unknown"}, {"npu_state", runtime_running ? "ready" : "not_ready"},
+                    {"model_catalog", model}, {"model_state", runtime_running ? "running" : model_state},
+                    {"stream_state", runtime_running ? "running" : "unavailable"}, {"mqtt_state", connected_.load() ? "connected" : "disconnected"},
                     {"desired_config_version", 0}, {"applied_config_version", 0}, {"queue_depth", counts["pending"]},
-                    {"outbox", counts}, {"sent_at", utc_now()}};
+                    {"outbox", counts}, {"cameras", cameras}, {"algorithms", algorithms}, {"sent_at", utc_now()}};
     }
 
     bool enqueue(const Json& event, std::string* error) { return outbox_.enqueue(event, error); }
@@ -172,8 +204,11 @@ public:
         start_mqtt();
         while (!stopping.load()) {
             if (connected_.load()) {
+                process_commands();
+                acknowledge_applied_rules();
                 publish_heartbeat();
                 publish_due_events();
+                upload_evidence();
             }
             std::this_thread::sleep_for(std::chrono::seconds(5));
         }
@@ -186,6 +221,123 @@ private:
     ModelCatalog models_;
     mosquitto* client_ = nullptr;
     std::atomic_bool connected_{false};
+    std::mutex config_mutex_;
+    std::mutex command_mutex_;
+    std::vector<Json> commands_;
+    std::string acknowledged_command_;
+
+    static std::size_t discard_response(char*, std::size_t size, std::size_t count, void*) { return size * count; }
+    void upload_evidence() {
+        const auto origin = env("YUNSHAO_EDGE_API_ORIGIN");
+        if (origin.empty()) return;
+        if (origin.rfind("https://", 0) != 0) throw std::runtime_error("edge API must use HTTPS");
+        const auto directory = std::filesystem::path(env("YUNSHAO_EVIDENCE_OUTBOX_DIR", "/var/lib/yunshao/evidence-outbox"));
+        if (!std::filesystem::exists(directory)) return;
+        static std::once_flag curl_initialized;
+        std::call_once(curl_initialized, [] { if (curl_global_init(CURL_GLOBAL_DEFAULT) != CURLE_OK) throw std::runtime_error("cannot initialize HTTPS uploader"); });
+        for (const auto& entry : std::filesystem::directory_iterator(directory)) {
+            if (!entry.is_regular_file() || entry.path().extension() != ".jpg") continue;
+            const auto event_id = entry.path().stem().string();
+            if (event_id.size() != 36) continue;
+            const auto state = outbox_.event_state(event_id);
+            if (state == "quarantined") { std::filesystem::remove(entry.path()); continue; }
+            if (state != "acked") continue;
+            const auto bytes = entry.file_size();
+            if (bytes == 0 || bytes > 4 * 1024 * 1024) continue;
+            FILE* file = std::fopen(entry.path().c_str(), "rb");
+            if (!file) return;
+            CURL* curl = curl_easy_init();
+            if (!curl) { std::fclose(file); return; }
+            const auto url = origin + "/edge/v1/devices/" + device_id_ + "/events/" + event_id + "/evidence";
+            const auto username = env("YUNSHAO_MQTT_USERNAME");
+            const auto password = env("YUNSHAO_MQTT_PASSWORD");
+            const auto ca = env("YUNSHAO_MQTT_CA");
+            auto* headers = curl_slist_append(nullptr, "Content-Type: image/jpeg");
+            curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+            curl_easy_setopt(curl, CURLOPT_PROXY, "");
+            curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
+            curl_easy_setopt(curl, CURLOPT_READDATA, file);
+            curl_easy_setopt(curl, CURLOPT_INFILESIZE_LARGE, static_cast<curl_off_t>(bytes));
+            curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+            curl_easy_setopt(curl, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+            curl_easy_setopt(curl, CURLOPT_USERNAME, username.c_str());
+            curl_easy_setopt(curl, CURLOPT_PASSWORD, password.c_str());
+            curl_easy_setopt(curl, CURLOPT_CAINFO, ca.c_str());
+            curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
+            curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
+            curl_easy_setopt(curl, CURLOPT_PROTOCOLS, CURLPROTO_HTTPS);
+            curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 0L);
+            curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 3L);
+            curl_easy_setopt(curl, CURLOPT_TIMEOUT, 8L);
+            curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
+            curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, &Agent::discard_response);
+            const auto result = curl_easy_perform(curl);
+            long status = 0;
+            curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &status);
+            curl_slist_free_all(headers); curl_easy_cleanup(curl); std::fclose(file);
+            if (result == CURLE_OK && status >= 200 && status < 300) {
+                std::filesystem::remove(entry.path());
+                std::cout << "evidence_uploaded event_id=" << event_id << '\n';
+            }
+            return; // Bound work per heartbeat; a failure is retried on a later pass.
+        }
+    }
+
+    std::filesystem::path config_directory() const { return env("YUNSHAO_AGENT_CONFIG_DIR", "/etc/yunshao"); }
+    Json runtime_state(const yunshao::StreamProfile& stream) const {
+        const auto directory = std::filesystem::path(env("YUNSHAO_RUNTIME_STATE_DIR", "/run/yunshao/runtime"));
+        return yunshao::fresh_runtime_state(directory / (stream.stream_id + ".json"), stream.model_id);
+    }
+    void command_ack(const Json& command, const std::string& status, const std::string& reason = "") {
+        const auto payload = Json{{"schema_version", 1}, {"device_id", device_id_},
+            {"command_id", command.value("command_id", "")}, {"sent_at", utc_now()},
+            {"status", status}, {"reported_config_version", command.value("expected_version", 0)},
+            {"failure_reason", reason}}.dump();
+        const auto destination = topic("command-acks");
+        if (mosquitto_publish(client_, nullptr, destination.c_str(), static_cast<int>(payload.size()), payload.data(), 1, false) != MOSQ_ERR_SUCCESS)
+            throw std::runtime_error("cannot acknowledge cloud configuration");
+    }
+    void process_commands() {
+        std::vector<Json> queued;
+        { std::lock_guard<std::mutex> lock(command_mutex_); queued.swap(commands_); }
+        for (const auto& command : queued) {
+            try {
+                std::lock_guard<std::mutex> lock(config_mutex_);
+                bool supported = false;
+                for (const auto& profile : config_.models) {
+                    if (!profile.enabled || profile.algorithm_key != command.value("algorithm_key", "")) continue;
+                    const auto model = models_.status(profile.model_id);
+                    if (model.value("model_state", "") != "installed") throw std::invalid_argument("model is not installed");
+                    yunshao::apply_cloud_rules(config_directory(), device_id_, profile.model_id,
+                        model.value("model_version", ""), command);
+                    supported = true;
+                    break;
+                }
+                if (!supported) throw std::invalid_argument("algorithm is not installed");
+                config_ = EdgeAppConfig::load(config_directory());
+            } catch (const std::exception& error) {
+                command_ack(command, "rejected", error.what());
+            }
+        }
+    }
+    void acknowledge_applied_rules() {
+        std::lock_guard<std::mutex> lock(config_mutex_);
+        const auto command = yunshao::read_json_file(config_directory() / "alarm_rules.json").value("cloud_command", Json::object());
+        if (command.empty() || command.value("command_id", "") == acknowledged_command_) return;
+        bool found = false;
+        for (const auto& stream : config_.streams) {
+            if (!stream.enabled || !stream.enable_ai || config_.require_model(stream.model_id).algorithm_key != command.value("algorithm_key", "")) continue;
+            found = true;
+            const auto state = runtime_state(stream);
+            if (state.value("cloud_command_id", "") != command.value("command_id", "")) return;
+        }
+        if (!found) return;
+        outbox_.replace_config(config_);
+        command_ack(command, "applied");
+        yunshao::write_json_atomic(config_directory() / "cloud-ready.json",
+            Json{{"command_id", command.at("command_id")}, {"updated_at_unix", std::time(nullptr)}});
+        acknowledged_command_ = command.at("command_id").get<std::string>();
+    }
 
     std::string topic(const char* suffix) const { return "devices/" + device_id_ + "/" + suffix; }
 
@@ -196,6 +348,11 @@ private:
             const auto ack_topic = self->topic("event-acks");
             if (mosquitto_subscribe(client, nullptr, ack_topic.c_str(), 1) != MOSQ_ERR_SUCCESS) {
                 std::cerr << "agent failed to subscribe event acknowledgements\n";
+                self->connected_.store(false);
+                return;
+            }
+            const auto commands_topic = self->topic("commands");
+            if (mosquitto_subscribe(client, nullptr, commands_topic.c_str(), 1) != MOSQ_ERR_SUCCESS) {
                 self->connected_.store(false);
                 return;
             }
@@ -216,6 +373,13 @@ private:
         if (!message || !message->payload || message->payloadlen <= 0) return;
         try {
             const std::string payload(static_cast<const char*>(message->payload), static_cast<std::size_t>(message->payloadlen));
+            if (std::string(message->topic) == self->topic("commands")) {
+                if (payload.size() > 65536) return;
+                const auto command = Json::parse(payload);
+                std::lock_guard<std::mutex> lock(self->command_mutex_);
+                if (self->commands_.size() < 16) self->commands_.push_back(command);
+                return;
+            }
             std::string error;
             if (!self->outbox_.apply_ack(Json::parse(payload), &error)) {
                 std::cerr << "agent ignored application acknowledgement: " << error << '\n';
@@ -234,7 +398,7 @@ private:
 
     void publish_due_events() {
         for (const auto& event : outbox_.due_events()) {
-            const std::string payload = event.dump();
+            const std::string payload = yunshao::cloud_event_payload(event).dump();
             const auto events_topic = topic("events");
             const int result = mosquitto_publish(client_, nullptr, events_topic.c_str(), static_cast<int>(payload.size()), payload.data(), 1, false);
             std::string error;

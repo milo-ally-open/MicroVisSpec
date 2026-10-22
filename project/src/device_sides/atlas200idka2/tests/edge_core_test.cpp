@@ -49,7 +49,7 @@ int main() {
                {"event_type", "classroom.behavior.hand-raising"}, {"severity", "medium"},
                {"occurred_at", "2026-10-19T00:00:00Z"}, {"sent_at", "2026-10-19T00:00:01Z"},
                {"algorithm_key", "classroom_behavior_detection"}, {"algorithm_version", "1.0.0"},
-               {"attributes", Json{{"behavior_class", "hand-raising"}, {"confidence", 0.91},
+               {"attributes", Json{{"model_id", "model_classroom_behavior_detection"}, {"behavior_class", "hand-raising"}, {"confidence", 0.91},
                                     {"rule_config_version", config.alarm_config_version}, {"observed_duration_ms", 1200}}}};
     std::string error;
     assert(outbox.enqueue(event, &error));

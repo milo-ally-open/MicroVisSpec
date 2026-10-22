@@ -1,4 +1,5 @@
 #include "common/core.hpp"
+#include "common/cloud_config.hpp"
 #include "manager/config_service.hpp"
 #include "manager/inference_manager.hpp"
 #include "manager/video_stream_manager.hpp"
@@ -15,6 +16,7 @@
 #include <ctime>
 #include <filesystem>
 #include <iomanip>
+#include <fstream>
 #include <iostream>
 #include <random>
 #include <sstream>
@@ -147,10 +149,28 @@ Options parse_options(int argc, char** argv) {
 
 void publish_alarm(const AlarmTrigger& trigger, const StreamProfile& stream,
                    const yunshao::ModelProfile& model, const std::string& model_version,
-                   const std::filesystem::path& socket_path) {
+                   const std::filesystem::path& socket_path, const std::vector<unsigned char>& jpeg) {
     const std::string device_id = env("YUNSHAO_DEVICE_ID");
     if (device_id.empty()) throw std::runtime_error("YUNSHAO_DEVICE_ID is required before enabling any alarm rule");
-    Json event{{"schema_version", 1}, {"device_id", device_id}, {"event_id", make_event_id()},
+    const auto event_id = make_event_id();
+    const auto evidence_directory = std::filesystem::path(env("YUNSHAO_EVIDENCE_OUTBOX_DIR", "/var/lib/yunshao/evidence-outbox"));
+    const auto evidence = evidence_directory / (event_id + ".jpg");
+    if (!jpeg.empty() && jpeg.size() <= 4 * 1024 * 1024) {
+        try {
+            std::filesystem::create_directories(evidence_directory);
+            std::uintmax_t used = 0;
+            for (const auto& item : std::filesystem::directory_iterator(evidence_directory))
+                if (item.is_regular_file()) used += item.file_size();
+            if (used + jpeg.size() > 100 * 1024 * 1024) throw std::runtime_error("evidence outbox is full");
+            auto temporary = evidence; temporary += ".tmp";
+            { std::ofstream output(temporary, std::ios::binary);
+              output.write(reinterpret_cast<const char*>(jpeg.data()), static_cast<std::streamsize>(jpeg.size()));
+              output.flush();
+              if (!output) throw std::runtime_error("cannot persist evidence"); }
+            std::filesystem::rename(temporary, evidence);
+        } catch (const std::exception&) { std::cerr << "alarm_evidence_persist_failed\n"; }
+    }
+    Json event{{"schema_version", 1}, {"device_id", device_id}, {"event_id", event_id},
                {"camera_id", stream.camera_id}, {"event_type", trigger.event_type},
                {"severity", trigger.severity}, {"occurred_at", utc_now()}, {"sent_at", utc_now()},
                {"algorithm_key", model.algorithm_key}, {"algorithm_version", model_version},
@@ -249,7 +269,9 @@ int main(int argc, char** argv) {
         InferenceManager inference(config.max_loaded_models, config.npu_device_id,
                                    options.model_root, options.plugin_dir);
         VideoStreamManager stream_manager(config, inference,
-            [&](const AlarmTrigger& trigger) { publish_alarm(trigger, stream, model, model_version, options.socket_path); });
+            [&](const AlarmTrigger& trigger, const std::vector<unsigned char>& jpeg) {
+                publish_alarm(trigger, stream, model, model_version, options.socket_path, jpeg);
+            }, options.config_dir);
         stream_manager.run(stream, input_uri, options.output, rtsp_server_config);
         std::cout << "Processed stream " << stream.stream_id << " with model " << stream.model_id
                   << '@' << model_version;

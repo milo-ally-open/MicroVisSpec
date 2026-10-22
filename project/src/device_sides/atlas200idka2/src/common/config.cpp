@@ -236,6 +236,7 @@ EdgeAppConfig EdgeAppConfig::parse(const Json& models_json,
         StreamProfile stream;
         stream.stream_id = value.at("stream_id").get<std::string>();
         stream.camera_id = value.at("camera_id").get<std::string>();
+        stream.camera_key = value.value("camera_key", stream.camera_id);
         stream.source_ref = value.at("source_ref").get<std::string>();
         stream.model_id = value.at("model_id").get<std::string>();
         stream.enabled = value.at("enabled").get<bool>();
@@ -251,6 +252,8 @@ EdgeAppConfig EdgeAppConfig::parse(const Json& models_json,
         stream.reconnect_max_delay_ms = value.at("reconnect_max_delay_ms").get<int>();
         stream.rtsp_transport = value.at("rtsp_transport").get<std::string>();
         const Json& rtsp_output = value.at("rtsp_output");
+        if (rtsp_output.contains("username_ref") || rtsp_output.contains("password_ref"))
+            throw std::invalid_argument("RTSP output does not support authentication references");
         require_keys(rtsp_output, {"enabled", "listen_address", "port", "mount_path", "max_queue_ms"},
                      "stream profile rtsp_output");
         stream.rtsp_output.enabled = rtsp_output.at("enabled").get<bool>();

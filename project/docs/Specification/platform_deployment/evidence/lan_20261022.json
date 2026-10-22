@@ -1,0 +1,143 @@
+{
+  "tested_at": "2026-10-22T19:33:32.031251+08:00",
+  "base_commit": "28384dd",
+  "branch": "assistant/lan-deployment",
+  "origin": "https://172.20.10.4:19080",
+  "atlas": "172.20.10.2",
+  "scope": "Real Atlas NPU inference on repository classroom test video; authenticated LAN HTTPS, MQTT TLS, video, rule commands, events, evidence and disposition. Browser push subscription and provider acceptance checked separately from notification display.",
+  "device_online": true,
+  "algorithms": [
+    {
+      "algorithm_key": "classroom_behavior_detection",
+      "algorithm_version": "1.0.0",
+      "runtime_state": "running",
+      "config_state": "applied",
+      "desired_version": 6,
+      "reported_version": 6
+    }
+  ],
+  "enabled_alarm_rules": [],
+  "real_event_count": 9,
+  "event_types": [
+    "classroom.behavior.reading"
+  ],
+  "resolved_event_id": "5aa97213-745d-45ba-9e83-6c0b959eafa6",
+  "resolved_status": "resolved",
+  "dispositions": 2,
+  "evidence_status": "available",
+  "evidence_bytes": 128882,
+  "evidence_sha256": "6894b6ce9f9814d4905126173680f028b61bac90ec098456c5e52206196a3277",
+  "statistics": {
+    "total_events": 9,
+    "open_events": 8,
+    "by_type": [
+      {
+        "key": "classroom.behavior.reading",
+        "count": 9
+      }
+    ],
+    "by_status": [
+      {
+        "key": "pending",
+        "count": 8
+      },
+      {
+        "key": "processing",
+        "count": 0
+      },
+      {
+        "key": "resolved",
+        "count": 1
+      },
+      {
+        "key": "false_positive",
+        "count": 0
+      }
+    ]
+  },
+  "anonymous_access": {
+    "/api/v1/devices": 401,
+    "/api/v1/events/5aa97213-745d-45ba-9e83-6c0b959eafa6/evidence": 401
+  },
+  "checks": {
+    "board_ctest": "4/4 passed; assertions enabled in release",
+    "media_go_tests": "passed",
+    "web_api_tests": "12/12 passed",
+    "web_build": "passed (TypeScript, Vite, PWA)",
+    "nginx_configuration": "passed"
+  },
+  "browser_results": {
+    "smoke": {
+      "trusted_https": true,
+      "login": true,
+      "secure_context": true,
+      "device_name_visible": true,
+      "service_worker_registered": true
+    },
+    "monitor": {
+      "trusted_https": true,
+      "login": true,
+      "secure_context": true,
+      "video": {
+        "width": 1280,
+        "height": 720,
+        "time": 3.533615,
+        "frames": 55
+      },
+      "frames_advanced": true,
+      "player_status": [
+        "WEBRTC"
+      ]
+    },
+    "hls": {
+      "trusted_https": true,
+      "login": true,
+      "secure_context": true,
+      "video": {
+        "width": 1280,
+        "height": 720,
+        "time": 3.745554,
+        "frames": 61
+      },
+      "frames_advanced": true,
+      "player_status": [
+        "HLS 回退"
+      ]
+    },
+    "resolve": {
+      "trusted_https": true,
+      "login": true,
+      "secure_context": true,
+      "event_status": "resolved",
+      "dispositions": 2,
+      "evidence_status": "available",
+      "evidence_images": [
+        {
+          "width": 1280,
+          "height": 720
+        }
+      ]
+    },
+    "push": {
+      "trusted_https": true,
+      "login": true,
+      "secure_context": true,
+      "push_status": "WEB PUSH\n手机告警通知\n\n只有已启用且命中的告警规则会触发通知。推送内容不包含截图，点击后需由登录态重新读取事件。\n\n通知已开启\n此浏览器的订阅已绑定当前账号。\n通知已订阅\n关闭通知\n\n本浏览器已订阅通知。点击通知后仍会重新验证登录状态和事件权限。",
+      "notifications": [],
+      "delivery_wait_error": "No notification observed within 60 seconds"
+    }
+  },
+  "push_delivery_statuses": {
+    "accepted": 6
+  },
+  "board_final_state": {
+    "pending_evidence": 0,
+    "runtime_restarts": 0,
+    "outbox": {
+      "acked": 9,
+      "quarantined": 0,
+      "pending": 0
+    },
+    "agent_restarts": 0
+  }
+}

@@ -25,7 +25,7 @@ endif()
 
 find_package(OpenSSL REQUIRED)
 find_package(SQLite3 REQUIRED)
-find_package(OpenCV 4 REQUIRED COMPONENTS core imgproc dnn)
+find_package(OpenCV 4 REQUIRED COMPONENTS core imgproc imgcodecs dnn)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(MOSQUITTO REQUIRED IMPORTED_TARGET libmosquitto)
 pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET libavformat libavcodec libavutil)
@@ -80,14 +80,16 @@ endfunction()
 
 add_library(edge_core
   src/common/core.cpp
+  src/common/cloud_config.cpp
   src/common/config.cpp)
 target_include_directories(edge_core PUBLIC include "${NLOHMANN_JSON_INCLUDE_DIR}" "${ACL_INCLUDE_DIR}")
 target_link_libraries(edge_core PUBLIC OpenSSL::Crypto SQLite::SQLite3 "${ASCENDCL_LIBRARY}")
 target_compile_options(edge_core PRIVATE -Wall -Wextra -Wpedantic)
 
 add_executable(yunshao-agent src/agent/agent.cpp)
+find_package(CURL REQUIRED)
 target_include_directories(yunshao-agent PRIVATE include "${NLOHMANN_JSON_INCLUDE_DIR}" "${ACL_INCLUDE_DIR}")
-target_link_libraries(yunshao-agent PRIVATE edge_core PkgConfig::MOSQUITTO)
+target_link_libraries(yunshao-agent PRIVATE edge_core PkgConfig::MOSQUITTO CURL::libcurl)
 target_compile_options(yunshao-agent PRIVATE -Wall -Wextra -Wpedantic)
 configure_ascend_runtime_rpath(yunshao-agent)
 
@@ -126,6 +128,10 @@ install(FILES udev/99-yunshao-rgn.rules DESTINATION /etc/udev/rules.d)
 
 include(CTest)
 if(BUILD_TESTING)
+  add_executable(cloud_config_test tests/cloud_config_test.cpp)
+  target_link_libraries(cloud_config_test PRIVATE edge_core)
+  configure_ascend_runtime_rpath(cloud_config_test)
+  add_test(NAME cloud_config_test COMMAND cloud_config_test)
   add_executable(edge_core_test tests/edge_core_test.cpp)
   target_include_directories(edge_core_test PRIVATE include "${NLOHMANN_JSON_INCLUDE_DIR}" "${ACL_INCLUDE_DIR}")
   target_link_libraries(edge_core_test PRIVATE edge_core)
@@ -144,4 +150,8 @@ if(BUILD_TESTING)
   configure_ascend_runtime_rpath(model_plugin_identity_test)
   add_test(NAME model_plugin_identity_test
     COMMAND model_plugin_identity_test $<TARGET_FILE:model_classroom_behavior_detection>)
+  # These tests use assertions; keep them active in release builds on the board.
+  foreach(_test_target cloud_config_test edge_core_test model_config_test model_plugin_identity_test)
+    target_compile_options(${_test_target} PRIVATE -UNDEBUG)
+  endforeach()
 endif()

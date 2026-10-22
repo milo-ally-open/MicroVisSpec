@@ -64,6 +64,8 @@ public:
     void note_publish_attempt(const std::string& event_id, const std::string& error = "");
     bool apply_ack(const Json& ack, std::string* error);
     Json counts();
+    void replace_config(EdgeAppConfig config);
+    std::string event_state(const std::string& event_id);
 
 private:
     ::sqlite3* db_ = nullptr;

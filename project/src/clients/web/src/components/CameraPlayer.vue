@@ -119,12 +119,10 @@ async function playHLS(url: URL) {
   if (!element) throw new Error('视频播放器尚未准备好。')
   if (peer) { peer.close(); peer = null }
   element.srcObject = null
-  if (element.canPlayType('application/vnd.apple.mpegurl')) {
-    element.src = url.href
-    await element.play()
-  } else {
-    const { default: Hls } = await import('hls.js')
-    if (!Hls.isSupported()) throw new Error('当前浏览器不支持 HLS 播放。')
+  const { default: Hls } = await import('hls.js')
+  // Prefer the MSE player where available. Some Chromium builds advertise
+  // native HLS yet stall on live fMP4 after loading the initial playlist.
+  if (Hls.isSupported()) {
     hls = new Hls({ xhrSetup: (xhr) => { xhr.withCredentials = true } })
     hls.loadSource(url.href)
     hls.attachMedia(element)
@@ -132,7 +130,10 @@ async function playHLS(url: URL) {
       hls?.on(Hls.Events.MANIFEST_PARSED, () => { void element.play().then(resolve).catch(reject) })
       hls?.on(Hls.Events.ERROR, (_event, data) => { if (data.fatal) reject(new Error('HLS 视频流无法播放。')) })
     })
-  }
+  } else if (element.canPlayType('application/vnd.apple.mpegurl')) {
+    element.src = url.href
+    await element.play()
+  } else throw new Error('当前浏览器不支持 HLS 播放。')
   state.value = 'fallback'
   message.value = 'WebRTC 不可用，已切换 HLS 回退播放'
 }

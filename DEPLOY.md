@@ -1,5 +1,7 @@
 # 云哨部署指南
 
+当前 `172.20.10.4` 电脑与 `172.20.10.2` Atlas 的实机局域网部署、启动入口和验收结果见 [当前局域网部署](LAN-DEPLOYMENT.md)。下文保留从零部署的通用步骤。
+
 这份指南按实际部署顺序，从空白部署机开始启动云端、Web/PWA、MediaMTX 和 Atlas 边缘端，最后用仓库中的测试视频完成浏览器端到端验证。
 
 目前聯調主機有兩條網路：Atlas 直連地址 `192.168.0.1`（Atlas 為 `192.168.0.2`），以及團隊 Wi‑Fi 地址 `172.50.53.131`。瀏覽器使用 `https://172.50.53.131:19080`；Windows + Docker Desktop 的 HTTP `18081` 會跳轉至 HTTPS，Linux 主機的 HTTP 入口為 `18080`。部署到其他網路時，應替換為穩定且客戶端可達的 Wi‑Fi 地址或內網 DNS 名稱，並為主機保留 DHCP 地址。目前 Wi‑Fi 網段是 `172.50.53.0/24`，不屬於 RFC 1918 私網地址段；確認網路入口 ACL/防火牆只允許團隊網段存取，且沒有網際網路入站轉發後再開放服務。
@@ -313,7 +315,7 @@ docker compose -f docker-compose.yaml -f docker-compose.atlas.yaml ps
 sudo apt-get update
 sudo apt-get install -y \
   build-essential cmake pkg-config \
-  libopencv-dev libssl-dev libsqlite3-dev \
+  libopencv-dev libssl-dev libsqlite3-dev libcurl4-openssl-dev \
   libmosquitto-dev libavformat-dev libavcodec-dev libavutil-dev \
   libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
   libgstrtspserver-1.0-dev gstreamer1.0-plugins-good \

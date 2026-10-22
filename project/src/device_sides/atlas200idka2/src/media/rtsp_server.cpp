@@ -141,7 +141,16 @@ bool RtspServer::push_access_unit(const std::uint8_t* data, std::size_t size,
                                   std::uint64_t duration) {
     if (data == nullptr || size == 0) return false;
     std::lock_guard<std::mutex> lock(appsrc_mutex_);
+    parameter_sets_.observe(data, size);
     if (active_appsrc_ == nullptr) return false;
+    const bool keyframe = gst_buffer_is_keyframe(data, size);
+    std::vector<std::uint8_t> access_unit;
+    if (keyframe) {
+        access_unit = parameter_sets_.prefix();
+        access_unit.insert(access_unit.end(), data, data + size);
+        data = access_unit.data();
+        size = access_unit.size();
+    }
     guint64 queued_bytes = 0;
     g_object_get(active_appsrc_, "current-level-bytes", &queued_bytes, nullptr);
     if (queued_bytes >= max_queue_bytes_ || size > max_queue_bytes_ - queued_bytes) {
@@ -159,7 +168,7 @@ bool RtspServer::push_access_unit(const std::uint8_t* data, std::size_t size,
         return false;
     }
     GST_BUFFER_DURATION(buffer) = duration;
-    if (!gst_buffer_is_keyframe(data, size)) GST_BUFFER_FLAG_SET(buffer, GST_BUFFER_FLAG_DELTA_UNIT);
+    if (!keyframe) GST_BUFFER_FLAG_SET(buffer, GST_BUFFER_FLAG_DELTA_UNIT);
     const GstFlowReturn result = gst_app_src_push_buffer(active_appsrc_, buffer);
     if (result != GST_FLOW_OK) {
         ++dropped_frames_;

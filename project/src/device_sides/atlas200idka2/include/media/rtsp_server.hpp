@@ -1,4 +1,5 @@
 #pragma once
+#include "media/h264_parameter_sets.hpp"
 
 #include <gst/app/gstappsrc.h>
 #include <gst/rtsp-server/rtsp-server.h>
@@ -54,6 +55,7 @@ private:
     std::thread loop_thread_;
     std::uint64_t dropped_frames_ = 0;
     std::atomic<bool> media_config_failed_{false};
+    H264ParameterSets parameter_sets_;
 };
 
 }  // namespace yunshao

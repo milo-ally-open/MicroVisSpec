@@ -2,12 +2,19 @@
 
 #include "media/media_pipeline.hpp"
 #include "media/region_osd.hpp"
+#include "common/cloud_config.hpp"
 
 #include <acl/media/hi_mpi_vpss.h>
+#include <acl/acl.h>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/imgcodecs.hpp>
 
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdlib>
+#include <ctime>
+#include <cstring>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
@@ -30,17 +37,57 @@ LetterboxInfo letterbox_for(int width, int height, int target_width, int target_
             static_cast<int>(std::round((target_height - resized_height) / 2.0F - 0.1F))};
 }
 
+std::vector<unsigned char> capture_evidence(const hi_video_frame& frame,
+                                          const std::vector<Detection>& detections) {
+    const int width = static_cast<int>(frame.width);
+    const int height = static_cast<int>(frame.height);
+    const auto pitch = frame.width_stride[0];
+    const auto chroma_pitch = frame.width_stride[1] ? frame.width_stride[1] : pitch;
+    const auto aligned_height = frame.height_stride[0] ? frame.height_stride[0] : frame.height;
+    std::vector<unsigned char> luma(static_cast<std::size_t>(pitch) * height);
+    std::vector<unsigned char> chroma(static_cast<std::size_t>(chroma_pitch) * height / 2);
+    const auto* uv = frame.virt_addr[1] ? static_cast<unsigned char*>(frame.virt_addr[1]) :
+        static_cast<unsigned char*>(frame.virt_addr[0]) + static_cast<std::size_t>(pitch) * aligned_height;
+    if (aclrtMemcpy(luma.data(), luma.size(), frame.virt_addr[0], luma.size(), ACL_MEMCPY_DEVICE_TO_HOST) != ACL_SUCCESS ||
+        aclrtMemcpy(chroma.data(), chroma.size(), uv, chroma.size(), ACL_MEMCPY_DEVICE_TO_HOST) != ACL_SUCCESS)
+        throw std::runtime_error("cannot copy evidence frame from VPSS");
+    cv::Mat nv21(height * 3 / 2, width, CV_8UC1);
+    for (int y = 0; y < height; ++y) std::memcpy(nv21.ptr(y), luma.data() + y * pitch, width);
+    for (int y = 0; y < height / 2; ++y) std::memcpy(nv21.ptr(height + y), chroma.data() + y * chroma_pitch, width);
+    cv::Mat image;
+    cv::cvtColor(nv21, image, cv::COLOR_YUV2BGR_NV21);
+    for (const auto& detection : detections) {
+        const cv::Rect box = cv::Rect(static_cast<int>(detection.x), static_cast<int>(detection.y),
+            static_cast<int>(detection.width), static_cast<int>(detection.height)) & cv::Rect(0, 0, width, height);
+        if (box.empty()) continue;
+        cv::rectangle(image, box, cv::Scalar(32, 210, 64), 2);
+        cv::putText(image, detection.label, cv::Point(box.x, std::max(18, box.y - 4)),
+                    cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(32, 210, 64), 1);
+    }
+    std::vector<unsigned char> jpeg;
+    if (!cv::imencode(".jpg", image, jpeg, {cv::IMWRITE_JPEG_QUALITY, 85}))
+        throw std::runtime_error("cannot encode evidence JPEG");
+    return jpeg;
+}
+
 }  // namespace
 
 VideoStreamManager::VideoStreamManager(const EdgeAppConfig& config, InferenceManager& inference,
-                                       AlarmCallback on_alarm)
-    : config_(config), inference_(inference), alarms_(config.alarm_rules, config.alarm_config_version), on_alarm_(std::move(on_alarm)) {}
+                                       AlarmCallback on_alarm, std::filesystem::path config_directory)
+    : config_(config), inference_(inference), alarms_(config.alarm_rules, config.alarm_config_version),
+      on_alarm_(std::move(on_alarm)), config_directory_(std::move(config_directory)) {}
 
 void VideoStreamManager::run(const StreamProfile& stream, const std::string& input_uri,
                              const std::filesystem::path& output_h264,
                              const RtspServerConfig& rtsp_server_config) {
     if (!stream.enabled || !stream.enable_ai) throw std::invalid_argument("stream is disabled");
     const auto& model_profile = config_.require_model(stream.model_id);
+    EdgeAppConfig current_config = config_;
+    Json command = Json::object();
+    auto next_refresh = std::chrono::steady_clock::time_point{};
+    bool rules_ready = true;
+    const char* state_env = std::getenv("YUNSHAO_RUNTIME_STATE_DIR");
+    const auto state_path = std::filesystem::path(state_env && *state_env ? state_env : "/run/yunshao/runtime") / (stream.stream_id + ".json");
     inference_.load(model_profile);
     const double confidence_threshold = stream.confidence_threshold.value_or(model_profile.confidence_threshold);
     const double nms_threshold = stream.nms_threshold.value_or(model_profile.nms_threshold);
@@ -101,8 +148,34 @@ void VideoStreamManager::run(const StreamProfile& stream, const std::string& inp
                     throw;
                 }
                 try {
-                    const auto alarms = alarms_.observe(stream.model_id, detections, std::chrono::steady_clock::now());
-                    if (on_alarm_) for (const auto& alarm : alarms) on_alarm_(alarm);
+                    const auto now = std::chrono::steady_clock::now();
+                    if (!config_directory_.empty() && now >= next_refresh) {
+                        try {
+                            const auto snapshot = EdgeAppConfig::load(config_directory_);
+                            const auto desired = yunshao::read_json_file(config_directory_ / "alarm_rules.json").value("cloud_command", Json::object());
+                            if (desired != command || snapshot.alarm_config_version != current_config.alarm_config_version) {
+                                alarms_ = AlarmFilter(snapshot.alarm_rules, snapshot.alarm_config_version);
+                                current_config = snapshot;
+                                command = desired;
+                            }
+                            rules_ready = command.empty();
+                            if (!command.empty()) {
+                                try {
+                                    const auto ready = yunshao::read_json_file(config_directory_ / "cloud-ready.json");
+                                    rules_ready = ready.value("command_id", "") == command.value("command_id", "") &&
+                                        ready.value("updated_at_unix", std::int64_t{0}) < std::time(nullptr);
+                                } catch (...) { rules_ready = false; }
+                            }
+                        } catch (const std::exception&) { std::cerr << "alarm_configuration_reload_failed\n"; }
+                        next_refresh = now + std::chrono::seconds(1);
+                    }
+                    const auto alarms = rules_ready ? alarms_.observe(stream.model_id, detections, std::chrono::steady_clock::now()) : std::vector<AlarmTrigger>{};
+                    if (on_alarm_ && !alarms.empty()) {
+                        std::vector<unsigned char> jpeg;
+                        try { jpeg = capture_evidence(output_frame.v_frame, detections); }
+                        catch (const std::exception&) { std::cerr << "alarm_evidence_capture_failed\n"; }
+                        for (const auto& alarm : alarms) on_alarm_(alarm, jpeg);
+                    }
                 } catch (...) {
                     pipeline.release_output_frame(output_frame);
                     pipeline.release_inference_frame(inference_frame);
@@ -125,6 +198,12 @@ void VideoStreamManager::run(const StreamProfile& stream, const std::string& inp
                 pipeline.release_output_frame(output_frame);
                 pipeline.release_inference_frame(inference_frame);
                 ++frames;
+                if (frames % static_cast<std::size_t>(stream.output_fps) == 0) {
+                    yunshao::write_json_atomic(state_path, Json{{"model_id", stream.model_id}, {"frames", frames},
+                        {"updated_at_unix", std::time(nullptr)}, {"runtime_state", "running"},
+                        {"cloud_command_id", command.value("command_id", "")},
+                        {"rule_config_version", current_config.alarm_config_version}});
+                }
                 reconnect_delay_ms = stream.reconnect_initial_delay_ms;
             }
             if (stream.live_source) throw InputSourceError("live source reached end-of-stream");

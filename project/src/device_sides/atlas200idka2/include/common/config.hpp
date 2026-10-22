@@ -44,6 +44,7 @@ struct RtspOutputProfile {
 struct StreamProfile {
     std::string stream_id;
     std::string camera_id;
+    std::string camera_key;
     std::string source_ref;
     std::string model_id;
     bool enabled = false;

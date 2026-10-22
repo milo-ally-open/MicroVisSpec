@@ -416,8 +416,8 @@ void EventOutbox::validate_event(const Json& event) const {
 
 bool EventOutbox::enqueue(const Json& event, std::string* error) {
     try {
-        validate_event(event);
         std::lock_guard<std::mutex> lock(mutex_);
+        validate_event(event);
         Statement size_stmt(db_, "PRAGMA page_count");
         if (sqlite3_step(size_stmt.get()) != SQLITE_ROW) throw std::runtime_error("cannot inspect outbox size");
         const auto pages = sqlite3_column_int64(size_stmt.get(), 0);
@@ -437,6 +437,19 @@ bool EventOutbox::enqueue(const Json& event, std::string* error) {
         if (error) *error = exception.what();
         return false;
     }
+}
+
+void EventOutbox::replace_config(EdgeAppConfig config) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    config_ = std::move(config);
+}
+
+std::string EventOutbox::event_state(const std::string& event_id) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    Statement statement(db_, "SELECT state FROM event_outbox WHERE event_id=?");
+    statement.bind_text(1, event_id);
+    if (sqlite3_step(statement.get()) != SQLITE_ROW) return "";
+    return reinterpret_cast<const char*>(sqlite3_column_text(statement.get(), 0));
 }
 
 std::vector<Json> EventOutbox::due_events(std::size_t limit) {

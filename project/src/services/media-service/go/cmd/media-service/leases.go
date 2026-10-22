@@ -198,7 +198,7 @@ func (a *App) authorizePlayback(c *gin.Context) {
 		return
 	}
 	values, err := url.ParseQuery(parsedURI.RawQuery)
-	if err != nil || len(values) > 1 || len(values["lease_id"]) > 1 {
+	if err != nil || !validPlaybackQuery(values) {
 		logReject("invalid_lease_query")
 		writeError(c, http.StatusUnauthorized, "unauthorized", "media access is not authorized")
 		return
