@@ -1,15 +1,9 @@
 # Local credentials and assistant state
 .token
-.assistant/*
-!.assistant/skills/
-.assistant/skills/*
-!.assistant/skills/huawei-cloud-publish-work-to-gallery/
+/.assistant/
 .playwright-cli/
 .weights/
-.codeartsdoer/*
-!.codeartsdoer/skills/
-.codeartsdoer/skills/*
-!.codeartsdoer/skills/huawei-cloud-publish-work-to-gallery/
+/.codeartsdoer/
 .agents/*
 
 # Operating system and editor files
@@ -20,8 +14,7 @@ Desktop.ini
 *.swo
 *~
 .idea/
-.vscode/*
-!.vscode/settings.json
+/.vscode/
 
 # Node.js dependencies, build output, and test artifacts
 node_modules/
