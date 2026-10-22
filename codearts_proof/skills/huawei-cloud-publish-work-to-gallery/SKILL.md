@@ -36,7 +36,7 @@ Step 8 (publish)                             ← 依赖以上全部
 
 ## Core Commands（脚本契约速查）
 
-> **`$SKILL_DIR` 定义**：本 skill 的安装目录绝对路径（含 SKILL.md 的目录）。执行前先设置 `export SKILL_DIR=/path/to/huawei-cloud-publish-work-to-gallery`（示例：`$HOME/.local/share/huawei-cloud-publish-work-to-gallery`）。所有脚本均为可执行文件（带 shebang），直接用 `$SKILL_DIR/scripts/…` 前缀调用，**无需** `node`/`python`/`bash` 解释器前缀（该说法仅 Linux 成立；**Windows 下 .mjs/.py 需 `node`/`python` 前缀、`preflight.ps1` 需 `powershell` 前缀**）；若安装器未恢复可执行位（Linux 直接调用报 `Permission denied`），先执行一次 `chmod +x "$SKILL_DIR/scripts/"*` 自愈，不改脚本；参数一律用可解析的示例值（无 `<…>` 占位符，避免命令提取器剥离后缺参/空值）。**W/R 标注**：`W` = 平台写操作（发布作品，必须经用户确认后才执行）；`R` = 只读查询/本地辅助命令。
+> **`$SKILL_DIR` 定义**：本 skill 的安装目录绝对路径（含 SKILL.md 的目录）。执行前先设置 `export SKILL_DIR=/path/to/huawei-cloud-publish-work-to-gallery`（示例：`$HOME/.local/share/huawei-cloud-publish-work-to-gallery`）。Linux/macOS 使用 bash 命令；Windows 使用 Git Bash，`.mjs`/`.py` 通过 `node`/`python` 调用，渲染预检统一运行 `bash "$SKILL_DIR/scripts/preflight.sh"`。仓库不保存 PowerShell 脚本。若安装器未恢复可执行位（Linux 直接调用报 `Permission denied`），先执行一次 `chmod +x "$SKILL_DIR/scripts/"*` 自愈；参数一律用可解析的示例值（无 `<…>` 占位符，避免命令提取器剥离后缺参/空值）。**W/R 标注**：`W` = 平台写操作（发布作品，必须经用户确认后才执行）；`R` = 只读查询/本地辅助命令。
 
 | 步骤 | 脚本/命令 | W/R | 行为（阻塞？耗时？内部调用？） | 成功信号（exit 0 且） | 失败（exit 1；2=参数错） |
 |------|-----------|-----|------------------------------|----------------------|-----------------------------------|
@@ -54,7 +54,7 @@ Step 8 (publish)                             ← 依赖以上全部
 | 3 | `$SKILL_DIR/scripts/extract-workname.mjs /path/to/project` | R | 瞬时；纯本地解析（frontmatter→H1→manifest→title→目录名） | stdout `#name=MyWork source=frontmatter` | exit 1=workDir 不存在 |
 | 2 | `$SKILL_DIR/scripts/spawn-detached.mjs --out /tmp/spawn.out --pidfile /tmp/app.pid --cwd /path/to/project -- npm run dev` | R | **立即返回**（脱管启动，**不等服务就绪**）→ 必须自行轮询健康检查；不传 `--cwd` 会用当前目录 serve 错目录 | `#spawn=ok pid=12345 out=/tmp/spawn.out` | exit 1=启动失败 |
 | 2 | 隧道：先跑 `$SKILL_DIR/scripts/detect-env.mjs` 看 `tunnel` 字段；`true`（Linux）→ 加载内置 skill `huawei-cloud-jobenv-devbridge-tunnel` 开隧道；`false`（Windows/macOS）→ **禁止加载，`envUrl=""`** | R | 瞬时；无参数；输出单行 JSON（os/shell/distro/sandbox/tunnel） | 取得 `envUrl`；skill 不可用/失败 → `envUrl=""` 照常发布 | tunnel=false 时仍尝试开隧道 = 违反契约 |
-| 4 | `$SKILL_DIR/scripts/preflight.sh`（Win: `powershell $SKILL_DIR/scripts/preflight.ps1`） | R | **阻塞 2~10 分钟**（pip 依赖 + 首次下载 Chromium；复用系统 Edge/Chrome 时约 1~2 分钟）；**Windows 同样阻塞，非 Linux 专属**；会补装 numpy/pillow/playwright | 写 `font-gate-ok`（`ok=true gate=preflight`） | 截图/封面/图表**禁止** |
+| 4 | `bash $SKILL_DIR/scripts/preflight.sh`（Windows 使用 Git Bash） | R | **阻塞 2~10 分钟**（pip 依赖 + 首次下载 Chromium；复用系统 Edge/Chrome 时约 1~2 分钟）；会补装 numpy/pillow/playwright | 写 `font-gate-ok`（`ok=true gate=preflight`） | 截图/封面/图表**禁止** |
 | 4 | `$SKILL_DIR/scripts/ensure-utf8.mjs /path/to/project` | R | 秒级；**会就地改写**非 UTF-8 文件（补 `@charset`/转码），是不可逆写操作 | 写 `utf8-gate-ok` | 编码非 UTF-8 → 禁止截图 |
 | 4 | `$SKILL_DIR/scripts/build-cover.mjs --url http://127.0.0.1:8080 --project-dir /path/to/project --title "MyWork" --out /tmp/cover.png --quiet` | R | **阻塞 ~60~120s**（截图+合成+校验）；失败页自动跳过，布局在脚本内闭环 | stdout 一行 `#cover=/tmp/cover.png layout=… multi=yes tmp=/tmp/shots`（内部调 `screenshot_guard.py`+`generate_cover.py`） | exit 1 → 截图/校验/合成任一失败，stderr 详情 |
 | 4 | `$SKILL_DIR/scripts/generate_cover.py --screenshot /tmp/shots/shot-index.png --title "MyWork" --out /tmp/cover.png` | R | 秒级；仅合成，需要已有截图文件（`--screenshot` 给源码级入口，日常走 build-cover） | 封面 PNG，再过 `verify-glyphs.py` | exit 1 → 禁止继续合成 |
@@ -67,7 +67,6 @@ Step 8 (publish)                             ← 依赖以上全部
 
 > 标记文件位置：Linux `/tmp/`；Windows `os.tmpdir()`（`%TEMP%`）。
 >
-> **维护提示（改技能自身时）**：`scripts/preflight.ps1` 与 `scripts/install-hcloud.ps1` 是 **UTF-8 带 BOM** 文件——Windows PowerShell 5.1 靠 BOM 解析其中的中文；编辑时务必保留 BOM，否则脚本会报乱码语法错。
 
 ## Parameter Confirmation（参数确认）
 
@@ -101,7 +100,7 @@ Step 8 (publish)                             ← 依赖以上全部
 1. **告知用户**（选目录=同意）：将创建 IAM 自委托 `SELF_VERIFY` 生成 STS 临时凭证（900s），永久 AK/SK 留本地不上传。
 2. **扫描项目根**：跑表内 `scan-projects.mjs`——自动递归 `**/README.md`，检查指示文件，排除 `skills/`/`node_modules/`/`dist/` 等，扫描 CodeArts 沙箱目录。
 3. 列候选，等用户选 → `workDir`。
-4. **解析 Domain ID**：跑表内 `resolve-domain.mjs`——自动 `hcloud configure set --region` + `IAM KeystoneListAuthDomains` + 提取 `domain_id`。凭证优先级：env → hcloud 已配置 → 引导用户（[troubleshooting#2](references/troubleshooting.md#2-hcloud-credentials-not-configured)）。Windows 已由 `install-hcloud.ps1` 装好并写入用户 PATH，通常无需 `--hcloud`。
+4. **解析 Domain ID**：跑表内 `resolve-domain.mjs`——自动 `hcloud configure set --region` + `IAM KeystoneListAuthDomains` + 提取 `domain_id`。凭证优先级：env → hcloud 已配置 → 引导用户（[troubleshooting#2](references/troubleshooting.md#2-hcloud-credentials-not-configured)）。Windows 用户按仓库根目录 [DEPLOY.md](../../../DEPLOY.md) 的 KooCLI 步骤安装并配置 hcloud。
 5. **生成 STS**：跑表内 `gen_sts.py`，`--account <domainID>`、`--creds-out`/`--sh-out` 指向会话 CWD。**凭证文件用相对路径读写（同一 CWD 会话内一致，跨平台无需区分 `/tmp`/`%TEMP%`）**；⚠️ 勿 `git add`/提交该凭证文件，Step 8 结束后统一清理。hcloud 探测顺序与 resolve-domain 一致。
 6. **输出**：`已获取 IAM Domain ID: <id>，用于将作品关联至您的华为云账号。`
 
@@ -134,7 +133,7 @@ Step 8 (publish)                             ← 依赖以上全部
 
 | 门禁 | 命令 | 标记 |
 |------|------|------|
-| 渲染 | `$SKILL_DIR/scripts/preflight.sh`（Win: `$SKILL_DIR/scripts/preflight.ps1`） | `font-gate-ok` |
+| 渲染 | `bash $SKILL_DIR/scripts/preflight.sh`（Windows 使用 Git Bash） | `font-gate-ok` |
 | 编码 | `$SKILL_DIR/scripts/ensure-utf8.mjs /path/to/project` | `utf8-gate-ok` |
 
 门禁失败禁止截图/合成。preflight 以标记文件 `ok=true` 为准，**Linux 一律后台化启动**（首次下载 Chromium 慢网 5~10 分钟）。轮询上限与心跳/卡死换源判定见 [work-preparation-linux.md#preflight-后台化与轮询linux](references/work-preparation-linux.md#preflight-后台化与轮询linux)。

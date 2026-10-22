@@ -141,7 +141,7 @@ Generate PPT-style cover
 
 **⚠️⚠️ 硬性要求 — 必须截图：** 作品封面**必须基于真实应用截图**生成。Option 1（截取运行中的应用）和 Option 2（mock 数据 + 本地 Playwright 截图）是**默认预期路径**，agent 必须主动尝试。Option 3（无前端模式）仅在项目确实无前端且 Option 1/2 均失败后才可使用——**绝不能因 Playwright 安装慢或依赖安装失败就跳过截图**。EulerOS/HCE 上 `playwright install-deps` 不生效是已知问题，按 [work-preparation-linux.md](work-preparation-linux.md) 映射表手动安装系统依赖后重试即可。
 
-> **平台分流：** Playwright/Chromium 安装前**预检脚本**（判断已装则跳过）：Windows → [work-preparation-windows.md#playwrightchromium-安装前预检powershell](work-preparation-windows.md#playwrightchromium-安装前预检powershell)；Linux/macOS → [work-preparation-linux.md#playwrightchromium-安装前预检bash](work-preparation-linux.md#playwrightchromium-安装前预检bash)。**预检逻辑（全平台同）：** 三项全 true → 跳过所有安装直接截图；Playwright 包 false → 仅 `pip install playwright`；Chromium 二进制 false → `python -m playwright install chromium`（~300MB）；包+二进制就绪但启动 false → Linux 装系统依赖（Windows 无需）。字体预检统一走 `preflight.sh`/`preflight.ps1`（SKILL.md Step 4 门禁），不依赖内联脚本。
+> **平台分流：** Playwright/Chromium 由统一的 `scripts/preflight.sh` 预检；Windows 使用 Git Bash，Linux/macOS 使用 bash。三项均就绪时跳过安装；缺 Python 包时安装 `playwright`，缺 Chromium 时运行 `python -m playwright install chromium`。字体与图表依赖也由该预检门禁处理。
 
 #### Option 1: Screenshot the running app
 
@@ -170,7 +170,7 @@ with sync_playwright() as p:
 
 **Chinese & emoji font handling：** Step 4（截图/封面合成）和 Step 6（图表生成）均需 CJK + emoji 字体。字体预装情况与安装命令按平台查：Windows → [work-preparation-windows.md#windows-字体预检powershell](work-preparation-windows.md#windows-字体预检powershell)；Linux → [work-preparation-linux.md#字体安装速查表aptyum-列](work-preparation-linux.md#字体安装速查表aptyum-列)。
 
-> **依赖预检一致性：** `preflight.sh`/`preflight.ps1`（SKILL.md Step 4 门禁脚本）已统一处理字体+fontconfig+图表依赖，通过写 `/tmp/font-gate-ok`。此处内联预检仅用于"判断是否可跳过安装"，门禁判定以 `preflight` 标记为准。
+> **依赖预检一致性：** `preflight.sh`（SKILL.md Step 4 门禁脚本）统一处理字体、fontconfig 和图表依赖，并写入 `font-gate-ok`。此处内联预检仅用于判断是否可跳过安装，门禁判定以 `preflight` 标记为准。
 
 #### Option 2: Local Playwright with Mock Data
 
@@ -250,7 +250,7 @@ node $SKILL_DIR/scripts/extract-fonts.mjs <workDir>
 | 衬线 | Times New Roman、Georgia | DejaVu Serif | Times New Roman |
 | Emoji | Segoe UI Emoji、Apple Color Emoji、Noto Color Emoji | Noto Color Emoji | Segoe UI Emoji |
 
-**兜底字体套件安装（预检发现某类别缺失时按需补齐）：** CJK + emoji 的安装即 `preflight.sh`/`preflight.ps1`（缺失时自动装 `google-noto-cjk-fonts`；emoji 优先从 jsDelivr CDN 下载彩色版 `NotoColorEmoji.ttf`，yum 版过旧作回退）。拉丁/衬线/等宽兜底与 fontconfig 配置：Linux → [work-preparation-linux.md#fontconfig-中文回退配置](work-preparation-linux.md#fontconfig-中文回退配置)；Windows 默认已含 Microsoft YaHei / Segoe UI Emoji / Consolas，通常无需操作。
+**兜底字体套件安装（预检发现某类别缺失时按需补齐）：** CJK + emoji 的安装由 `preflight.sh` 处理（Linux 缺失时可安装 `google-noto-cjk-fonts`；Windows 默认已含 Microsoft YaHei / Segoe UI Emoji / Consolas）。拉丁/衬线/等宽兜底与 fontconfig 配置见 [Linux 字体说明](work-preparation-linux.md#fontconfig-中文回退配置)。
 
 > **等宽字体的 CJK 覆盖（Linux）：** 等宽兜底 `DejaVu Sans Mono` **不含中文字形**。若截图中的代码/终端文本含中文字符，需把等宽族兜底换成 `Noto Sans Mono CJK SC`，否则代码里的中文仍会口口。
 
@@ -270,7 +270,7 @@ node $SKILL_DIR/scripts/extract-fonts.mjs <workDir>
 fc-match --format='%file' 'sans-serif:lang=zh'   # 不得命中 DejaVuSans.ttf
 ```
 
-> **上游产物门禁：** 环境级一键门禁 = 运行 `preflight.sh`/`preflight.ps1`（跨平台，SKILL.md Step 4）→ 写 `/tmp/font-gate-ok`（`ok=true\ngate=preflight`）；页面级守卫 `screenshot_guard.py` 通过后写 `/tmp/screenshot-gate-ok`（`ok=true\ngate=screenshot-guard`）。发布前 `check-gates.mjs` 统一复核全部门禁标记 + 产物文件（SKILL.md Step 8）。
+> **上游产物门禁：** 环境级一键门禁 = 运行 `preflight.sh`（Windows 使用 Git Bash）→ 写 `font-gate-ok`（`ok=true\ngate=preflight`）；页面级守卫 `screenshot_guard.py` 通过后写 `screenshot-gate-ok`（`ok=true\ngate=screenshot-guard`）。发布前 `check-gates.mjs` 统一复核全部门禁标记 + 产物文件（SKILL.md Step 8）。
 
 #### ③ Playwright 页面内字形自检 + `@font-face` 兜底注入（截图前必做）
 

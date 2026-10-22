@@ -63,7 +63,7 @@ if ($launchOk) {
 }
 ```
 
-> **Windows 说明：** Chromium **无需手动安装系统依赖**（自带所有必要 DLL，不会出现 `Missing libraries`）；不会出现 "OS not officially supported" 警告。缓存路径 `%LOCALAPPDATA%\ms-playwright\chromium-*`。安装命令同 Linux：`pip install playwright` + `python -m playwright install chromium`。`preflight.ps1` 已自动设 `PLAYWRIGHT_DOWNLOAD_HOST=https://cdn.npmmirror.com/binaries/playwright` 走国内镜像加速（npmmirror 镜像了 CFT win64 全部构建）。
+> **Windows 说明：** Chromium **无需手动安装系统依赖**（自带所有必要 DLL，不会出现 `Missing libraries`）；不会出现 "OS not officially supported" 警告。缓存路径 `%LOCALAPPDATA%\ms-playwright\chromium-*`。安装命令同 Linux：`pip install playwright` + `python -m playwright install chromium`。仓库统一从 Git Bash 运行 `preflight.sh`，由它按需安装依赖并优先尝试复用系统浏览器。
 
 ---
 

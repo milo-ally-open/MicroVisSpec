@@ -9,7 +9,7 @@
 - `SCREENSHOTS.md`：素材用途、真实系统截图与场景示意的区分。
 - `assets/screenshots/`：桌面与窄屏的完整系统截图。
 - `assets/slides/`：直接从运行中的浏览器重新拍摄的演示配图，未通过图片生成工具改动系统状态。
-- `build_deck.ps1`：Windows PowerPoint 自动化重建入口；不覆盖已有文件，重建时传入新的 `-OutputPath`。
+- 汇报文件由 PowerPoint 编辑；仓库不保留自动化生成脚本。修改后请另存为新文件，并重新检查逐页预览。
 
 ## 大纲
 

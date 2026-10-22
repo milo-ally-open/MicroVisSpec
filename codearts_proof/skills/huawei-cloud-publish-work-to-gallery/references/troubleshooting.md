@@ -116,7 +116,7 @@ Certificate errors occur when accessing the platform via HTTPS.
 无 Python 时流程会在以下任一处被门禁拦截：
 
 - **Step 1**：`python scripts/gen_sts.py` 无法运行 → `python : 无法将"python"项识别为 cmdlet…`（exit 9009），STS 生成失败，后续全部中断；
-- **Step 4 门禁** `scripts/preflight.ps1`：
+- **Step 4 门禁** `scripts/preflight.sh`（Windows 使用 Git Bash）：
   `[preflight] X 缺可用 python3（WindowsApps 下 python3 可能是 Store stub，用 python 替代）。请从华为云镜像下载安装 Python 3.x: https://mirrors.huaweicloud.com/python/ （选最新 3.12/3.11 的 Windows installer，安装时勾选 Add to PATH）` → exit 1，不写 `font-gate-ok`，截图/封面禁止；
 - **`scripts/build-cover.mjs`**：`❌ 找不到可用的 Python（已尝试 "python" 和 "python3"）。` → 封面合成禁止。
 
@@ -147,7 +147,7 @@ Start-Process -Wait -FilePath $exe -ArgumentList "/quiet","InstallAllUsers=0","P
 & "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe" --version
 ```
 
-安装完成后**重新打开终端**重跑 `scripts/preflight.ps1`，再回到 Step 1 重新发布。
+安装完成后**重新打开 Git Bash**重跑 `scripts/preflight.sh`，再回到 Step 1 重新发布。
 
 > ⚠️ **镜像 URL 与描述必须一致：** Python 安装包一律指华为云镜像 `https://mirrors.huaweicloud.com/python/`（TUNA `https://mirrors.tuna.tsinghua.edu.cn/python-release/` 非安装包镜像，访问 403，禁用）。pypi 源 `https://pypi.tuna.tsinghua.edu.cn/simple`、Git for Windows 的 TUNA github-release 镜像与 Python 无关，保持不变。
 
@@ -174,18 +174,7 @@ curl -sSL https://cn-north-4-hdn-koocli.obs.cn-north-4.myhuaweicloud.com/cli/lat
 
 > **下载源失效兜底（Linux）**：安装 URL 404/`NoSuchBucket` 时 → 参照官方文档更新下载源：[在Linux系统上安装KooCLI](https://support.huaweicloud.com/qs-hcli/hcli_02_003_02.html)（一键式安装 / 分步安装，URL 按最新文档取用）。
 
-```powershell
-# Windows — 一键安装脚本（下载官方 zip → 解压 → 验证版本 → 自动写入用户 PATH）
-powershell -ExecutionPolicy Bypass -File $SKILL_DIR/scripts/install-hcloud.ps1                         # 装到 ensure-user-bindir.mjs 选定目录（默认）
-powershell -ExecutionPolicy Bypass -File $SKILL_DIR/scripts/install-hcloud.ps1 -Dir D:\tools\hcloud   # 指定目录（覆盖默认）
-# 默认装到「用户级统一 bIN 目录」（ensure-user-bindir.mjs 首选 %LOCALAPPDATA%\Programs\.huawei\bin）；默认幂等：
-# PATH 或目标目录已有可用 hcloud 则输出路径并跳过；加 -Force 强制重装。
-# 安装/幂等命中后，脚本会把安装目录写入「用户 PATH」（去重），新终端或新进程即可直接 `hcloud`，无需再传 --hcloud。
-# 注意：%TEMP% 兜底目录重启清理后 PATH 条目会失效并自动清死链；持续可用请让脚本走主路径或用 -Dir 指定固定目录。
-# 成功输出: #hcloud=<exe 绝对路径>
-```
-
-> **下载源失效兜底（Windows）**：`install-hcloud.ps1` 下载失败（404/`NoSuchBucket` 等）时 → 参照官方文档更新脚本内 `$ZipUrl`：[在Windows系统上安装KooCLI](https://support.huaweicloud.com/qs-hcli/hcli_02_003_01.html)（脚本失败提示已含该指引）。
+Windows 用户按仓库根目录 [DEPLOY.md](../../../DEPLOY.md) 的 KooCLI 章节下载官方 zip、解压到用户级工具目录并配置 PATH。若官方下载地址失效，按华为云[Windows 安装 KooCLI 文档](https://support.huaweicloud.com/qs-hcli/hcli_02_003_01.html)获取最新下载地址。
 
 Verify installation:
 
@@ -478,7 +467,7 @@ done
 # 再用 pgrep -f preflight.sh 判断进程状态，确认是仍存活还是已失败
 ```
 
-- Windows（`preflight.ps1`）同样适用：轮询 `%TEMP%\font-gate-ok` 内容含 `ok=true`，或用 `Get-Process` 检查进程存活。
+- Windows（Git Bash 运行 `preflight.sh`）同样适用：检查系统临时目录下的 `font-gate-ok` 是否包含 `ok=true`，或查看 `preflight.log` 的最后输出。
 - 判定门禁是否通过**只看标记文件内容**（`ok=true` + `gate=preflight`），不看命令返回码。
 
 ### 2. Page shows "unexpected token" error

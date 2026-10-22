@@ -47,7 +47,7 @@ def check_gate() -> None:
             "❌ 渲染门禁未通过：缺少 font-gate-ok 标记（Step 4 preflight 尚未完成，图表依赖 playwright）。\n"
             f"   标记路径: {marker}\n"
             "   请等待 preflight 完成（轮询 font-gate-ok 出现 ok=true）后重跑本脚本；\n"
-            "   或先独立运行 preflight: bash $SKILL_DIR/scripts/preflight.sh / Windows: powershell $SKILL_DIR/scripts/preflight.ps1"
+            "   或先独立运行 preflight: bash $SKILL_DIR/scripts/preflight.sh（Windows 使用 Git Bash）"
         )
 
 
@@ -80,7 +80,7 @@ def main():
     except ImportError as e:
         sys.exit(
             "❌ 缺少 Python 依赖 playwright（图表生成必需）。请先运行渲染前 preflight 自动补齐：\n"
-            "   bash $SKILL_DIR/scripts/preflight.sh   （或 Windows: powershell $SKILL_DIR/scripts/preflight.ps1）\n"
+            "   bash $SKILL_DIR/scripts/preflight.sh   （Windows 使用 Git Bash）\n"
             "   或手动安装：python -m pip install playwright && python -m playwright install chromium\n"
             f"   原始错误: {e}"
         )

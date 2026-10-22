@@ -36,8 +36,6 @@ import { fileURLToPath } from "node:url";
 
 const thisDir = path.dirname(fileURLToPath(import.meta.url));
 const SCREENSHOT = path.join(thisDir, "screenshot_guard.py");
-const PREFLIGHT = path.join(thisDir, "preflight.ps1"); // Windows 优先；非 win 自动换 preflight.sh
-const PREFLIGHT_SH = path.join(thisDir, "preflight.sh");
 const GEN_COVER = path.join(thisDir, "generate_cover.py");
 const VERIFY = path.join(thisDir, "verify-glyphs.py");
 

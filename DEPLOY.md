@@ -1,6 +1,6 @@
 # 云哨部署指南
 
-当前 `172.20.10.4` 电脑与 `172.20.10.2` Atlas 的实机局域网部署、启动入口和验收结果见 [当前局域网部署](LAN-DEPLOYMENT.md)。下文保留从零部署的通用步骤。
+本文包含从零部署步骤，以及当前 `172.20.10.4` 电脑与 `172.20.10.2` Atlas 的局域网联调说明。部署命令集中维护于本文；仓库不使用 PowerShell 脚本。
 
 这份指南按实际部署顺序，从空白部署机开始启动云端、Web/PWA、MediaMTX 和 Atlas 边缘端，最后用仓库中的测试视频完成浏览器端到端验证。
 
@@ -13,6 +13,29 @@
 - 一台已安装匹配版本 Ascend 驱动及 CANN 的 Atlas 200I DK A2。
 - Windows 安装浏览器和 FFmpeg，终端中能运行 ffmpeg、ffplay、ssh 和 scp。
 - Windows、部署机、Atlas 网络互通。
+
+## 华为云 KooCLI（hcloud）
+
+需要通过华为云 API 查询账号域或申请临时 STS 凭据时，安装 KooCLI。仓库内发布工具要求 KooCLI 3.2.0 或更新版本，建议使用华为云[官方安装指南](https://support.huaweicloud.com/qs-hcli/hcli_02_003_01.html)提供的当前版本。Windows 可从华为云官方对象存储下载 [Windows x64 安装包](https://cn-north-4-hdn-koocli.obs.cn-north-4.myhuaweicloud.com/cli/latest/huaweicloud-cli-windows-amd64.zip)，用文件资源管理器解压，并把包含 `hcloud.exe` 的目录加入用户 PATH。建议安装到 `%LOCALAPPDATA%\Programs\.huawei\bin`，不要放在临时目录。更新 PATH 后打开新终端验证：
+
+```text
+hcloud version
+```
+
+首次配置时按提示输入 AK/SK 和默认区域；KooCLI 会在本地加密保存认证信息。只更新默认区域时，使用 `--cli-region` 参数：
+
+```text
+hcloud configure init
+hcloud configure set --cli-region=cn-north-4
+```
+
+也可通过环境变量提供凭据：`HUAWEICLOUD_SDK_AK`、`HUAWEICLOUD_SDK_SK`，临时凭据另设 `HUAWEICLOUD_SDK_SECURITY_TOKEN`。不要把凭据写入仓库、命令示例或提交记录。验证账号域查询：
+
+```text
+hcloud IAM KeystoneListAuthDomains
+```
+
+Linux/macOS 按华为云[官方 Linux 安装指南](https://support.huaweicloud.com/qs-hcli/hcli_02_003_02.html)下载对应系统和 CPU 架构的发行包，解压后把 `hcloud` 放入 `~/.local/bin` 或其他用户级 PATH 目录，再使用相同的验证、配置和查询命令。
 
 防火墙按需开放以下端口：
 
@@ -85,15 +108,15 @@ WEB_HTTPS_PORT=19080
 WEB_HTTPS_REDIRECT_PORT=19080
 ```
 
-若部署在 Linux 主機，使用上面的雙介面設定和 `docker-compose.atlas.yaml`。若在 Windows + Docker Desktop/WSL 上執行，Compose 連接埠繼續繫結 loopback：`WEB_BIND_ADDRESS=127.0.0.1`、`WEB_HTTP_PORT=18080`、`WEB_HTTPS_PORT=18443`、`WEB_HTTPS_REDIRECT_PORT=19080`。Web 容器啟動後，在系統管理員 PowerShell 中為 Wi‑Fi 地址增加轉發，並將防火牆來源限制在目前 Wi‑Fi 子網：
+若部署在 Linux 主機，使用上面的雙介面設定和 `docker-compose.atlas.yaml`。若在 Windows + Docker Desktop/WSL 上執行，Compose 連接埠繼續繫結 loopback：`WEB_BIND_ADDRESS=127.0.0.1`、`WEB_HTTP_PORT=18080`、`WEB_HTTPS_PORT=18443`、`WEB_HTTPS_REDIRECT_PORT=19080`。Web 容器啟動後，以系統管理員身分開啟命令提示字元，為 Wi‑Fi 地址增加轉發，並將防火牆來源限制在目前 Wi‑Fi 子網：
 
-```powershell
-netsh interface portproxy add v4tov4 listenaddress=172.50.53.131 listenport=18081 connectaddress=127.0.0.1 connectport=18080
-netsh interface portproxy add v4tov4 listenaddress=172.50.53.131 listenport=19080 connectaddress=127.0.0.1 connectport=18443
-New-NetFirewallRule -DisplayName "Yunshao Web WiFi 172.50.53.0-24" -Direction Inbound -Action Allow -Protocol TCP -LocalAddress 172.50.53.131 -LocalPort 18081,19080 -RemoteAddress 172.50.53.0/24 -Profile Public
+```text
+netsh interface portproxy add v4tov4 listenaddress=172.50.53.131 listenport=18081 connectaddress=127.0.0.1 connectport=18080 protocol=tcp
+netsh interface portproxy add v4tov4 listenaddress=172.50.53.131 listenport=19080 connectaddress=127.0.0.1 connectport=18443 protocol=tcp
+netsh advfirewall firewall add rule name="Yunshao Web WiFi 172.50.53.0-24" dir=in action=allow protocol=TCP localip=172.50.53.131 localport=18081,19080 remoteip=172.50.53.0/24 profile=public
 ```
 
-Windows Docker Desktop 已將 HTTP 對外端口設為 `18081`，因為容器的本機 HTTP 發布端口 `18080` 已被占用。上述 Windows 轉發與防火牆規則只作用於 Wi‑Fi 地址和目前 `/24` 來源；既有 `192.168.0.1` Atlas portproxy 保持不變。若客戶端啟用了系統代理，請將 `172.50.53.131` 加入代理繞過清單，讓瀏覽器直接連到 Wi‑Fi 主機。重複部署前先用 `netsh interface portproxy show all` 和 `Get-NetFirewallRule -DisplayName "Yunshao Web WiFi 172.50.53.0-24"` 檢查現有規則。網卡地址變更時，更新轉發、Origin、憑證 SAN 和 MediaMTX 設定。
+Windows Docker Desktop 已將 HTTP 對外端口設為 `18081`，因為容器的本機 HTTP 發布端口 `18080` 已被占用。上述 Windows 轉發與防火牆規則只作用於 Wi‑Fi 地址和目前 `/24` 來源；既有 `192.168.0.1` Atlas portproxy 保持不變。若客戶端啟用了系統代理，請將 `172.50.53.131` 加入代理繞過清單，讓瀏覽器直接連到 Wi‑Fi 主機。重複部署前先用 `netsh interface portproxy show all` 和 `netsh advfirewall firewall show rule name="Yunshao Web WiFi 172.50.53.0-24"` 檢查現有規則。網卡地址變更時，更新轉發、Origin、憑證 SAN 和 MediaMTX 設定。
 
 为 Web 和 MQTT 生成开发证书。mkcert 会在本机创建 CA，并把服务器证书和私钥直接写入服务使用的文件：
 
@@ -537,5 +560,115 @@ docker compose --env-file .env logs --tail 100
 sudo journalctl -u yunshao-agent.service -n 50 --no-pager
 sudo journalctl -u yunshao-classroom-runtime.service -n 50 --no-pager
 ```
+
+## 9. 当前局域网演示部署（2026-10-22）
+
+本机平台入口为 `https://172.20.10.4:19080/`，Atlas 为 `172.20.10.2`，演示网段为 `172.20.10.0/28`。浏览器使用 HTTPS；HTTP `18080` 跳转到 HTTPS `19080`。演示账号为 `lan_demo`，密码保存在部署机本地、已被 Git 忽略的 `.secret-lan-access.json` 中。客户端首次访问时需信任 `.assistant/lan-20261022/yunshao-lan-ca.crt`；只分发公开 CA 证书，不分发私钥。
+
+当前运行组件与数据位置：
+
+| 部件 | 位置或入口 |
+| --- | --- |
+| Web、认证、设备、事件、媒体、推送、PostgreSQL、Mosquitto | Docker Desktop Compose 项目 `yunshao-local`、`yunshao-local-web` |
+| 服务源码与私有配置 | `E:\Yunshao-dev\project\src\services`、`E:\Yunshao-dev\project\src\clients\web` |
+| MediaMTX | `E:\视频制作\Yunshao-local-demo\project\src\services\media-service` |
+| Web HTTP/HTTPS | `172.20.10.4:18080` → `127.0.0.1:80`；`172.20.10.4:19080` → `127.0.0.1:443` |
+| Atlas MQTT TLS | `172.20.10.4:18883` → `127.0.0.1:8883` |
+| WebRTC | 电脑 `172.20.10.4:8189/UDP`；播放器可回退到 HLS |
+| Atlas RTSP | `rtsp://172.20.10.2:8554/classroom-demo` |
+| Atlas 配置和凭据 | `/var/lib/yunshao/lan-config`、`/etc/yunshao/agent.env`、`/etc/yunshao/classroom-runtime.env` |
+
+### 手动配置 Windows 局域网入口
+
+以管理员身份打开命令提示字元。确认 `172.20.10.4` 仍是本机当前网卡地址；启用 IP Helper 服务，然后增加端口转发：
+
+```text
+sc config iphlpsvc start= auto
+sc start iphlpsvc
+netsh interface portproxy add v4tov4 listenaddress=172.20.10.4 listenport=18080 connectaddress=127.0.0.1 connectport=80 protocol=tcp
+netsh interface portproxy add v4tov4 listenaddress=172.20.10.4 listenport=19080 connectaddress=127.0.0.1 connectport=443 protocol=tcp
+netsh interface portproxy add v4tov4 listenaddress=172.20.10.4 listenport=18883 connectaddress=127.0.0.1 connectport=8883 protocol=tcp
+netsh advfirewall firewall add rule name="Yunshao LAN Web 20261022" dir=in action=allow protocol=TCP localip=172.20.10.4 localport=18080,19080 remoteip=172.20.10.0/28 profile=any
+netsh advfirewall firewall add rule name="Yunshao Atlas MQTT 20261022" dir=in action=allow protocol=TCP localip=172.20.10.4 localport=18883 remoteip=172.20.10.2 profile=any
+netsh advfirewall firewall add rule name="Yunshao LAN WebRTC 20261022" dir=in action=allow protocol=UDP localip=172.20.10.4 localport=8189 remoteip=172.20.10.0/28 profile=any
+netsh interface portproxy show all
+```
+
+更换网段或地址时，同步更新端口转发、防火墙来源范围、Web Origin、证书 SAN、MediaMTX 配置与 Atlas 连接地址。不要开放 PostgreSQL、Go 服务端口或 MediaMTX 管理 API。
+
+撤销这些本机入口时，在管理员命令提示字元中执行：
+
+```text
+netsh interface portproxy delete v4tov4 listenaddress=172.20.10.4 listenport=18080 protocol=tcp
+netsh interface portproxy delete v4tov4 listenaddress=172.20.10.4 listenport=19080 protocol=tcp
+netsh interface portproxy delete v4tov4 listenaddress=172.20.10.4 listenport=18883 protocol=tcp
+netsh advfirewall firewall delete rule name="Yunshao LAN Web 20261022"
+netsh advfirewall firewall delete rule name="Yunshao Atlas MQTT 20261022"
+netsh advfirewall firewall delete rule name="Yunshao LAN WebRTC 20261022"
+```
+
+### 手动启动和停止演示
+
+先启动 Docker Desktop。在后端目录执行：
+
+```text
+cd /d E:\Yunshao-dev\project\src\services
+docker compose -f docker-compose.yaml -f E:\workspace\Yunshao\.assistant\lan-20261022\lan-push.compose.yaml up -d --no-build
+```
+
+再启动 Web，并重启 Web 容器使其重新解析后端地址：
+
+```text
+cd /d E:\Yunshao-dev\project\src\clients\web
+docker compose up -d --no-build
+docker compose restart web
+```
+
+在 MediaMTX 目录单独启动 `mediamtx.exe mediamtx.yml`，保持该进程运行。测试推流时，从仓库根目录运行：
+
+```text
+ffmpeg -nostdin -hide_banner -loglevel warning -re -stream_loop -1 -i video/classroom_behavior.mp4 -map 0:v:0 -vf "scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2:black,fps=15" -an -c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p -g 30 -bf 0 -b:v 700k -f mpegts "udp://172.20.10.2:5000?pkt_size=1316"
+```
+
+不需要测试视频时跳过 FFmpeg。停止推流按 `Ctrl+C`；停止服务但保留数据库和运行数据：
+
+```text
+cd /d E:\Yunshao-dev\project\src\clients\web
+docker compose stop
+cd /d E:\Yunshao-dev\project\src\services
+docker compose stop
+```
+
+Atlas 服务已配置为随板卡启动；需停止时在 Atlas 上执行 `sudo systemctl stop yunshao-classroom-runtime.service yunshao-agent.service yunshao-mediamtx.service`。日常停止不要运行 `docker compose down -v`，以免删除数据库和事件证据卷。
+
+### 推送服务 DNS 覆盖
+
+当前 Clash DNS 对部分浏览器推送域名返回 Fake-IP（`198.18.0.0/15`），推送服务会拒绝这些地址。新增推送订阅后，从服务目录查询启用的域名：
+
+```text
+docker exec yunshao-local-postgres-1 psql -U yunshao_bootstrap -d yunshao -At -c "select distinct substring(endpoint from '^https://([^/]+)') from push.subscriptions where disabled_at is null;"
+```
+
+对标准推送域名（`notify.windows.com`、`fcm.googleapis.com`、`push.services.mozilla.com`、`web.push.apple.com`）使用可信的 HTTPS DNS 查询服务取得公网 A 记录，并手动更新 `.assistant/lan-20261022/lan-push.compose.yaml`。格式如下，地址应替换成当时查到的公网 IPv4：
+
+```yaml
+services:
+  push-service:
+    extra_hosts:
+      - "fcm.googleapis.com:142.250.72.170"
+```
+
+只重建推送服务应用覆盖配置：
+
+```text
+cd /d E:\Yunshao-dev\project\src\services
+docker compose -f docker-compose.yaml -f E:\workspace\Yunshao\.assistant\lan-20261022\lan-push.compose.yaml up -d --no-build --no-deps push-service
+```
+
+这些地址是 DNS 快照，服务商变更地址后需重新查询。长期部署应让容器使用能返回真实公网地址的 DNS。当前演示验收证据见 `project/docs/Specification/platform_deployment/evidence/lan_20261022.json`；本机截图与本地凭据不提交仓库。
+
+## 10. 文档渲染与 KooCLI 辅助流程
+
+文档封面、截图和图表流程在 Windows 上统一通过 Git Bash 运行仓库内的 `codearts_proof/skills/huawei-cloud-publish-work-to-gallery/scripts/preflight.sh`。该门禁检查字体、Python 渲染依赖和 Playwright；缺依赖时按脚本提示安装，必要时下载 Chromium。预检通过后会在系统临时目录写 `font-gate-ok` 标记。KooCLI 的安装和凭据配置见本指南“华为云 KooCLI（hcloud）”一节。
 
 日常停止不要使用 docker compose down -v；该命令会删除数据库和事件证据卷。

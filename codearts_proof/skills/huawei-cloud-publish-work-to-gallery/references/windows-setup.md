@@ -54,35 +54,15 @@ chcp 65001 > $null
 # 安装 Git for Windows 会附带 Git Bash（C:\Program Files\Git\bin\bash.exe）
 ```
 
-## 3. 渲染门禁脚本选择（preflight.ps1 vs preflight.sh）
+## 3. 渲染门禁
 
-- `preflight.sh` 依赖 bash 执行。Windows 需安装 **Git Bash**（随 Git for Windows 附带）或 WSL 发行版。
-- 若 bash 不可用，改用 PowerShell 原生版：`powershell -ExecutionPolicy Bypass -File $SKILL_DIR/scripts/preflight.ps1`（与 preflight.sh 的 Windows 分支逻辑对齐，优先复用系统 Edge/Chrome，无需 bash）。
+Windows 统一使用 Git Bash 运行仓库内的 `scripts/preflight.sh`。Git for Windows 安装后可从 Git Bash 打开仓库目录，再执行：
 
-### bash 可用性判断（避免 WSL stub 误判）
-
-Windows 10/11 默认在 `C:\Users\<user>\AppData\Local\Microsoft\WindowsApps\bash.exe` 放置 WSL stub，`Get-Command bash` 会找到它但无发行版时不可用。**禁止仅凭 `Get-Command bash` 判断，必须实际执行：**
-
-```powershell
-$bashOk = $false
-try { $r = bash -c "echo ok" 2>&1; if ($r -match "ok") { $bashOk = $true } } catch {}
-if (-not $bashOk) { Write-Host "bash 不可用（WSL stub 无发行版），改用 preflight.ps1" }
+```bash
+bash "$SKILL_DIR/scripts/preflight.sh"
 ```
 
-仅当 `$bashOk=true` 时方可使用 `preflight.sh`，否则走 `preflight.ps1`。
-
-### preflight.ps1 编码自检（PowerShell 5.1）
-
-`preflight.ps1` 必须以 **UTF-8 with BOM** 保存方可被 PowerShell 5.1 正确解析（无 BOM 时按 GBK 解码中文 → 语法错误）。运行前自动检测并修正：
-
-```powershell
-$f = "$SKILL_DIR/scripts/preflight.ps1"
-$b = [System.IO.File]::ReadAllBytes($f)
-if (-not ($b.Length -ge 3 -and $b[0] -eq 0xEF -and $b[1] -eq 0xBB -and $b[2] -eq 0xBF)) {
-  $c = [System.IO.File]::ReadAllText($f, [System.Text.Encoding]::UTF8)
-  [System.IO.File]::WriteAllText($f, $c, [System.Text.UTF8Encoding]::new($true))
-}
-```
+若该命令不可用，请安装或修复 Git for Windows 后再继续。预检通过会在系统临时目录写入 `font-gate-ok`；门禁失败时先查看同目录的 `preflight.log` 并修复原因。Windows 默认包含微软雅黑和 Segoe UI Emoji，Playwright Chromium 通常也无需额外系统 DLL。
 
 ## 4. Playwright Python 包路径（跨平台通用）
 
@@ -96,7 +76,7 @@ Python Playwright 通过 `pip install playwright` 安装为 Python 包，模块�
 python -c "import playwright"
 ```
 
-> 若 `preflight.ps1` / `preflight.sh` 检测到 Playwright 未装，会自动 `pip install playwright` + `python -m playwright install chromium`——优先复用系统 Edge/Chrome，无需下载 ~300MB Chromium。
+> 若 `preflight.sh` 检测到 Playwright 未装，会自动安装 `playwright` 并按需运行 `python -m playwright install chromium`；预检会优先复用系统 Edge/Chrome。
 
 ## 5. 详情 zip 打包（首选 build-detail-zip.mjs，跨平台零依赖）
 
@@ -133,10 +113,10 @@ python3 -c "print('py3 ok')" 2>$null   # 失败（Store stub）则改用 python
 python $SKILL_DIR/scripts/verify-glyphs.py <image.png>
 ```
 
-`preflight.ps1` 已内置该回退（`@("python3","python") | Where-Object { Test-PyCmd $_ }`），但 SKILL.md / work-preparation.md 中的命令示例默认写 `python3`——Windows 实际执行时按本节替换为 `python` 即可。
+`preflight.sh` 会检测 Windows 上可用的 Python 命令；若默认 `python3` 不可用，可在 Git Bash 中确认 `python --version` 并安装完整的 Python 发行版。
 
 ## 7b. 多 Python 解释器补装（Windows）
 
-Windows 可能同时存在 `python3.9` 与 `python`（3.11）等多个解释器，**site-packages 互不可见**。若 `preflight.ps1` 只装到主解释器，agent 用另一个解释器调门禁脚本会 `ModuleNotFoundError: playwright`。
+Windows 可能同时存在多个 Python 解释器，site-packages 互不可见。使用同一个 `python` 解释器运行门禁和渲染脚本，避免依赖装到另一个解释器。
 
-`preflight.ps1` 已内置 `Add-OtherPythonDeps`：发现 `python3/python/python3.13~3.8` 候选（真实路径去重），为**主解释器之外**的每个解释器补装 `numpy/pillow/playwright`；补装失败**记录 `⚠️` 日志而非静默**（gate 不记录该解释器，避免误以为就绪）。gate 文件的 `python_bins=` 只含补装成功的解释器。
+`preflight.sh` 记录实际预检所用的解释器；若渲染由另一个 Python 解释器启动，请在该解释器中单独安装所需依赖。
