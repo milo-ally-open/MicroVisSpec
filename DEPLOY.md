@@ -2,7 +2,7 @@
 
 这份指南按实际部署顺序，从空白部署机开始启动云端、Web/PWA、MediaMTX 和 Atlas 边缘端，最后用仓库中的测试视频完成浏览器端到端验证。
 
-示例地址沿用当前联调环境：云端主机 192.168.0.1，Atlas 板卡 192.168.0.2，Web 地址 https://192.168.0.1:19080。部署到其他网段时，把这些地址改成实际可互相访问的地址。使用 19080 端口时直接访问 HTTPS 地址；HTTP 端口会跳转到标准的 443 端口。
+目前聯調主機有兩條網路：Atlas 直連地址 `192.168.0.1`（Atlas 為 `192.168.0.2`），以及團隊 Wi‑Fi 地址 `172.50.53.131`。瀏覽器使用 `https://172.50.53.131:19080`；Windows + Docker Desktop 的 HTTP `18081` 會跳轉至 HTTPS，Linux 主機的 HTTP 入口為 `18080`。部署到其他網路時，應替換為穩定且客戶端可達的 Wi‑Fi 地址或內網 DNS 名稱，並為主機保留 DHCP 地址。目前 Wi‑Fi 網段是 `172.50.53.0/24`，不屬於 RFC 1918 私網地址段；確認網路入口 ACL/防火牆只允許團隊網段存取，且沒有網際網路入站轉發後再開放服務。
 
 ## 先准备好这些
 
@@ -14,15 +14,16 @@
 
 防火墙按需开放以下端口：
 
-| 端口 | 方向 | 用途 |
+| 端口 | 方向/来源范围 | 用途 |
 | --- | --- | --- |
-| 19080/TCP | 浏览器到部署机 | Web HTTPS |
-| 8883/TCP | Atlas 到部署机 | MQTT over TLS |
+| 18080/TCP（Linux）／18081/TCP（Windows Docker Desktop） | 團隊 Wi‑Fi 客戶端到部署機 | Web HTTP，跳轉到 HTTPS |
+| 19080/TCP | 團隊 Wi‑Fi 客戶端；Atlas `192.168.0.2` 到部署機 | Web HTTPS 與設備激活 |
+| 8883/TCP | 仅 Atlas `192.168.0.2` 到部署机 | MQTT over TLS |
 | 8554/TCP | 部署机到 Atlas | Atlas 输出的 RTSP 视频 |
-| 8189/UDP | 浏览器到部署机 | WebRTC 视频 |
+| 8189/UDP | 团队 Wi‑Fi 浏览器到部署机 | WebRTC 视频 |
 | 5000/UDP | Windows 到 Atlas | 本指南的测试视频输入 |
 
-PostgreSQL、Go 服务端口和 MediaMTX 管理 API 不要开放给公网。生产环境请使用正式证书；mkcert 仅用于开发和内网试点。
+PostgreSQL、Go 服務端口和 MediaMTX 管理 API 不要開放給局域網或網際網路。將 Linux 的 `18080/TCP` 或 Windows 的 `18081/TCP`，以及 `19080/TCP` 入站規則限制為團隊 Wi‑Fi 網段 `172.50.53.0/24`，另允許 Atlas `192.168.0.2` 存取 `19080/TCP`；MQTT `8883/TCP` 只允許 Atlas。生產環境請使用正式憑證；mkcert 僅用於開發和內網試點。若團隊 Wi‑Fi 啟用了客戶端隔離，其他無線終端仍無法互訪，需由網路管理員開放同網段存取。
 
 ## 1. 获取项目
 
@@ -50,13 +51,13 @@ cp project/src/clients/web/.env.example project/src/clients/web/.env
 vim project/src/services/.env
 ```
 
-把部署地址设置为当前示例值：
+设置后端地址。`PUBLIC_ORIGIN` 是浏览器/PWA 的来源；`PUBLIC_HOST` 保留为 Atlas 直连地址：
 
 ```dotenv
 COMPOSE_PROJECT_NAME=yunshao
 BACKEND_NETWORK=yunshao_backend
 PUBLIC_HOST=192.168.0.1
-PUBLIC_ORIGIN=https://192.168.0.1:19080
+PUBLIC_ORIGIN=https://172.50.53.131:19080
 MQTT_BIND_ADDRESS=192.168.0.1
 MQTT_TLS_PORT=8883
 MQTT_ADVERTISED_BROKER_URL=ssl://192.168.0.1:8883
@@ -71,28 +72,40 @@ VAPID_SUBJECT=mailto:ops@example.com
 vim project/src/clients/web/.env
 ```
 
-确认共享网络和端口配置如下：
+配置浏览器网卡为 Wi‑Fi 地址，并配置第二个绑定地址保留 Atlas 直连激活：
 
 ```dotenv
 BACKEND_NETWORK=yunshao_backend
-WEB_BIND_ADDRESS=192.168.0.1
+WEB_BIND_ADDRESS=172.50.53.131
+WEB_ATLAS_BIND_ADDRESS=192.168.0.1
 WEB_HTTP_PORT=18080
 WEB_HTTPS_PORT=19080
+WEB_HTTPS_REDIRECT_PORT=19080
 ```
+
+若部署在 Linux 主機，使用上面的雙介面設定和 `docker-compose.atlas.yaml`。若在 Windows + Docker Desktop/WSL 上執行，Compose 連接埠繼續繫結 loopback：`WEB_BIND_ADDRESS=127.0.0.1`、`WEB_HTTP_PORT=18080`、`WEB_HTTPS_PORT=18443`、`WEB_HTTPS_REDIRECT_PORT=19080`。Web 容器啟動後，在系統管理員 PowerShell 中為 Wi‑Fi 地址增加轉發，並將防火牆來源限制在目前 Wi‑Fi 子網：
+
+```powershell
+netsh interface portproxy add v4tov4 listenaddress=172.50.53.131 listenport=18081 connectaddress=127.0.0.1 connectport=18080
+netsh interface portproxy add v4tov4 listenaddress=172.50.53.131 listenport=19080 connectaddress=127.0.0.1 connectport=18443
+New-NetFirewallRule -DisplayName "Yunshao Web WiFi 172.50.53.0-24" -Direction Inbound -Action Allow -Protocol TCP -LocalAddress 172.50.53.131 -LocalPort 18081,19080 -RemoteAddress 172.50.53.0/24 -Profile Public
+```
+
+Windows Docker Desktop 已將 HTTP 對外端口設為 `18081`，因為容器的本機 HTTP 發布端口 `18080` 已被占用。上述 Windows 轉發與防火牆規則只作用於 Wi‑Fi 地址和目前 `/24` 來源；既有 `192.168.0.1` Atlas portproxy 保持不變。若客戶端啟用了系統代理，請將 `172.50.53.131` 加入代理繞過清單，讓瀏覽器直接連到 Wi‑Fi 主機。重複部署前先用 `netsh interface portproxy show all` 和 `Get-NetFirewallRule -DisplayName "Yunshao Web WiFi 172.50.53.0-24"` 檢查現有規則。網卡地址變更時，更新轉發、Origin、憑證 SAN 和 MediaMTX 設定。
 
 为 Web 和 MQTT 生成开发证书。mkcert 会在本机创建 CA，并把服务器证书和私钥直接写入服务使用的文件：
 
 ```sh
 umask 077
 mkcert -install
-mkcert -cert-file project/src/clients/web/.secret-nginx-tls-certificate.pem -key-file project/src/clients/web/.secret-nginx-tls-private-key.pem 192.168.0.1
+mkcert -cert-file project/src/clients/web/.secret-nginx-tls-certificate.pem -key-file project/src/clients/web/.secret-nginx-tls-private-key.pem 172.50.53.131 192.168.0.1
 mkcert -cert-file project/src/services/device-service/.secret-mqtt-tls-certificate.pem -key-file project/src/services/device-service/.secret-mqtt-tls-private-key.pem 192.168.0.1
 cp "$(mkcert -CAROOT)/rootCA.pem" project/src/services/device-service/.secret-mqtt-ca-certificate.pem
 chmod 600 project/src/clients/web/.secret-nginx-tls-private-key.pem
 chmod 600 project/src/services/device-service/.secret-mqtt-tls-private-key.pem
 ```
 
-让 Windows 浏览器信任 mkcert CA。先把公开 CA 证书复制到 Windows 用户下载目录：
+让每台使用 Web/PWA 的客户端设备信任签发 Web 证书的 CA。按本节从零部署时，以下命令将 mkcert 的公开 CA 证书复制到当前 Windows 用户的下载目录；若沿用现有本机开发 CA，则使用 `project/src/services/device-service/.secret-mqtt-ca-certificate.pem`：
 
 ```sh
 cp "$(mkcert -CAROOT)/rootCA.pem" /mnt/c/Users/Administrator/Downloads/yunshao-rootCA.pem
@@ -104,7 +117,7 @@ cp "$(mkcert -CAROOT)/rootCA.pem" /mnt/c/Users/Administrator/Downloads/yunshao-r
 certutil -addstore -user Root "%USERPROFILE%\Downloads\yunshao-rootCA.pem"
 ```
 
-rootCA.pem 是公开的 CA 证书。不要复制或分享 mkcert 的 rootCA-key.pem。Atlas 信任 CA 的步骤在第 6 节。
+在每位同事的 Windows 设备上，通过可信的内部渠道提供 `rootCA.pem` 并执行导入命令；macOS、Linux 和手机也需将该公开证书加入系统信任库。不要复制或分享 `rootCA-key.pem`。生产环境应改用组织信任的正式证书。Atlas 信任 CA 的步骤在第 6 节。
 
 ## 3. 生成服务密钥
 
@@ -221,8 +234,8 @@ vim mediamtx.yml
 
 - __MEDIAMTX_API_PASSWORD__：刚才输出的 API 密码。
 - __MEDIAMTX_READER_PASSWORD__：刚才输出的播放密码。
-- __PUBLIC_ORIGIN__：https://192.168.0.1:19080
-- __WEBRTC_ADDITIONAL_HOSTS__：192.168.0.1
+- __PUBLIC_ORIGIN__：https://172.50.53.131:19080
+- __WEBRTC_ADDITIONAL_HOSTS__：172.50.53.131, 192.168.0.1
 
 保存后限制配置文件读取权限，并校验配置：
 
@@ -285,12 +298,12 @@ docker compose --env-file .env ps
 
 ```sh
 cd ../clients/web
-docker compose config --quiet
-docker compose up --build -d
-docker compose ps
+docker compose -f docker-compose.yaml -f docker-compose.atlas.yaml config --quiet
+docker compose -f docker-compose.yaml -f docker-compose.atlas.yaml up --build -d
+docker compose -f docker-compose.yaml -f docker-compose.atlas.yaml ps
 ```
 
-浏览器打开 https://192.168.0.1:19080/。首次部署没有默认账号，请在页面注册并登录。登录后确认能打开实时监控、告警列表、数据分析和边缘设备页面。
+團隊 Wi‑Fi 客戶端瀏覽器開啟 `https://172.50.53.131:19080/`。Atlas 激活仍存取 `https://192.168.0.1:19080/edge/v1/activate`。首次部署沒有預設帳號，請在頁面註冊並登入。登入後確認能開啟即時監控、告警清單、資料分析和邊緣設備頁面。
 
 ## 6. 安装 Atlas 程序、激活设备并安装模型
 

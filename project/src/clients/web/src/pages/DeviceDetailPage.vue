@@ -157,5 +157,5 @@ onMounted(load)
 </template>
 
 <style scoped>
-.detail-heading-actions{display:flex;align-items:center;gap:9px}.confirm-backdrop{position:fixed;z-index:100;inset:0;display:grid;place-items:center;padding:22px;background:#14242378;backdrop-filter:blur(3px)}.confirm-panel{width:min(100%,440px);padding:22px}.confirm-panel h2{margin:0;color:#263b39;font-size:17px}.confirm-panel p{margin:12px 0 20px;color:#71817e;font-size:11px;line-height:1.7}.confirm-panel>div{display:flex;justify-content:flex-end;gap:8px}.button--danger{border-color:#a84f49;background:#a84f49;color:#fff}.button--danger:hover:not(:disabled){background:#873d38}
+.detail-heading-actions{display:flex;align-items:center;gap:9px}.confirm-backdrop{position:fixed;z-index:100;inset:0;display:grid;place-items:center;padding:22px;background:#1c19177a;backdrop-filter:blur(3px)}.confirm-panel{width:min(100%,440px);padding:22px}.confirm-panel h2{margin:0;color:#1c1917;font-family:"Songti SC","STSong","SimSun",Georgia,serif;font-size:18px;font-weight:400}.confirm-panel p{margin:12px 0 20px;color:#6d655b;font-size:12px;line-height:1.7}.confirm-panel>div{display:flex;justify-content:flex-end;gap:8px}.button--danger{border-color:#a84f49;background:#a84f49;color:#fff}.button--danger:hover:not(:disabled){background:#873d38}
 </style>

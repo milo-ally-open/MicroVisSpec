@@ -1,23 +1,23 @@
 /* Yunshao workbench: shared tokens, components and responsive layouts. */
 :root {
   font-family: "Segoe UI Variable", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-  color: #203b38;
-  background: #f3f6f5;
+  color: #1c1917;
+  background: #faf8f4;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-  --ink: #203b38;
-  --muted: #6f817c;
-  --line: #e1e9e5;
-  --paper: #fff;
-  --canvas: #f3f6f5;
-  --teal: #1b806b;
-  --teal-dark: #135e4f;
-  --teal-light: #e9f5ef;
-  --orange: #dd8558;
-  --gold: #d49b3f;
-  --green: #3c9a71;
-  --danger: #c46161;
+  --ink: #1c1917;
+  --muted: #756d63;
+  --line: #e4dfd5;
+  --paper: #fffdfa;
+  --canvas: #faf8f4;
+  --teal: #1f4d3a;
+  --teal-dark: #173d2d;
+  --teal-light: #edf1e7;
+  --orange: #c17b52;
+  --gold: #ad843d;
+  --green: #587950;
+  --danger: #b65a50;
   font-size: 14px;
   line-height: 1.6;
 }
@@ -3764,4 +3764,334 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
+
+/* Exhibition visual system: warm paper, ink panels, and forest accents. */
+html {
+  background: var(--canvas);
+}
+
+body {
+  background: var(--canvas);
+  color: var(--ink);
+}
+
+::selection {
+  background: #e8e1d4;
+  color: #1c1917;
+}
+
+:focus-visible {
+  outline: 2px solid #2f6b52;
+  outline-offset: 3px;
+}
+
+.sidebar {
+  background: linear-gradient(180deg, #1c1917 0%, #24201c 100%);
+  border-right-color: #302b26;
+}
+
+.brand-lockup__logo {
+  border-color: #e4dfd5;
+  background: #faf8f4;
+  box-shadow: 0 4px 14px #00000018;
+}
+
+.workspace-label {
+  color: #a8a094;
+}
+
+.nav-link {
+  color: #c5bfb4;
+}
+
+.nav-link:hover {
+  background: #302b26;
+  color: #faf8f4;
+}
+
+.nav-link--active {
+  background: #f1ede4;
+  color: #1f4d3a;
+}
+
+.nav-link--active:before {
+  background: #2f6b52;
+}
+
+.connection-card {
+  border-color: #3a3530;
+  background: #ffffff08;
+  color: #e5ded2;
+}
+
+.connection-card strong {
+  color: #f5f1e8;
+}
+
+.connection-card small,
+.profile-copy small {
+  color: #a8a094;
+}
+
+.profile-button {
+  border-top-color: #3a3530;
+}
+
+.profile-copy strong {
+  color: #f5f1e8;
+}
+
+.main-column,
+.page-content {
+  background: var(--canvas);
+}
+
+.topbar {
+  border-bottom-color: var(--line);
+  background: rgb(250 248 244 / 94%);
+  backdrop-filter: blur(12px);
+}
+
+.breadcrumb,
+.breadcrumb strong,
+.topbar-status,
+.topbar-settings {
+  color: #5c544b;
+}
+
+.topbar-avatar,
+.avatar {
+  background: #1f4d3a;
+}
+
+.mobile-nav {
+  border-color: var(--line);
+  background: rgb(250 248 244 / 96%);
+}
+
+.mobile-nav a.mobile-nav__active {
+  color: #1f4d3a;
+}
+
+.eyebrow {
+  color: #82796e;
+}
+
+.page-heading h1,
+.overview-hero h1,
+.auth-aside__copy h1,
+.auth-card h2,
+.panel-heading h2,
+.device-list-header h2,
+.list-toolbar h2,
+.not-found h1 {
+  font-family: "Songti SC", "STSong", "SimSun", Georgia, serif;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.page-heading h1,
+.panel-heading h2,
+.device-list-header h2,
+.list-toolbar h2 {
+  color: #1c1917;
+}
+
+.page-heading p,
+.panel-intro {
+  color: #6d655b;
+}
+
+.button {
+  border-radius: 999px;
+}
+
+.button--primary {
+  background: #1c1917;
+  color: #faf8f4;
+  box-shadow: 0 4px 12px #1c19171a;
+}
+
+.button--primary:hover:not(:disabled) {
+  background: #1f4d3a;
+  box-shadow: 0 6px 14px #1f4d3a24;
+}
+
+.button--secondary {
+  border-color: #d9d2c6;
+  background: #fffdfa;
+  color: #4f4942;
+}
+
+.button--secondary:hover:not(:disabled) {
+  border-color: #9aaa8c;
+  background: #f5f2eb;
+  color: #1f4d3a;
+}
+
+.button--quiet {
+  background: #eee9df;
+  color: #5c544b;
+}
+
+.button--quiet:hover:not(:disabled) {
+  background: #e6e0d5;
+  color: #1f4d3a;
+}
+
+.text-button,
+.inline-link {
+  color: #1f4d3a;
+}
+
+.panel,
+.stat-card,
+.device-card,
+.monitor-tile,
+.filters-panel,
+.event-list-panel,
+.event-summary-card,
+.evidence-panel,
+.disposition-panel,
+.timeline-panel,
+.analytics-trend,
+.breakdown-panel,
+.settings-grid > .panel {
+  border-color: #e4dfd5;
+  border-radius: 6px;
+  background: #fffdfa;
+  box-shadow: 0 4px 16px #31271a08;
+}
+
+.field input,
+.field select,
+.field textarea,
+.select-field select {
+  border-color: #ded7ca;
+  border-radius: 3px;
+  background: #fffdfa;
+  color: #1c1917;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus,
+.select-field select:focus {
+  border-color: #63816b;
+  box-shadow: 0 0 0 3px #1f4d3a1a;
+}
+
+.range-tabs {
+  border-color: #e4dfd5;
+  background: #f1ede4;
+}
+
+.range-tabs button.range-tabs__active {
+  color: #1f4d3a;
+  box-shadow: 0 1px 4px #1c191710;
+}
+
+.event-table thead {
+  background: #f5f2eb;
+}
+
+.event-table th {
+  color: #756d63;
+}
+
+.event-table__row:hover {
+  background: #f8f5ef;
+}
+
+.overview-hero {
+  border-color: #e4dfd5;
+  border-radius: 6px;
+  background: linear-gradient(115deg, #f1ede4 0%, #f7f4ed 62%, #ebe6db 100%);
+}
+
+.overview-hero h1 {
+  color: #1c1917;
+}
+
+.overview-hero p,
+.hero-date,
+.hero-scene__label {
+  color: #5c544b;
+}
+
+.hero-date__divider {
+  border-color: #cfc6b7;
+}
+
+.hero-scene__orbit {
+  border-color: #8b9d7a50;
+  box-shadow: 0 0 0 30px #8b9d7a20, 0 0 0 60px #8b9d7a14;
+}
+
+.hero-scene__core {
+  border-color: #d6cebf;
+  border-radius: 6px;
+  background: #fffdf9;
+  color: #1f4d3a;
+  box-shadow: 0 10px 20px #1c191712, inset 0 0 0 5px #fff8;
+}
+
+.auth-aside {
+  background: radial-gradient(ellipse at 5% 90%, #2f4e3e 0, transparent 62%), linear-gradient(150deg, #1c1917 0%, #25231f 72%);
+}
+
+.auth-aside__copy h1 {
+  color: #f5f1e8;
+}
+
+.auth-aside__copy p,
+.auth-aside__foot {
+  color: #c1b9ac;
+}
+
+.auth-panel {
+  background: #faf8f4;
+}
+
+.auth-card {
+  border-color: #e4dfd5;
+  border-radius: 6px;
+  background: #fffdfa;
+  box-shadow: 0 14px 50px #31271a0d;
+}
+
+.auth-card h2 {
+  color: #1c1917;
+}
+
+.auth-description,
+.auth-switch,
+.auth-privacy {
+  color: #6d655b;
+}
+
+.auth-card .field input {
+  border-color: #ded7ca;
+  background: #fffdfa;
+}
+
+.auth-switch a,
+.auth-card > .eyebrow {
+  color: #1f4d3a;
+}
+
+.auth-privacy {
+  border-top-color: #e4dfd5;
+}
+
+@media (max-width: 760px) {
+  body {
+    background: #faf8f4;
+  }
+
+  .auth-page,
+  .auth-panel {
+    background: #faf8f4;
+  }
 }

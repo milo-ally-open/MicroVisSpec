@@ -25,5 +25,5 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.offline-screen{display:grid;min-height:100vh;align-content:center;justify-items:center;padding:28px;background:#f4f7f6;text-align:center}.offline-screen__mark{display:grid;width:45px;height:45px;place-items:center;border-radius:14px;background:#176a63;color:#fff;font-size:22px;font-weight:800}.offline-screen h1{margin:20px 0 0;color:#203536;font-size:22px}.offline-screen p{max-width:430px;margin:10px 0 0;color:#748183;font-size:13px;line-height:1.7}
+.offline-screen{display:grid;min-height:100vh;align-content:center;justify-items:center;padding:28px;background:#faf8f4;text-align:center}.offline-screen__mark{display:grid;width:45px;height:45px;place-items:center;border-radius:8px;background:#1f4d3a;color:#faf8f4;font-size:22px;font-weight:800}.offline-screen h1{margin:20px 0 0;color:#1c1917;font-family:"Songti SC","STSong","SimSun",Georgia,serif;font-size:22px;font-weight:400}.offline-screen p{max-width:430px;margin:10px 0 0;color:#6d655b;font-size:13px;line-height:1.7}
 </style>

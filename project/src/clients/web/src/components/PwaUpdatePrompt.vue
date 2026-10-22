@@ -33,11 +33,11 @@ const { offlineReady, needRefresh, updateServiceWorker } = useRegisterSW()
   bottom: 1rem;
   max-width: min(28rem, calc(100vw - 2rem));
   padding: 1rem;
-  border: 1px solid #d7e0e8;
-  border-radius: 0.75rem;
-  background: #fff;
-  box-shadow: 0 0.75rem 2rem rgb(15 35 55 / 16%);
-  color: #10243a;
+  border: 1px solid #e4dfd5;
+  border-radius: 6px;
+  background: #fffdfa;
+  box-shadow: 0 0.75rem 2rem rgb(28 25 23 / 12%);
+  color: #1c1917;
 }
 
 .pwa-notice p {
@@ -53,17 +53,17 @@ const { offlineReady, needRefresh, updateServiceWorker } = useRegisterSW()
 button {
   min-height: 2.5rem;
   padding: 0.5rem 0.875rem;
-  border: 1px solid #126c72;
-  border-radius: 0.5rem;
-  background: #126c72;
-  color: #fff;
+  border: 1px solid #1c1917;
+  border-radius: 999px;
+  background: #1c1917;
+  color: #faf8f4;
   font: inherit;
   cursor: pointer;
 }
 
 button.secondary {
-  border-color: #cbd5df;
-  background: #fff;
-  color: #10243a;
+  border-color: #ded7ca;
+  background: #fffdfa;
+  color: #5c544b;
 }
 </style>

@@ -13,6 +13,8 @@ Use `localhost` for local PWA testing. Browsers require a secure context for ser
 
 For production hosting, serve the app from the manifest scope (`/` with the current configuration), rewrite client-side routes to `index.html`, and allow the generated `sw.js` to be fetched from the app root. If deploying under a subpath, update Vite's `base` and the manifest's `start_url` and `scope` together.
 
+By default the Docker Compose port bindings are loopback-only. For deployment, set `WEB_BIND_ADDRESS` to the host address reachable by browser clients. When Atlas reaches the host through a separate interface, also set `WEB_ATLAS_BIND_ADDRESS` and run Compose with `docker-compose.atlas.yaml`. Set `WEB_HTTPS_REDIRECT_PORT` to the public HTTPS port; this may differ from the container host port `WEB_HTTPS_PORT` when Windows/WSL port forwarding is used.
+
 ## Check the production PWA
 
 ```sh
