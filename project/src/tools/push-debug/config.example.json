@@ -1,0 +1,10 @@
+{
+  "platform_origin": "https://localhost",
+  "port": 9088,
+  "ca_file": "C:/path/to/development-ca.pem",
+  "mqtt_host": "localhost",
+  "mqtt_port": 8883,
+  "profiles": [
+    {"id": "demo-a", "label": "测试账号 A", "username": "your_test_username", "password": "configure_only_in_private_local_file"}
+  ]
+}

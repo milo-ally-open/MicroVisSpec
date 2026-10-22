@@ -1,0 +1,360 @@
+{
+  "tested_at": "2026-10-22T10:33:30.188863+00:00",
+  "base_commit": "28384dd",
+  "initial_commit": "5f5504c",
+  "environment": "Windows + Docker Desktop + real localhost HTTPS/MQTT/PostgreSQL; Microsoft Edge headless",
+  "checks": [
+    {
+      "check": "Two configured accounts generate independently owned events via real MQTT and Push inbox",
+      "result": "passed"
+    },
+    {
+      "check": "Cross-account event and evidence access denied in both directions",
+      "result": "passed"
+    },
+    {
+      "check": "New simulated evidence is accessible to its owning account",
+      "result": "passed"
+    },
+    {
+      "check": "HTTP retry with the same request ID reuses one event",
+      "result": "passed"
+    },
+    {
+      "check": "Protected routing, rejected credentials and successful login preserve behavior",
+      "result": "passed"
+    },
+    {
+      "check": "Thirty page/viewport checks have no horizontal overflow and share exhibit design tokens",
+      "result": "passed",
+      "count": 30
+    },
+    {
+      "check": "Event evidence and pending-to-processing-to-resolved browser workflow passed",
+      "result": "passed"
+    },
+    {
+      "check": "No uncaught browser JavaScript errors",
+      "result": "passed"
+    }
+  ],
+  "visual": [
+    {
+      "page": "overview",
+      "width": 1440,
+      "overflow_px": 0,
+      "theme": {
+        "background": "rgb(250, 248, 244)",
+        "accent": "#1f4d3a"
+      }
+    },
+    {
+      "page": "devices",
+      "width": 1440,
+      "overflow_px": 0,
+      "theme": {
+        "background": "rgb(250, 248, 244)",
+        "accent": "#1f4d3a"
+      }
+    },
+    {
+      "page": "device-detail",
+      "width": 1440,
+      "overflow_px": 0,
+      "theme": {
+        "background": "rgb(250, 248, 244)",
+        "accent": "#1f4d3a"
+      }
+    },
+    {
+      "page": "events",
+      "width": 1440,
+      "overflow_px": 0,
+      "theme": {
+        "background": "rgb(250, 248, 244)",
+        "accent": "#1f4d3a"
+      }
+    },
+    {
+      "page": "event-detail",
+      "width": 1440,
+      "overflow_px": 0,
+      "theme": {
+        "background": "rgb(250, 248, 244)",
+        "accent": "#1f4d3a"
+      }
+    },
+    {
+      "page": "analytics",
+      "width": 1440,
+      "overflow_px": 0,
+      "theme": {
+        "background": "rgb(250, 248, 244)",
+        "accent": "#1f4d3a"
+      }
+    },
+    {
+      "page": "settings",
+      "width": 1440,
+      "overflow_px": 0,
+      "theme": {
+        "background": "rgb(250, 248, 244)",
+        "accent": "#1f4d3a"
+      }
+    },
+    {
+      "page": "monitor",
+      "width": 1440,
+      "overflow_px": 0,
+      "theme": {
+        "background": "rgb(250, 248, 244)",
+        "accent": "#1f4d3a"
+      }
+    },
+    {
+      "page": "overview",
+      "width": 1024,
+      "overflow_px": 0,
+      "theme": {
+        "background": "rgb(250, 248, 244)",
+        "accent": "#1f4d3a"
+      }
+    },
+    {
+      "page": "devices",
+      "width": 1024,
+      "overflow_px": 0,
+      "theme": {
+        "background": "rgb(250, 248, 244)",
+        "accent": "#1f4d3a"
+      }
+    },
+    {
+      "page": "device-detail",
+      "width": 1024,
+      "overflow_px": 0,
+      "theme": {
+        "background": "rgb(250, 248, 244)",
+        "accent": "#1f4d3a"
+      }
+    },
+    {
+      "page": "events",
+      "width": 1024,
+      "overflow_px": 0,
+      "theme": {
+        "background": "rgb(250, 248, 244)",
+        "accent": "#1f4d3a"
+      }
+    },
+    {
+      "page": "event-detail",
+      "width": 1024,
+      "overflow_px": 0,
+      "theme": {
+        "background": "rgb(250, 248, 244)",
+        "accent": "#1f4d3a"
+      }
+    },
+    {
+      "page": "analytics",
+      "width": 1024,
+      "overflow_px": 0,
+      "theme": {
+        "background": "rgb(250, 248, 244)",
+        "accent": "#1f4d3a"
+      }
+    },
+    {
+      "page": "settings",
+      "width": 1024,
+      "overflow_px": 0,
+      "theme": {
+        "background": "rgb(250, 248, 244)",
+        "accent": "#1f4d3a"
+      }
+    },
+    {
+      "page": "monitor",
+      "width": 1024,
+      "overflow_px": 0,
+      "theme": {
+        "background": "rgb(250, 248, 244)",
+        "accent": "#1f4d3a"
+      }
+    },
+    {
+      "page": "overview",
+      "width": 390,
+      "overflow_px": 0,
+      "theme": {
+        "background": "rgb(250, 248, 244)",
+        "accent": "#1f4d3a"
+      }
+    },
+    {
+      "page": "devices",
+      "width": 390,
+      "overflow_px": 0,
+      "theme": {
+        "background": "rgb(250, 248, 244)",
+        "accent": "#1f4d3a"
+      }
+    },
+    {
+      "page": "device-detail",
+      "width": 390,
+      "overflow_px": 0,
+      "theme": {
+        "background": "rgb(250, 248, 244)",
+        "accent": "#1f4d3a"
+      }
+    },
+    {
+      "page": "events",
+      "width": 390,
+      "overflow_px": 0,
+      "theme": {
+        "background": "rgb(250, 248, 244)",
+        "accent": "#1f4d3a"
+      }
+    },
+    {
+      "page": "event-detail",
+      "width": 390,
+      "overflow_px": 0,
+      "theme": {
+        "background": "rgb(250, 248, 244)",
+        "accent": "#1f4d3a"
+      }
+    },
+    {
+      "page": "analytics",
+      "width": 390,
+      "overflow_px": 0,
+      "theme": {
+        "background": "rgb(250, 248, 244)",
+        "accent": "#1f4d3a"
+      }
+    },
+    {
+      "page": "settings",
+      "width": 390,
+      "overflow_px": 0,
+      "theme": {
+        "background": "rgb(250, 248, 244)",
+        "accent": "#1f4d3a"
+      }
+    },
+    {
+      "page": "overview",
+      "width": 360,
+      "overflow_px": 0,
+      "theme": {
+        "background": "rgb(250, 248, 244)",
+        "accent": "#1f4d3a"
+      }
+    },
+    {
+      "page": "devices",
+      "width": 360,
+      "overflow_px": 0,
+      "theme": {
+        "background": "rgb(250, 248, 244)",
+        "accent": "#1f4d3a"
+      }
+    },
+    {
+      "page": "device-detail",
+      "width": 360,
+      "overflow_px": 0,
+      "theme": {
+        "background": "rgb(250, 248, 244)",
+        "accent": "#1f4d3a"
+      }
+    },
+    {
+      "page": "events",
+      "width": 360,
+      "overflow_px": 0,
+      "theme": {
+        "background": "rgb(250, 248, 244)",
+        "accent": "#1f4d3a"
+      }
+    },
+    {
+      "page": "event-detail",
+      "width": 360,
+      "overflow_px": 0,
+      "theme": {
+        "background": "rgb(250, 248, 244)",
+        "accent": "#1f4d3a"
+      }
+    },
+    {
+      "page": "analytics",
+      "width": 360,
+      "overflow_px": 0,
+      "theme": {
+        "background": "rgb(250, 248, 244)",
+        "accent": "#1f4d3a"
+      }
+    },
+    {
+      "page": "settings",
+      "width": 360,
+      "overflow_px": 0,
+      "theme": {
+        "background": "rgb(250, 248, 244)",
+        "accent": "#1f4d3a"
+      }
+    }
+  ],
+  "uncaught_errors": [],
+  "jobs": [
+    {
+      "request_id": "01805ac3-f34e-4c4b-89a3-966bfe64cfbc",
+      "profile_id": "demo-a",
+      "stage": "event_created",
+      "created_at": "2026-10-22T10:33:02.386858+00:00",
+      "occurred_at": "2026-10-22T10:33:02.549018+00:00",
+      "mqtt_ack": "accepted",
+      "event_id": "5681ce3d-a920-4eef-a7df-38dfb9191737",
+      "detail_url": "https://localhost/events/5681ce3d-a920-4eef-a7df-38dfb9191737",
+      "evidence": "uploaded",
+      "delivery": {
+        "state": "observed",
+        "inbox_received": true,
+        "outbox_delivered": true,
+        "account_active_subscriptions": 0,
+        "deliveries": []
+      }
+    },
+    {
+      "request_id": "177393b1-7e0c-4dfd-a7f3-38e318b1a387",
+      "profile_id": "demo-b",
+      "stage": "event_created",
+      "created_at": "2026-10-22T10:33:04.951209+00:00",
+      "occurred_at": "2026-10-22T10:33:05.107654+00:00",
+      "mqtt_ack": "accepted",
+      "event_id": "ca233191-35e0-4a8a-b15c-5380051cd63f",
+      "detail_url": "https://localhost/events/ca233191-35e0-4a8a-b15c-5380051cd63f",
+      "evidence": "uploaded",
+      "delivery": {
+        "state": "observed",
+        "inbox_received": true,
+        "outbox_delivered": true,
+        "account_active_subscriptions": 0,
+        "deliveries": []
+      }
+    }
+  ],
+  "screenshots": "ppt/assets/screenshots",
+  "limits": [
+    "All generated devices/events/evidence are explicitly simulated; no model inference",
+    "No subscriptions were fabricated; provider/phone display not claimed",
+    "Physical phone and CodeArts evidence deferred by user",
+    "Viewport emulation is not a physical phone test",
+    "Localhost results do not validate upstream LAN/Wi-Fi access or firewall configuration"
+  ]
+}

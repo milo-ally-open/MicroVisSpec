@@ -1,0 +1,140 @@
+{
+  "title": "云哨 · 边缘智枢",
+  "subtitle": "面向多行业的 AIoT 边缘视频智能平台",
+  "date": "2026-10-22",
+  "slides": [
+    {
+      "title": "云哨 · 边缘智枢",
+      "kind": "cover",
+      "image": "readme/assets/atlas-200i-dk-a2-official.png",
+      "lead": "面向多行业的 AIoT\n边缘视频智能平台",
+      "body": "边缘智能识别，云端统一处置",
+      "caption": "首发硬件：华为 Atlas 200I DK A2",
+      "source": "README.md；project/docs/Analysis/PRD.md；设备图片复用仓库原始资产"
+    },
+    {
+      "title": "产品定位与应用场景",
+      "kind": "positioning",
+      "lead": "一套平台，连接视频、设备、事件与处置",
+      "body": "面向园区、工厂、企业与校园，统一管理边缘设备、摄像头、视觉算法与异常事件。\n\n教室行为检测是首发验证场景；行业扩展通过算法、规则和设备接入逐步推进。",
+      "source": "project/docs/Analysis/PRD.md §1–4"
+    },
+    {
+      "title": "云边端协同架构",
+      "kind": "feature",
+      "image": "readme/assets/multi-scene-monitoring.png",
+      "lead": "摄像头 → Atlas → 云端 → Web / PWA",
+      "body": "边缘：视频解码、推理与画面叠加\n\n云端：认证、设备、事件、媒体、推送\n\n终端：视频查看、事件追溯与处置",
+      "caption": "方案示意图；本机演示使用模拟设备，未连接真实摄像头",
+      "source": "project/docs/Design/STRUCTURE.md；project/src/services/docker-compose.yaml；readme/assets/multi-scene-monitoring.png 为仓库展示示意图"
+    },
+    {
+      "title": "当前交付规模",
+      "kind": "scale",
+      "lead": "平台骨架与业务闭环已经落地",
+      "body": "5 类业务服务 · 8 类工作台页面\n3 套模型准备流程 · 3 类课堂行为\n\n账号隔离、设备与规则、事件证据、处置和统计已实现。\n\n已验证单点位与本机模拟链路。\n最多 12 路为容量目标，并发性能待验收。",
+      "source": "project/src/services/docker-compose.yaml；project/src/clients/web/src/router/index.ts；project/preparation/；project/docs/Analysis/PRD.md；页面数含概览、设备列表/详情、监控、事件列表/详情、分析、设置"
+    },
+    {
+      "title": "运行概览",
+      "kind": "screenshot",
+      "image": "ppt/assets/slides/overview.png",
+      "lead": "设备、事件与处理进度，在一个入口查看",
+      "body": "设备在线概况\n事件趋势与待处置数量\n今天 / 近 7 天 / 近 30 天",
+      "caption": "本机真实系统截图 · 统计来自后端，设备与事件为模拟数据",
+      "source": "project/src/clients/web/src/pages/OverviewPage.vue；project/docs/Specification/web_pwa_client/evidence/delivery_20261022.json"
+    },
+    {
+      "title": "设备与规则管理",
+      "kind": "screenshot",
+      "image": "ppt/assets/slides/device-rules.png",
+      "lead": "区分设备、摄像头、算法与配置状态",
+      "body": "设备与摄像头登记\n告警规则开关与参数\n配置版本与实际 ACK\n单字段 RTSP 来源",
+      "caption": "专用模拟设备 · 无 Atlas 推理或真实视频连接",
+      "source": "project/src/clients/web/src/pages/DeviceDetailPage.vue；project/docs/Specification/web_pwa_client/evidence/delivery_20261022.json"
+    },
+    {
+      "title": "边缘推理与实时监控",
+      "kind": "feature",
+      "image": "readme/assets/classroom-behavior-detection.png",
+      "lead": "首发以教室行为验证边缘运行时",
+      "body": "举手、阅读、书写三类行为\n\n既有板端合成流测试：\n短测 75 / 75 帧\n长测 8997 / 9000 帧\n\n真实摄像头、完整媒体链路\n与精度仍待验收",
+      "caption": "场景示意图；板端数据来自既有验收记录，非本轮实测",
+      "source": "project/docs/Specification/classroom_behavior_detection/tasks.md；project/preparation/model_classroom_behavior/model_val/reports/release_20261020/atlas_runtime_smoke.json；atlas_runtime_sustained.json；readme/assets/classroom-behavior-detection.png"
+    },
+    {
+      "title": "异常事件查询",
+      "kind": "screenshot",
+      "image": "ppt/assets/slides/events.png",
+      "lead": "按类型、等级、地点和处置状态追溯",
+      "body": "稳定分页与条件筛选\n按账号隔离事件\n关联设备、摄像头与时间\n普通检测不自动变成告警",
+      "caption": "本机真实系统截图 · 列表中的测试事件均来自模拟链路",
+      "source": "project/src/clients/web/src/pages/EventsPage.vue；project/docs/Specification/event_service/spec.md；project/docs/Specification/web_pwa_client/evidence/delivery_20261022.json"
+    },
+    {
+      "title": "事件证据与处置闭环",
+      "kind": "screenshot",
+      "image": "ppt/assets/slides/event-detail.png",
+      "lead": "一条事件关联截图、状态与处理记录",
+      "body": "授权读取事件截图\n待处置 → 处理中 → 已解除\n保留处置时间与结果\n并发更新由版本校验保护",
+      "caption": "模拟证据明确标识；本轮已验证完整浏览器处置流程",
+      "source": "project/src/clients/web/src/pages/EventDetailPage.vue；project/docs/Specification/web_pwa_client/evidence/delivery_20261022.json"
+    },
+    {
+      "title": "基础数据分析",
+      "kind": "screenshot",
+      "image": "ppt/assets/slides/analytics.png",
+      "lead": "用事件分布辅助日常巡查与复盘",
+      "body": "事件趋势与时间范围\n类型与危险等级\n高发位置与处置状态\n当前账号的后端统计",
+      "caption": "基础统计已实现；AI 自动研判与 MCP 接入属于后续规划",
+      "source": "project/src/clients/web/src/pages/AnalyticsPage.vue；project/docs/Analysis/PRD.md；project/docs/Specification/web_pwa_client/evidence/delivery_20261022.json"
+    },
+    {
+      "title": "推送链路调试",
+      "kind": "screenshot",
+      "image": "ppt/assets/slides/push-debug.png",
+      "lead": "选择测试账号，创建可追溯的模拟告警",
+      "body": "类型、地点、时间、等级\n配置规则并等待 ACK\nMQTT → 事件 → Push\n只读投递状态\n手机显示与点击后补",
+      "caption": "当前无有效订阅时不会伪报通知成功；provider accepted 不等于手机已显示",
+      "source": "project/src/tools/push-debug/CONTRACT.md；project/src/tools/push-debug/server.py；project/docs/Specification/web_pwa_client/evidence/delivery_20261022.json"
+    },
+    {
+      "title": "验证结果与下一步",
+      "kind": "status",
+      "lead": "区分已实现、已验证与后续规划",
+      "rows": [
+        [
+          "能力",
+          "当前证据",
+          "下一步"
+        ],
+        [
+          "Web 与业务闭环",
+          "本机 HTTPS / MQTT / 数据库 / 浏览器验证",
+          "真实园区与长期运行"
+        ],
+        [
+          "推送",
+          "订阅、投递代码与本机事件接入",
+          "手机通知显示与点击"
+        ],
+        [
+          "Atlas 与视频",
+          "既有合成流推理记录",
+          "真实摄像头、媒体与精度"
+        ],
+        [
+          "扩展能力",
+          "三套模型准备流程",
+          "多行业验证；MCP 与原生 App"
+        ],
+        [
+          "CodeArts 证据",
+          "保留证据目录与补录说明",
+          "实际操作截图由用户后补"
+        ]
+      ],
+      "source": "project/docs/Specification/web_pwa_client/evidence/delivery_20261022.json；project/docs/Specification/push_service/tasks.md；project/docs/Specification/atlas_edge_runtime/tasks.md；本轮用户明确将手机与 CodeArts 实机证据后补"
+    }
+  ]
+}

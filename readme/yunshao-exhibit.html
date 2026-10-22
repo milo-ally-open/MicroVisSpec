@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>云哨 · 边缘智枢 — 云边端协同智能视觉平台</title>
-<meta name="description" content="云哨·边缘智枢，面向园区、工厂、企业与校园的云边端协同智能平台，集异常事件感知、智能数据分析、告警消息推送与对外 MCP 服务于一体。" />
+<meta name="description" content="云哨·边缘智枢，面向园区、工厂、企业与校园的 AIoT 边缘视频智能平台，覆盖设备、异常事件、基础统计与告警处置，规划接入 MCP 和更多行业算法。" />
 
 <!-- === Fonts === -->
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -493,7 +493,7 @@ footer { padding: 40px 0; border-top: 1px solid var(--line); }
         <img class="hardware-product-img" src="assets/atlas-200i-dk-a2-official.png" alt="华为 Atlas 200I DK A2 开发者套件实物图" />
       </a>
       <div class="platform-text reveal reveal-delay-1">
-        <p>云哨·边缘智枢是一套面向公共场所的<strong>云边端协同智能平台</strong>，集异常事件感知、智能数据分析、告警消息推送与对外 MCP 服务于一体。</p>
+        <p>云哨·边缘智枢是一套面向公共场所的<strong>AIoT 边缘视频智能平台</strong>，统一管理设备、异常事件、基础统计和告警处置；MCP 与原生客户端属于后续规划。</p>
         <p>团队自研垂直领域计算机视觉算法，首发部署于华为 <strong>Atlas 200I DK A2</strong> 开发者套件。<a href="https://www.hiascend.com/doc_center/source/zh/Atlas200IDKA2DeveloperKit/23.0.RC2/pd/%E4%BA%A7%E5%93%81%E4%BB%8B%E7%BB%8D.pdf" target="_blank" rel="noopener noreferrer"><strong>查看华为官方产品介绍 ↗</strong></a>。通过分析摄像头采集的实时视频流，平台能够感知异常事件。</p>
         <p>边缘设备集群既可以把算法处理后的视频流实时传输至监控大屏，也可以将检测到的异常事件上传至平台数据库——<strong>媒体走流，事件走库</strong>，各走各的通道。</p>
         <div class="platform-pills">
@@ -546,7 +546,7 @@ footer { padding: 40px 0; border-top: 1px solid var(--line); }
         <div class="hl-info">
           <span class="idx">— 亮点 02</span>
           <h3>用户友好</h3>
-          <p>平台围绕实时监控、历史告警与智能数据分析构建三类主要界面，覆盖实时查看、单个事件追溯与整体情况研判。告警可推送至 PWA 与原生 App，用户点击通知即进入事件详情，无需持续盯守监控画面。</p>
+          <p>平台围绕实时监控、历史告警与基础数据分析构建主要界面，覆盖实时查看、事件追溯与处置。PWA 订阅、推送投递和点击详情代码已实现；手机实际通知仍待验收，原生 App 属于后续规划。</p>
           <div class="hl-flow">
             <span class="step">实时监控</span><span class="arr">·</span>
             <span class="step">历史告警</span><span class="arr">·</span>
@@ -559,12 +559,12 @@ footer { padding: 40px 0; border-top: 1px solid var(--line); }
       <article class="hl-item reveal">
         <div class="hl-img">
           <img src="assets/warehouse-detection.png" alt="在智能助手聊天框输入 /mcp 后弹出的工具列表" />
-          <span class="tag">工具调用 · 智能助手</span>
+          <span class="tag">规划示意 · 智能助手</span>
         </div>
         <div class="hl-info">
           <span class="idx">— 亮点 03</span>
           <h3>AI 友好</h3>
-          <p>平台内置 MCP 服务，可接入各类成熟的 AI Agent 客户端。用户可在 Agent 中设置定时任务，让其分析异常事件的发生时段与高发点位，并结合分析结果提出巡查、处置或算法优化建议。</p>
+          <p>平台规划通过 MCP 接入 AI Agent，让 Agent 查询事件、分析高发点位并提出巡查建议。当前 MCP 服务尚为占位，工具、权限与调用审计将在后续阶段实现。</p>
           <div class="hl-flow">
             <span class="step">MCP 服务</span><span class="arr">→</span>
             <span class="step">AI Agent</span><span class="arr">→</span>
@@ -681,7 +681,7 @@ footer { padding: 40px 0; border-top: 1px solid var(--line); }
           <span class="num">03</span>
           <div>
             <h4>告警消息推送</h4>
-            <p>事件经规则校验后进入 outbox，由 push-service 经 Web Push 投递至 PWA 与原生 App；点击通知先鉴权再打开详情。</p>
+            <p>事件经规则校验后进入 outbox，由 push-service 经 Web Push 投递至 PWA；点击通知先鉴权再打开详情。手机实际通知待验收，原生 App 后续接入。</p>
             <div class="kw"><span>规则校验</span><span>Web Push</span><span>多端通知</span></div>
           </div>
         </div>
@@ -689,7 +689,7 @@ footer { padding: 40px 0; border-top: 1px solid var(--line); }
           <span class="num">04</span>
           <div>
             <h4>对外 MCP 服务</h4>
-            <p>内置受控业务能力入口，可接入各类 AI Agent 客户端；Agent 可定时分析事件分布，结合建议采取后续措施，或为算法优化提供参考。</p>
+            <p>后续计划提供受控业务能力入口，接入 AI Agent 查询与分析事件分布；当前尚未实现 MCP 工具与权限审计，不作为已交付能力。</p>
             <div class="kw"><span>MCP</span><span>AI Agent</span><span>定时分析</span></div>
           </div>
         </div>

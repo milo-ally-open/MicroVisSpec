@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>云哨 · 推送联调</title><link rel="stylesheet" href="/style.css"><script type="module" src="/app.js"></script></head>
+<body><header><a class="brand" href="/">云哨 <span>边缘智枢</span></a><span class="local-label">本机测试工具</span></header>
+<main><section class="intro"><p class="eyebrow">PUSH VERIFICATION</p><h1>把一条测试事件，送到目标账号</h1><p>填写事件信息，经过设备规则、事件服务和推送服务，验证完整告警链路。</p><p class="notice">所有新增设备、摄像头和事件均为模拟数据。接收者是所选测试账号的有效通知订阅。</p></section>
+<div class="workspace"><section><h2>测试事件</h2><form id="event-form">
+<label>接收账号<select id="profile" name="profile_id" required disabled><option value="">正在加载测试账号…</option></select></label>
+<div class="row"><label>事件类型<select name="behavior"><option value="hand-raising">举手规则事件</option><option value="reading">阅读规则事件</option><option value="writing">书写规则事件</option></select></label><label>危险等级<select name="severity"><option value="low">低</option><option value="medium">中</option><option value="high">高</option><option value="critical">紧急</option></select></label></div>
+<label>发生地点<input name="location" value="推送联调 · 模拟教室 A101" maxlength="120" required></label>
+<label>时间方式<select name="time_mode"><option value="now">规则确认后立即发生（推荐）</option><option value="custom">自定义时间</option></select></label>
+<label>发生时间<input name="occurred_at" type="datetime-local" disabled><small>默认使用规则确认后的当前时间。自定义时间必须位于该规则生效之后，过去 24 小时内；首次配置前的历史事件会被正式服务拒绝。</small></label>
+<p class="hint">工具会为所选账号创建专用模拟设备，并只启用本次所选规则。其他设备和规则不受影响。</p>
+<div class="actions"><button id="send" type="submit" disabled>创建事件并推送</button><button class="secondary" id="new-event" type="button">准备新事件</button></div>
+<p id="error" class="error" role="alert"></p></form></section>
+<section class="result" aria-live="polite"><div class="result-heading"><h2>链路结果</h2><button id="refresh" class="text-button" type="button" disabled>刷新状态</button></div>
+<ol id="stages"><li>等待填写表单</li></ol><div id="event-link"></div><p id="delivery-note" class="hint">请先在目标账号的“账号与通知”页面开启浏览器通知。provider accepted 仅代表推送平台受理，实际弹出和点击需要在接收端确认。</p><details><summary>查看脱敏结果</summary><pre id="raw">尚未创建事件</pre></details></section></div>
+<section class="instructions"><h2>接收端验收</h2><p>① 使用目标账号登录云哨，开启“此设备通知”。 ② 在这里创建事件。 ③ 查看系统通知，点击后应打开同一事件详情。</p><p>检查账号隔离时，使用另一个账号访问事件地址，应被拒绝。真实手机测试需可达的 HTTPS 域名与受信证书。</p></section></main><footer>边缘智能识别，云端统一处置 · 此工具不执行模型推理</footer></body></html>

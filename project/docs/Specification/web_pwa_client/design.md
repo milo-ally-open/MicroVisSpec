@@ -4,7 +4,7 @@
 
 ## 当前实现与目标
 
-- 当前源码为 Vue 3、Vite、TypeScript；路由和 API index 是空壳，页面只有占位组件；已有 PWA 图标、service worker 插件和更新提示。
+- 当前源码为 Vue 3、Vite、TypeScript；已有八类业务页面及认证、设备、媒体、事件、统计、通知 API 模块。PWA、更新与离线代码已有实现，真实媒体与手机通知仍独立验收。
 - 目标在既有 SPA 中按 `auth`、`devices`、`events`、`media`、`push` 拆 API 模块，按公用 dashboard 布局组织页面与导航。
 - 部署归 Web 客户端源码：`src/clients/web/Dockerfile` 构建静态站点与 Nginx 镜像，`src/clients/web/docker-compose.yaml` 单独运行名为 `web` 的入口容器。该 Compose 加入后端 Compose 创建的 external `BACKEND_NETWORK`（默认 `yunshao_backend`），仅发布 Web HTTP/HTTPS 与挂载 Web 自有 TLS/header secrets；不会创建 `web-service` 目录，也不管理后端服务的生命周期。
 
@@ -13,6 +13,8 @@
 2026-10-22 局域网访问：Linux 部署时 Web Compose 的 `WEB_BIND_ADDRESS` 绑定团队 Wi‑Fi 接口，附加 `docker-compose.atlas.yaml` 将同一 Nginx 端口发布到 Atlas 直连接口；不使用 `0.0.0.0`。Windows/WSL 部署保留 Compose loopback 绑定，由 Windows portproxy 映射 Wi‑Fi 地址。Nginx 启动时以 `WEB_HTTPS_REDIRECT_PORT` 渲染 HTTP→HTTPS 重定向，支持端口转发后的外部 HTTPS 端口。`PUBLIC_ORIGIN`、MediaMTX HLS/WebRTC 来源使用团队 Wi‑Fi HTTPS Origin，Web TLS SAN 同时包含 Wi‑Fi 与 Atlas 地址，WebRTC candidates 同时公布两个可达地址。防火墙范围由部署方配置并限制为 Wi‑Fi 客户端网段与 Atlas；当前网段不是 RFC 1918 私网，不能把接口绑定视为网络边界。
 
 ## 方案
+
+2026-10-22 本轮整合远端 `28384dd`，复用其 `style.css` 和组件主题，移除本轮重复主题文件，保持单一视觉来源。独立推送工具位于 `src/tools/push-debug/`，不进入正式导航或生产 API；本机回归见 T-14。
 
 2026-10-20 视觉方案沿用现有页面与业务组件：`style.css` 保留同一套共享组件规则并展开为可读格式，统一字体、间距、边界、深绿导航及浅色内容面板；新 `AppIcon.vue` 提供本地 SVG 图标，`AuthBrandPanel.vue` 供登录/注册共用品牌区。响应式适配 1440/1024/390/360px，移动端保留底部导航和堆叠表单；概览不再显示写死的星期/早上问候，选定范围同时驱动卡片标题。可见性切换只作用于密码框，不持久化凭据。无新依赖和远程视觉资源。
 

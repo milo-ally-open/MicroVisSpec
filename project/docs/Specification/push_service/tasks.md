@@ -13,6 +13,12 @@
 
 ## 验收证据
 
+### 2026-10-22 本机补充验收
+
+- 既有 push-service 生产代码未修改。本轮重新运行 `go test -count=1 -v -tags=integration ./...`，在独立的 `push_debug_it_20261022` PostgreSQL 数据库中 10/10 通过、无跳过，覆盖 endpoint 重绑、撤销、重复 inbox、并发领取、429 重试、410 停用、过期及密钥保护。见 [local_integration_20261022.json](evidence/local_integration_20261022.json)。
+- 独立工具 `src/tools/push-debug/` 已实现表单、两账号专用模拟设备、规则 ACK、MQTT 事件和只读投递观察。两个账号的事件均进入真实 Push inbox，event outbox 已投递；双向事件/证据跨账号访问被拒绝，同一 request_id 重试复用事件。
+- 当前测试账号有效订阅数为 0，没有伪造订阅或实际手机投递。10 项服务端测试中的可控 sender 不代表真实浏览器 Push。本轮用户明确将手机显示/点击与 CodeArts 实机证据后补。工具合同与本机测试入口见 [README](../../../src/tools/push-debug/README.md) 与 [CONTRACT](../../../src/tools/push-debug/CONTRACT.md)。
+
 | REQ/AC | 检查方法 | 当前证据 | 状态 |
 |---|---|---|---|
 | REQ-01/AC-01.1–01.2 | 账号/endpoint 绑定、权限及密钥保护测试 | `go test ./...` 与隔离 PostgreSQL integration suite 通过，覆盖 endpoint 重绑、跨账号隔离与秘密处理 | 部分通过 |
