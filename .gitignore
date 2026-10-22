@@ -1,6 +1,7 @@
 # Local credentials and assistant state
 .token
 /.assistant/
+/.codeartsproof/
 .playwright-cli/
 .weights/
 /.codeartsdoer/
