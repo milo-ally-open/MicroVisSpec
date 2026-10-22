@@ -16,9 +16,6 @@ if [[ -f /usr/local/miniconda3/etc/profile.d/conda.sh ]]; then
 fi
 command -v atc >/dev/null
 mkdir -p "$out"
-# Atlas development kits have a small memory cgroup; keep operator compilation
-# bounded while allowing an explicit override for larger hosts.
-export TE_PARALLEL_COMPILER="${TE_PARALLEL_COMPILER:-1}"
 atc --model="$model" --framework=5 --output="$out/$name" --input_format=NCHW --input_shape="images:1,3,640,640" --insert_op_conf="$aipp" --soc_version=Ascend310B4 --log=error
 test -s "$out/$name.om"
 sha256sum "$model" "$aipp" "$out/$name.om" > "$out/SHA256SUMS"

@@ -8,7 +8,7 @@ from pathlib import Path
 
 import psutil
 
-from accuracy_eval import create_inference, image_paths, preprocess_for_backend, read_image, sha256
+from accuracy_eval import create_inference, image_paths, preprocess, read_image, sha256
 
 try:
     import resource
@@ -38,7 +38,7 @@ def main() -> None:
     first_image = read_image(images[0])
     if first_image is None:
         raise ValueError(f"Cannot decode image: {images[0]}")
-    batch, _ = preprocess_for_backend(first_image, args.imgsz, args.backend)
+    batch, _ = preprocess(first_image, args.imgsz)
     outputs = infer(batch)
     if resource is not None:
         process_peak_rss_mib = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
@@ -62,7 +62,6 @@ def main() -> None:
         "split": args.split,
         "sample_images": len(images),
         "image_size": args.imgsz,
-        "input_format": "nv21_yuv420sp_u8_static_aipp" if args.backend == "om" else "rgb_nchw_float32",
         "process_peak_rss_mib": process_peak_rss_mib,
         "input_tensor_bytes": int(batch.nbytes),
         "output_tensors": [

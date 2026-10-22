@@ -7,7 +7,7 @@ from pathlib import Path
 
 import numpy as np
 
-from accuracy_eval import create_inference, decode, image_paths, preprocess_for_backend, read_image, sha256
+from accuracy_eval import create_inference, decode, image_paths, preprocess, read_image, sha256
 
 
 def summarize(values: list[float]) -> dict[str, float]:
@@ -48,7 +48,7 @@ def main() -> None:
         if image is None:
             raise ValueError(f"Cannot decode image: {image_path}")
         started = time.perf_counter()
-        batch, pad = preprocess_for_backend(image, args.imgsz, args.backend)
+        batch, pad = preprocess(image, args.imgsz)
         preprocess_ms.append((time.perf_counter() - started) * 1000)
         if image_index == 0:
             for _ in range(args.warmup):
@@ -71,7 +71,6 @@ def main() -> None:
         "split": args.split,
         "images": len(images),
         "image_size": args.imgsz,
-        "input_format": "nv21_yuv420sp_u8_static_aipp" if args.backend == "om" else "rgb_nchw_float32",
         "confidence_threshold": args.conf,
         "nms_iou_threshold": args.iou,
         "warmup_iterations": args.warmup,
