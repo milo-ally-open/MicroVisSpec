@@ -114,3 +114,6 @@ backups/
 .opencode/ 
 wsl-test.sh 
 wsl-sts.sh 
+wsl-sts-direct.py 
+wsl-find-python.sh 
+wsl-run-sts.sh 
