@@ -22,6 +22,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace {
@@ -50,6 +51,26 @@ std::string utc_now() {
     std::ostringstream result;
     result << std::put_time(&utc, "%Y-%m-%dT%H:%M:%SZ");
     return result.str();
+}
+
+bool activation_lease_expired() {
+    const char* configured = std::getenv("YUNSHAO_ACTIVATION_LEASE_FILE");
+    const std::filesystem::path path = configured && *configured ? configured : "/var/lib/yunshao/activation-lease.json";
+    if (!std::filesystem::exists(path)) return false;
+    try {
+        const auto lease = yunshao::read_json_file(path);
+        if (!lease.contains("expires_at_unix") || lease["expires_at_unix"].is_null()) return false;
+        return lease.at("expires_at_unix").get<std::int64_t>() <= std::time(nullptr);
+    } catch (...) {
+        return true;
+    }
+}
+
+void wait_for_activation_lease() {
+    while (activation_lease_expired()) {
+        std::cout << "设备授权已到期，runtime 暂停；网页续期后将自动恢复" << std::endl;
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+    }
 }
 
 std::string make_event_id() {
@@ -240,6 +261,7 @@ int main(int argc, char** argv) {
             std::cout << "Stream " << stream.stream_id << " is disabled.\n";
             return 0;
         }
+        wait_for_activation_lease();
         const auto& model = config.require_model(stream.model_id);
         const std::string input_uri = env(stream.source_ref.c_str());
         if (input_uri.empty()) throw std::runtime_error("configured camera source is not injected: " + stream.source_ref);
@@ -272,7 +294,11 @@ int main(int argc, char** argv) {
             [&](const AlarmTrigger& trigger, const std::vector<unsigned char>& jpeg) {
                 publish_alarm(trigger, stream, model, model_version, options.socket_path, jpeg);
             }, options.config_dir);
-        stream_manager.run(stream, input_uri, options.output, rtsp_server_config);
+        for (;;) {
+            stream_manager.run(stream, input_uri, options.output, rtsp_server_config);
+            if (!activation_lease_expired()) break;
+            wait_for_activation_lease();
+        }
         std::cout << "Processed stream " << stream.stream_id << " with model " << stream.model_id
                   << '@' << model_version;
         if (!options.output.empty()) std::cout << "; annotated H.264 saved to " << options.output.string();

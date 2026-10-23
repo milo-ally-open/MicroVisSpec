@@ -45,6 +45,7 @@ type Config struct {
 	BrokerServiceUser    string
 	BrokerServicePass    string
 	BrokerServiceClient  string
+	AtlasActivationOrigin string
 	InternalToken        string
 	MediaServiceURL      string
 	MediaServiceToken    string
@@ -78,6 +79,7 @@ func LoadConfig() (Config, error) {
 		BrokerServiceUser:    read("MQTT_DEVICE_SERVICE_USERNAME"),
 		BrokerServicePass:    read("MQTT_DEVICE_SERVICE_PASSWORD"),
 		BrokerServiceClient:  env("MQTT_DEVICE_SERVICE_CLIENT_ID", "yunshao-device-service"),
+		AtlasActivationOrigin: strings.TrimRight(os.Getenv("ATLAS_ACTIVATION_ORIGIN"), "/"),
 		InternalToken:        read("DEVICE_INTERNAL_SERVICE_TOKEN"),
 		MediaServiceURL:      strings.TrimRight(os.Getenv("MEDIA_SERVICE_INTERNAL_URL"), "/"),
 		MediaServiceToken:    read("MEDIA_SERVICE_INTERNAL_TOKEN"),
@@ -107,6 +109,9 @@ func LoadConfig() (Config, error) {
 	if err := validateMQTTBrokerURL(c.AdvertisedBrokerURL); err != nil {
 		return c, errors.New("MQTT_ADVERTISED_BROKER_URL must be an absolute ssl:// broker URL without credentials or path")
 	}
+	if err := validateAtlasActivationOrigin(c.AtlasActivationOrigin); err != nil {
+		return c, errors.New("ATLAS_ACTIVATION_ORIGIN must be an absolute HTTPS origin without credentials, path, query, or fragment")
+	}
 	if (c.MediaServiceURL == "") != (c.MediaServiceToken == "") {
 		return c, errors.New("MEDIA_SERVICE_INTERNAL_URL and MEDIA_SERVICE_INTERNAL_TOKEN must be configured together")
 	}
@@ -135,19 +140,20 @@ func envPositiveInt(key string, fallback int) int {
 }
 
 type Device struct {
-	ID              uuid.UUID       `gorm:"type:uuid;primaryKey" json:"device_id"`
-	AccountID       uuid.UUID       `gorm:"type:uuid;not null;index:idx_devices_account_active,priority:1" json:"-"`
-	Name            string          `gorm:"size:120;not null" json:"name"`
-	IP              string          `gorm:"size:45;not null" json:"ip"`
-	Location        string          `gorm:"size:256;not null" json:"location"`
-	ActivationState string          `gorm:"size:24;not null;default:pending;index" json:"activation_state"`
-	Active          bool            `gorm:"not null;default:true;index:idx_devices_account_active,priority:2" json:"active"`
-	LastSeenAt      *time.Time      `gorm:"index" json:"last_seen_at,omitempty"`
-	ReportedAt      *time.Time      `gorm:"index" json:"reported_at,omitempty"`
-	ReportedState   json.RawMessage `gorm:"type:jsonb;not null;default:'{}'" json:"reported_state"`
-	CreatedAt       time.Time       `gorm:"not null;index:idx_devices_created" json:"created_at"`
-	UpdatedAt       time.Time       `gorm:"not null" json:"updated_at"`
-	DisabledAt      *time.Time      `json:"disabled_at,omitempty"`
+	ID                  uuid.UUID       `gorm:"type:uuid;primaryKey" json:"device_id"`
+	AccountID           uuid.UUID       `gorm:"type:uuid;not null;index:idx_devices_account_active,priority:1" json:"-"`
+	Name                string          `gorm:"size:120;not null" json:"name"`
+	IP                  string          `gorm:"size:45;not null" json:"ip"`
+	Location            string          `gorm:"size:256;not null" json:"location"`
+	ActivationState     string          `gorm:"size:24;not null;default:pending;index" json:"activation_state"`
+	Active              bool            `gorm:"not null;default:true;index:idx_devices_account_active,priority:2" json:"active"`
+	ActivationExpiresAt *time.Time      `gorm:"index" json:"activation_expires_at"`
+	LastSeenAt          *time.Time      `gorm:"index" json:"last_seen_at,omitempty"`
+	ReportedAt          *time.Time      `gorm:"index" json:"reported_at,omitempty"`
+	ReportedState       json.RawMessage `gorm:"type:jsonb;not null;default:'{}'" json:"reported_state"`
+	CreatedAt           time.Time       `gorm:"not null;index:idx_devices_created" json:"created_at"`
+	UpdatedAt           time.Time       `gorm:"not null" json:"updated_at"`
+	DisabledAt          *time.Time      `json:"disabled_at,omitempty"`
 }
 
 func (Device) TableName() string { return "device.devices" }
@@ -189,15 +195,16 @@ type AlgorithmAssignment struct {
 func (AlgorithmAssignment) TableName() string { return "device.algorithm_assignments" }
 
 type ActivationTicket struct {
-	ID             uuid.UUID  `gorm:"type:uuid;primaryKey"`
-	DeviceID       uuid.UUID  `gorm:"type:uuid;not null;index"`
-	TokenHash      string     `gorm:"size:64;not null;uniqueIndex"`
-	ExpiresAt      time.Time  `gorm:"not null;index"`
-	ConsumedAt     *time.Time `gorm:"index"`
-	RevokedAt      *time.Time `gorm:"index"`
-	ClaimID        *uuid.UUID `gorm:"type:uuid;index"`
-	ClaimExpiresAt *time.Time `gorm:"index"`
-	CreatedAt      time.Time  `gorm:"not null"`
+	ID                   uuid.UUID  `gorm:"type:uuid;primaryKey"`
+	DeviceID             uuid.UUID  `gorm:"type:uuid;not null;index"`
+	TokenHash            string     `gorm:"size:64;not null;uniqueIndex"`
+	ExpiresAt            time.Time  `gorm:"not null;index"`
+	UsageDurationSeconds *int64     `gorm:"index"`
+	ConsumedAt           *time.Time `gorm:"index"`
+	RevokedAt            *time.Time `gorm:"index"`
+	ClaimID              *uuid.UUID `gorm:"type:uuid;index"`
+	ClaimExpiresAt       *time.Time `gorm:"index"`
+	CreatedAt            time.Time  `gorm:"not null"`
 }
 
 func (ActivationTicket) TableName() string { return "device.activation_tickets" }
@@ -248,13 +255,15 @@ type Outbox struct {
 func (Outbox) TableName() string { return "device.outbox" }
 
 type BrokerCredential struct {
-	ID           uuid.UUID  `gorm:"type:uuid;primaryKey"`
-	DeviceID     uuid.UUID  `gorm:"type:uuid;not null;uniqueIndex"`
-	Username     string     `gorm:"size:120;not null;uniqueIndex"`
-	ClientID     string     `gorm:"size:120;not null;uniqueIndex"`
-	PasswordHash string     `gorm:"size:64;not null"`
-	CreatedAt    time.Time  `gorm:"not null"`
-	RevokedAt    *time.Time `gorm:"index"`
+	ID                   uuid.UUID  `gorm:"type:uuid;primaryKey"`
+	DeviceID             uuid.UUID  `gorm:"type:uuid;not null;uniqueIndex"`
+	Username             string     `gorm:"size:120;not null;uniqueIndex"`
+	ClientID             string     `gorm:"size:120;not null;uniqueIndex"`
+	PasswordHash         string     `gorm:"size:64;not null"`
+	PreviousPasswordHash string     `gorm:"size:64"`
+	RecoveryTicketID     *uuid.UUID `gorm:"type:uuid"`
+	CreatedAt            time.Time  `gorm:"not null"`
+	RevokedAt            *time.Time `gorm:"index"`
 }
 
 func (BrokerCredential) TableName() string { return "device.broker_credentials" }
@@ -320,6 +329,7 @@ func (app *App) Handler() http.Handler {
 	r.GET("/health/live", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"status": "live"}) })
 	r.GET("/health/ready", app.ready)
 	api := r.Group("/api/v1/devices", app.requireAccount())
+	api.GET("/activation-config", app.activationConfig)
 	api.GET("/stats", app.stats)
 	api.POST("", app.createDevice)
 	api.GET("", app.listDevices)
@@ -327,15 +337,29 @@ func (app *App) Handler() http.Handler {
 	api.PATCH("/:device_id", app.updateDevice)
 	api.DELETE("/:device_id", app.disableDevice)
 	api.POST("/:device_id/activation-tickets", app.createActivationTicket)
+	api.POST("/:device_id/activation-requests", app.createActivationRequest)
+	api.GET("/:device_id/activation-requests/:request_id", app.getActivationRequest)
 	api.POST("/:device_id/cameras", app.createCamera)
 	api.GET("/:device_id/algorithms", app.listAlgorithms)
 	api.PUT("/:device_id/algorithms/:assignment_id/parameters", app.updateAlgorithmParameters)
 	r.POST("/edge/v1/activate", app.activateDevice)
+	r.GET("/edge/v1/devices/:device_id/activation", app.pollDeviceActivation)
 	r.POST("/internal/v1/devices/:device_id/http-authenticate", app.requireInternalToken(), app.authenticateDeviceHTTP)
 	r.GET("/internal/v1/cameras/:camera_id/ownership", app.requireInternalToken(), app.resolveCameraOwnershipByID)
 	r.GET("/internal/v1/devices/:device_id/cameras/:camera_id/ownership", app.requireInternalToken(), app.resolveCameraOwnership)
 	r.POST("/internal/v1/devices/:device_id/classroom-events/validate", app.requireInternalToken(), app.validateClassroomEvent)
 	return r
+}
+
+func validateAtlasActivationOrigin(raw string) error {
+	if raw == "" {
+		return nil
+	}
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Scheme != "https" || parsed.Hostname() == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" || parsed.Path != "" {
+		return errors.New("invalid Atlas activation origin")
+	}
+	return nil
 }
 
 func (a *App) requestContext() gin.HandlerFunc {
@@ -448,6 +472,10 @@ func (a *App) createDevice(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"device_id": device.ID, "activation_state": device.ActivationState, "created_at": device.CreatedAt})
 }
 
+func (a *App) activationConfig(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"server_origin": a.config.AtlasActivationOrigin})
+}
+
 func validateAsset(name, ip, location string) error {
 	if strings.TrimSpace(name) == "" || len(strings.TrimSpace(name)) > 120 || net.ParseIP(strings.TrimSpace(ip)) == nil || strings.TrimSpace(location) == "" || len(strings.TrimSpace(location)) > 256 {
 		return errors.New("invalid asset fields")
@@ -461,14 +489,14 @@ func (a *App) listDevices(c *gin.Context) {
 		writeError(c, http.StatusUnprocessableEntity, "invalid_pagination", "limit must be between 1 and 100")
 		return
 	}
-	query := a.db.Where("account_id = ? AND active = ?", accountID(c), true)
+	query := a.db.Where("account_id = ? AND (active = ? OR activation_state = ?)", accountID(c), true, "expired")
 	if token := c.Query("cursor"); token != "" {
 		createdAt, id, err := decodeCursor(token)
 		if err != nil {
 			writeError(c, http.StatusUnprocessableEntity, "invalid_cursor", "cursor is invalid")
 			return
 		}
-		query = query.Where("created_at < ? OR (created_at = ? AND id < ?)", createdAt, createdAt, id)
+		query = query.Where("(created_at < ? OR (created_at = ? AND id < ?))", createdAt, createdAt, id)
 	}
 	var devices []Device
 	if err := query.Order("created_at DESC, id DESC").Limit(limit + 1).Find(&devices).Error; err != nil {
@@ -542,11 +570,11 @@ func (a *App) deviceView(device Device) (DeviceView, error) {
 }
 
 func isOnline(device Device, now time.Time) bool {
-	return device.Active && device.ActivationState == "active" && device.LastSeenAt != nil && now.Sub(*device.LastSeenAt) <= heartbeatTimeout
+	return device.Active && device.ActivationState == "active" && (device.ActivationExpiresAt == nil || device.ActivationExpiresAt.After(now)) && device.LastSeenAt != nil && now.Sub(*device.LastSeenAt) <= heartbeatTimeout
 }
 
 func (a *App) getDevice(c *gin.Context) {
-	device, ok := a.findOwnedDevice(c, c.Param("device_id"), true)
+	device, ok := a.findOwnedActivatableDevice(c, c.Param("device_id"))
 	if !ok {
 		return
 	}
@@ -558,6 +586,25 @@ func (a *App) getDevice(c *gin.Context) {
 	c.JSON(http.StatusOK, view)
 }
 
+func (a *App) findOwnedActivatableDevice(c *gin.Context, rawID string) (Device, bool) {
+	id, err := uuid.Parse(rawID)
+	if err != nil {
+		writeError(c, http.StatusNotFound, "not_found", "device was not found")
+		return Device{}, false
+	}
+	var device Device
+	query := a.db.Where("id = ? AND account_id = ? AND (active = ? OR activation_state = ?)", id, accountID(c), true, "expired")
+	if err := query.First(&device).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			writeError(c, http.StatusNotFound, "not_found", "device was not found")
+		} else {
+			writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "device could not be loaded")
+		}
+		return Device{}, false
+	}
+	return device, true
+}
+
 func (a *App) findOwnedDevice(c *gin.Context, rawID string, activeOnly bool) (Device, bool) {
 	id, err := uuid.Parse(rawID)
 	if err != nil {
@@ -566,7 +613,7 @@ func (a *App) findOwnedDevice(c *gin.Context, rawID string, activeOnly bool) (De
 	}
 	query := a.db.Where("id = ? AND account_id = ?", id, accountID(c))
 	if activeOnly {
-		query = query.Where("active = ?", true)
+		query = query.Where("active = ? AND (activation_expires_at IS NULL OR activation_expires_at > ?)", true, time.Now().UTC())
 	}
 	var device Device
 	if err := query.First(&device).Error; err != nil {
@@ -619,7 +666,7 @@ func (a *App) updateDevice(c *gin.Context) {
 		}
 		updates["location"] = value
 	}
-	if err := a.db.Model(&Device{}).Where("id = ? AND account_id = ? AND active = ?", device.ID, accountID(c), true).Updates(updates).Error; err != nil {
+	if err := a.db.Model(&Device{}).Where("id = ? AND account_id = ? AND active = ? AND (activation_expires_at IS NULL OR activation_expires_at > ?)", device.ID, accountID(c), true, time.Now().UTC()).Updates(updates).Error; err != nil {
 		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "device could not be updated")
 		return
 	}
@@ -716,12 +763,12 @@ func (a *App) stats(c *gin.Context) {
 	var registered int64
 	var online int64
 	account := accountID(c)
-	if err := a.db.Model(&Device{}).Where("account_id = ? AND active = ?", account, true).Count(&registered).Error; err != nil {
+	if err := a.db.Model(&Device{}).Where("account_id = ? AND active = ? AND (activation_expires_at IS NULL OR activation_expires_at > ?)", account, true, time.Now().UTC()).Count(&registered).Error; err != nil {
 		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "device statistics could not be loaded")
 		return
 	}
 	cutoff := time.Now().UTC().Add(-heartbeatTimeout)
-	if err := a.db.Model(&Device{}).Where("account_id = ? AND active = ? AND activation_state = ? AND last_seen_at >= ?", account, true, "active", cutoff).Count(&online).Error; err != nil {
+	if err := a.db.Model(&Device{}).Where("account_id = ? AND active = ? AND activation_state = ? AND (activation_expires_at IS NULL OR activation_expires_at > ?) AND last_seen_at >= ?", account, true, "active", time.Now().UTC(), cutoff).Count(&online).Error; err != nil {
 		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "device statistics could not be loaded")
 		return
 	}
@@ -772,6 +819,7 @@ func main() {
 	go app.pendingCommandLoop(ctx)
 	go app.outboxLoop(ctx)
 	go app.brokerRevocationLoop(ctx)
+	go app.activationExpiryLoop(ctx)
 	server := &http.Server{Addr: config.ListenAddress, Handler: app.Handler(), ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 60 * time.Second}
 	go func() {
 		slog.Info("device_service_started", "listen_address", config.ListenAddress, "heartbeat_interval_seconds", int(heartbeatInterval.Seconds()))

@@ -51,7 +51,7 @@
 ### 2.1 实现任务
 
 1. 在现有 `go/` 占位目录内建立 Go module、入口、配置、健康接口和数据库迁移；实现后把占位 Dockerfile 补为可构建镜像。`/health/live` 表示进程存活，`/health/ready` 反映 PostgreSQL 与必需的 MediaMTX 控制面状态。
-2. 由 media-service 独占 PostgreSQL `media` schema，至少保存 `streams`、`viewer_leases` 与 `inbox`。`streams` 保存 `stream_id`、`account_id`、经 device-service 核对的 `device_id`、唯一 `camera_id`、加密的 RTSP URL/凭据、配置版本及状态；`viewer_leases` 保存 `session_id`、流 ID、到期时间和播放器关联；`inbox` 对 `session.revoked`、`device.disabled` 去重。
+2. 由 media-service 独占 PostgreSQL `media` schema，至少保存 `streams`、`viewer_leases` 与 `inbox`。`streams` 保存 `stream_id`、`account_id`、经 device-service 核对的 `device_id`、唯一 `camera_id`、加密的 RTSP URL/凭据、配置版本及状态；`viewer_leases` 保存 `session_id`、流 ID、到期时间和播放器关联；`inbox` 对 `session.revoked`、`device.disabled`、`device.activated` 去重。
 3. RTSP URL 使用现有部署密钥加密保存，密钥不写仓库、镜像或普通日志。数据库账号仅有 `media` schema 所需权限；不直接读取 device-service 的表。
 4. 日志和指标携带请求 ID、camera_id、stream_id；不输出 RTSP URL、浏览器 Cookie、内部服务凭据或可复用播放凭据。
 
@@ -78,7 +78,7 @@
 1. `camera_id` 必须是 device-service 已登记且属于当前账号的摄像头；浏览器请求体中的 `account_id` 无效。新接口只接受 `rtsp_url`，拒绝 URL userinfo；数据库仅加密保存 URL。部署升级时解密历史来源、移除旧 username/password 属性并重加密，代码不得再使用旧来源认证字段。
 2. MediaMTX 路径使用不暴露设备信息的 `stream_id`。将来源设置为 Atlas 输出的可达 RTSP 地址，显式启用 `sourceOnDemand`；来源无人观看时释放拉流，恢复观看时向界面呈现连接中状态。[MediaMTX 配置](https://mediamtx.org/docs/references/configuration-file/)
 3. 维护“期望配置版本”和“MediaMTX 实际配置版本”。配置更新失败时标记 `pending`/`failed`，后台定期对账重试；不得把数据库已保存误认为 MediaMTX 已生效。
-4. 接收 device-service 的 `device.disabled`，按设备关闭关联流路径和观看租约；重复通知幂等。定期向 device-service 对账摄像头归属与设备启用状态，补偿消息延迟或 MediaMTX 重启。历史事件、截图与处置由 event-service 按自己的留存规则管理。
+4. 接收 device-service 的 `device.disabled`，按设备关闭关联流路径和观看租约；接收 `device.activated` 后只恢复由设备到期停用且保留来源配置的流，并重新对账 MediaMTX。处理生命周期事件前向 device-service 核对当前设备状态，忽略过期的乱序通知；重复通知幂等。定期对账摄像头归属与设备启用状态，补偿消息延迟或 MediaMTX 重启。历史事件、截图与处置由 event-service 按自己的留存规则管理。
 5. 监控“设备在线”“RTSP 来源可达”“媒体正在拉取”“浏览器可播放”四个不同状态，界面按具体原因提示。
 
 ### 3.3 交付物与阶段验收

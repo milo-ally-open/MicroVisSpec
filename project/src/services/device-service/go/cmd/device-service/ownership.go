@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -38,7 +39,7 @@ func (a *App) resolveCameraOwnership(c *gin.Context) {
 		return
 	}
 	var device Device
-	if err := a.db.WithContext(c.Request.Context()).Where("id = ? AND active = ?", deviceID, true).Take(&device).Error; err != nil {
+	if err := a.db.WithContext(c.Request.Context()).Where("id = ? AND active = ? AND (activation_expires_at IS NULL OR activation_expires_at > ?)", deviceID, true, time.Now().UTC()).Take(&device).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			writeError(c, http.StatusNotFound, "device_not_found", "device or camera was not found")
 			return
@@ -85,7 +86,7 @@ func (a *App) resolveCameraOwnershipByID(c *gin.Context) {
 		return
 	}
 	var device Device
-	if err := a.db.WithContext(c.Request.Context()).Where("id = ? AND account_id = ? AND active = ?", camera.DeviceID, camera.AccountID, true).Take(&device).Error; err != nil {
+	if err := a.db.WithContext(c.Request.Context()).Where("id = ? AND account_id = ? AND active = ? AND (activation_expires_at IS NULL OR activation_expires_at > ?)", camera.DeviceID, camera.AccountID, true, time.Now().UTC()).Take(&device).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			writeError(c, http.StatusNotFound, "device_not_found", "camera was not found")
 			return

@@ -83,6 +83,8 @@ COMPOSE_PROJECT_NAME=yunshao
 BACKEND_NETWORK=yunshao_backend
 PUBLIC_HOST=192.168.0.1
 PUBLIC_ORIGIN=https://172.50.53.131:19080
+# Legacy administrator commissioning endpoint; normal user activation is requested in Web.
+ATLAS_ACTIVATION_ORIGIN=https://192.168.0.1:19080
 MQTT_BIND_ADDRESS=192.168.0.1
 MQTT_TLS_PORT=8883
 MQTT_ADVERTISED_BROKER_URL=ssl://192.168.0.1:8883
@@ -328,7 +330,7 @@ docker compose -f docker-compose.yaml -f docker-compose.atlas.yaml up --build -d
 docker compose -f docker-compose.yaml -f docker-compose.atlas.yaml ps
 ```
 
-團隊 Wi‑Fi 客戶端瀏覽器開啟 `https://172.50.53.131:19080/`。Atlas 激活仍存取 `https://192.168.0.1:19080/edge/v1/activate`。首次部署沒有預設帳號，請在頁面註冊並登入。登入後確認能開啟即時監控、告警清單、資料分析和邊緣設備頁面。
+团队 Wi-Fi 客户端浏览器打开 `https://172.50.53.131:19080/`。Atlas agent 使用其预置的 `YUNSHAO_EDGE_API_ORIGIN` 经 HTTPS 后台轮询设备激活请求；用户登录后在设备详情选择期限并点击网页激活/续期，不需要在 Atlas 终端运行激活命令。首次部署没有默认账号，请先在页面注册并登录。
 
 ## 6. 安装 Atlas 程序、激活设备并安装模型
 
@@ -390,67 +392,11 @@ sudo udevadm trigger
 sudo systemctl daemon-reload
 ```
 
-在 Web 的边缘设备页面创建设备，IP 填 192.168.0.2，再签发一次性激活票据。票据只显示一次，有效期 10 分钟。
+首次部署先在 Web 登记设备并记录生成的 device ID；管理员再按受控设备安装流程，将该 ID、初始可信 MQTT 身份、CA 证书和云端 HTTPS Origin 绑定到 Atlas agent，并启用 `yunshao-agent.service`。初始身份必须同时由服务端登记，agent 才能用它建立 TLS 轮询；agent 需能访问 `https://192.168.0.1:19080`。这是一次性的设备部署/接入工作，终端用户日常激活与续期无需登录 Atlas 或执行命令。切勿把凭据写入浏览器或普通部署文档。
 
-把 MQTT CA 证书复制到 Atlas：
+完成 agent 预置并确认设备在线后，用户在 Web 打开对应设备记录（不要重复登记）。选择“无限期”或输入自定义期限（分钟、小时、天），点击“网页激活设备”或“网页续期并激活”。页面等待 Atlas 确认保存新凭据后才显示完成；agent 在后台通过 TLS 领取轮换后的 MQTT 凭据，写入仅设备服务用户可读的 `/var/lib/yunshao/activation.env`，自动重启自身并同步本地租期。浏览器不显示票据、激活命令或 MQTT 密码。
 
-```text
-scp project/src/services/device-service/.secret-mqtt-ca-certificate.pem root@192.168.0.2:/tmp/yunshao-mqtt-ca.pem
-```
-
-在 Atlas 上创建激活请求文件。将设备页面中的设备 UUID 和一次性票据填入：
-
-```json
-{"device_id":"设备 UUID","ticket":"一次性激活票据"}
-```
-
-在 Atlas 上用 vim 创建并保存请求文件：
-
-```sh
-vim /tmp/yunshao-activate.json
-```
-
-将上面的 JSON 填入文件后，请求激活：
-
-```sh
-umask 077
-curl --fail --silent --show-error --cacert /tmp/yunshao-mqtt-ca.pem \
-  -H 'Content-Type: application/json' \
-  --data-binary @/tmp/yunshao-activate.json \
-  https://192.168.0.1:19080/edge/v1/activate \
-  --output /root/yunshao-activation.json
-jq . /root/yunshao-activation.json
-```
-
-激活响应包含 MQTT broker 地址、client_id、用户名和密码。将 broker_url 中的主机和端口、以及其余字段原样复制到 agent.env。下面的地址和端口是当前示例值：
-
-```sh
-sudo install -o root -g yunshao -m 0640 /tmp/yunshao-mqtt-ca.pem /etc/yunshao/mqtt-ca.pem
-sudo vim /etc/yunshao/agent.env
-```
-
-文件内容如下。将尖括号中的值从激活响应中复制；client_id 必须使用响应原值：
-
-```text
-YUNSHAO_DEVICE_ID=设备 UUID
-YUNSHAO_MQTT_HOST=192.168.0.1
-YUNSHAO_MQTT_PORT=8883
-YUNSHAO_MQTT_CLIENT_ID=激活响应中的client_id
-YUNSHAO_MQTT_USERNAME=激活响应中的username
-YUNSHAO_MQTT_PASSWORD=激活响应中的password
-YUNSHAO_MQTT_CA=/etc/yunshao/mqtt-ca.pem
-```
-
-保存后收紧权限并启动 agent：
-
-```sh
-sudo chown root:yunshao /etc/yunshao/agent.env
-sudo chmod 0640 /etc/yunshao/agent.env
-sudo rm -f /tmp/yunshao-activate.json /tmp/yunshao-mqtt-ca.pem /root/yunshao-activation.json
-sudo systemctl enable --now yunshao-agent.service
-sudo systemctl status yunshao-agent.service --no-pager
-```
-
+有限期授权从服务端确认激活时开始。到期后 device-service 自动将设备置为 `expired` 并撤销 MQTT 权限；Atlas classroom runtime 根据本地租期暂停，agent 保留 HTTPS 轮询以便用户网页续期。续期成功后新租期和凭据由 agent 自动接收，runtime 恢复。检查服务可使用部署阶段的运维方式；终端用户日常续期不需登录 Atlas。
 安装仓库中的课堂 OM 模型：
 
 ```text

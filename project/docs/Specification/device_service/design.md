@@ -36,6 +36,13 @@ device schema 由本服务独占；激活票据一次性；MQTT ACL 按设备隔
 - **安全与数据处理**：所有新增字段具有明确类型和非负范围校验；未知字段仍拒绝，payload 中 `account_id` 仍不可信；仅完整校验后的报告更新 `reported_state` 和心跳时间。
 - **影响**：扩展状态 DTO 与服务内集成测试，不改变 MQTT 主题、身份 ACL 或设备在线超时规则。
 
+### 设备授权租期与到期撤权（2026-10-23）
+
+- **决定**：设备激活请求保存 `duration_seconds`；激活成功后从服务器时间计算 `activation_expires_at`。`null` 表示无限期。device-service 每 15 秒检查到期设备，并在单个事务内将设备置为 `expired`、写 `device.disabled` outbox；随后立即尝试撤销 MQTT 身份，失败继续由现有撤销对账循环重试。
+- **网页激活与续期**：已预置可信身份的设备由所有者在网页提交不含秘密值的请求，Atlas agent 后台轮询并领取 MQTT 密码；用户日常操作不需要登录板端。请求消费后，页面保持 `syncing`，直到 agent 用新身份再次轮询确认保存成功。若凭据响应丢失，服务端可用现有 broker 管理机密和请求 ID 重放相同密码，不将明文密码写入数据库；设备确认后清除旧密码哈希。`expired` 资产仍可续期并写 `device.activated` outbox，media-service 恢复保留来源配置的流；人工停用的 `disabled` 设备不会被续期入口匹配。首次安装 agent、CA、HTTPS Origin 和可信设备身份仍由管理员部署流程预置。
+- **依据**：用户要求自定义或无限设备授权期限，并明确要求到期自动停用和撤销 MQTT 权限。
+- **影响**：PostgreSQL 自动迁移新增设备到期时间和票据期限字段；列表/详情仅额外显示 `expired`；业务鉴权仍以 `active` 和激活态为准；到期与重新激活分别使用 media outbox，并沿用 broker 撤销恢复路径。
+
 ## 状态依据
 
 设计描述目标与约束，不代表已实现；状态由[任务与证据清单](tasks.md)、仓库代码和部署记录确认。

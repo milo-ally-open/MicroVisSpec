@@ -116,7 +116,7 @@ func (a *App) processDeviceState(topic string, payload []byte) error {
 	stateJSON := append(json.RawMessage(nil), payload...)
 	return a.db.Transaction(func(tx *gorm.DB) error {
 		var device Device
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND active = ? AND activation_state = ?", deviceID, true, "active").First(&device).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND active = ? AND activation_state = ? AND (activation_expires_at IS NULL OR activation_expires_at > ?)", deviceID, true, "active", time.Now().UTC()).First(&device).Error; err != nil {
 			return errors.New("state report is not from an active device")
 		}
 		if device.ReportedAt != nil && sentAt.Before(*device.ReportedAt) {

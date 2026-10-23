@@ -10,6 +10,7 @@ Group=yunshao
 SupplementaryGroups=video HwHiAiUser HwBaseUser
 EnvironmentFile=/etc/yunshao/cann.env
 EnvironmentFile=/etc/yunshao/agent.env
+EnvironmentFile=-/var/lib/yunshao/activation.env
 ExecStart=/usr/local/bin/yunshao-agent
 Restart=on-failure
 RestartSec=3

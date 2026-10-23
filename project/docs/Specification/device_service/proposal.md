@@ -23,6 +23,10 @@ Atlas agent 上报设备、相机、NPU、模型、流、MQTT、配置版本和�
 
 设备详情页为设备下登记的摄像头提供一个 RTSP 地址配置入口，方便用户从设备工作区完成边缘视频接入。摄像头及账号归属仍由 device-service 校验；来源 URL、状态与 MediaMTX 对账继续由 media-service 持有。界面和写请求不提供来源用户名或密码。
 
+## 本次变更：设备授权期限与自动停用
+
+网页激活请求可携带使用时长：`duration_seconds: null` 表示无限期，正整数表示自激活成功后开始计算的自定义时长。到期后 device-service 将设备设为 `expired`、停用业务访问、写入 `device.disabled` outbox 并撤销 MQTT 身份；过期设备保留在账号设备列表。用户在网页提交续期后，已预置可信身份的 Atlas agent 自动轮询领取新凭据；服务端写 `device.activated` outbox 恢复已保存媒体来源。浏览器不接收票据或 MQTT 密码；首次设备部署仍需管理员预置 agent、CA 与可信设备身份。
+
 ## 边界
 
 事件处置、媒体播放授权和其他服务数据库读写。

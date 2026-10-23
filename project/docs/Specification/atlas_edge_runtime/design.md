@@ -29,7 +29,7 @@ sequenceDiagram
   EA->>DB: 标记对应 ID 已确认
 ```
 
-设备首次激活由 device-service 的一次性凭据交换建立设备身份；运维将响应中的 broker 地址、`client_id`、username、password 和 CA 安全写入 agent 环境文件，agent 必须原样使用返回的 `client_id`，不得自行从 device_id 推导，否则会与 Mosquitto Dynamic Security 登记的固定 client ID 不匹配。后续 MQTT 使用每设备凭据和 `devices/{deviceId}/...` topic ACL。凭据定期轮换、停用时撤销。配置是带单调版本的完整快照，runtime ACK 后才报告已生效。期望态与实报态始终分开。
+设备身份、HTTPS Origin/CA 和初始 MQTT 凭据在部署时由管理员预置。日常激活/续期由网页创建不含秘密值的请求；agent 通过现有设备身份轮询 HTTPS 路由，服务端轮换 MQTT 凭据，agent 安全写入 systemd credential overlay 并自动重启。用户浏览器和命令行不接触新 MQTT 密码。agent 必须原样使用服务端返回的 `client_id`，不得自行从 device_id 推导，否则会与 Mosquitto Dynamic Security 登记的固定 client ID 不匹配。后续 MQTT 使用每设备凭据和 `devices/{deviceId}/...` topic ACL。凭据轮换、停用或到期时撤销。配置是带单调版本的完整快照，runtime ACK 后才报告已生效。期望态与实报态始终分开。
 
 模型包目录按 `models/{model_id}/{version}/` 只读保存模型文件和 `manifest.json`；安装流程在 `staging/` 校验 SHA-256，并按 `models.json` 中对应 profile 比较芯片/格式/输入尺寸/类别，成功后以原子符号链接切换 `active/{model_id}`，至少保留该 model_id 的上一个版本。公共配置/入库逻辑只做通用结构校验，不含 classroom class、类别数和 classroom event type 常量。
 

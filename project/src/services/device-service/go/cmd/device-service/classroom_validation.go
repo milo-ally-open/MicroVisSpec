@@ -48,7 +48,7 @@ func (a *App) validateClassroomEvent(c *gin.Context) {
 		return
 	}
 	var device Device
-	if err := a.db.Where("id = ? AND active = ? AND activation_state = ?", deviceID, true, "active").First(&device).Error; err != nil {
+	if err := a.db.Where("id = ? AND active = ? AND activation_state = ? AND (activation_expires_at IS NULL OR activation_expires_at > ?)", deviceID, true, "active", time.Now().UTC()).First(&device).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			writeError(c, http.StatusNotFound, "not_found", "device was not found")
 		} else {

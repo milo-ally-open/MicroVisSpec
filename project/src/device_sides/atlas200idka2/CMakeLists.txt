@@ -86,7 +86,7 @@ target_include_directories(edge_core PUBLIC include "${NLOHMANN_JSON_INCLUDE_DIR
 target_link_libraries(edge_core PUBLIC OpenSSL::Crypto SQLite::SQLite3 "${ASCENDCL_LIBRARY}")
 target_compile_options(edge_core PRIVATE -Wall -Wextra -Wpedantic)
 
-add_executable(yunshao-agent src/agent/agent.cpp)
+add_executable(yunshao-agent src/agent/agent.cpp src/agent/activation.cpp)
 find_package(CURL REQUIRED)
 target_include_directories(yunshao-agent PRIVATE include "${NLOHMANN_JSON_INCLUDE_DIR}" "${ACL_INCLUDE_DIR}")
 target_link_libraries(yunshao-agent PRIVATE edge_core PkgConfig::MOSQUITTO CURL::libcurl)

@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -24,7 +25,7 @@ func (a *App) authenticateDeviceHTTP(c *gin.Context) {
 		return
 	}
 	var device Device
-	err = a.db.WithContext(c.Request.Context()).Table(Device{}.TableName()).Where("id = ? AND active = ?", deviceID, true).Take(&device).Error
+	err = a.db.WithContext(c.Request.Context()).Table(Device{}.TableName()).Where("id = ? AND active = ? AND (activation_expires_at IS NULL OR activation_expires_at > ?)", deviceID, true, time.Now().UTC()).Take(&device).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			writeError(c, http.StatusUnauthorized, "unauthorized", "device credentials are invalid")
