@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="readme/assets/logo.png" alt="云哨·边缘智枢" width="168" />
+  <img src="assets/logo.png" alt="云哨·边缘智枢" width="168" />
 </p>
 
 <h1 align="center">云哨·边缘智枢</h1>
