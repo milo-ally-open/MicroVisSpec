@@ -1,4 +1,0 @@
-interface:
-  display_name: "Yunshao Classroom Model R&D"
-  short_description: "Follow the classroom model SOP from data to Atlas demo"
-  default_prompt: "Use $yunshao-classroom-model-rnd to complete the classroom model workflow in this Yunshao repository."
