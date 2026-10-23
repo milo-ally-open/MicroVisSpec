@@ -1,6 +1,6 @@
 #include "ai_interface.hpp"
 
-#include <acl/acl.h>
+
 #include <opencv2/core.hpp>
 #include <opencv2/dnn.hpp>
 
@@ -11,6 +11,10 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+
+
+#include <acl/acl.h>
+
 
 namespace yunshao {
 namespace {
