@@ -1,76 +1,135 @@
 <p align="center">
-  <img src="readme/assets/logo.png" alt="云哨边缘智枢 Logo" width="180" />
+  <img src="readme/assets/logo.png" alt="云哨·边缘智枢" width="168" />
+</p>
+
+<h1 align="center">云哨·边缘智枢</h1>
+
+<p align="center">
+  面向园区、校园与工厂的云边协同视频智能平台
 </p>
 
 <p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License: Apache 2.0" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache--2.0-blue.svg" alt="Apache-2.0 License" /></a>
+  <img src="https://img.shields.io/badge/Edge-Huawei%20Atlas%20200I%20DK%20A2-cc0000" alt="Huawei Atlas 200I DK A2" />
+  <img src="https://img.shields.io/badge/Status-MVP%20%2F%20Pilot%20Development-2563eb" alt="MVP and pilot development" />
 </p>
 
-<h1 align="center">云哨 边缘智枢</h1>
+云哨·边缘智枢（Yunshao）将视频接入、边缘 AI 推理、设备管理、事件处置与运行分析整合在一个可部署的平台中。摄像头视频由边缘设备就近处理，结构化事件和经授权的证据再进入云端工作台，帮助组织统一查看设备与告警状态。
 
-<p align="center"><em>边缘智能识别，云端统一处置</em></p>
+项目首发部署目标为 **华为 Atlas 200I DK A2（Ascend 310B4）**。当前仓库处于 MVP 与试点验证阶段；本文会区分已实现能力和仍需现场验收的能力，不将规划功能描述为已交付功能。
 
-## 介绍
+## 适用场景
 
-从零部署云端、Web/PWA、MediaMTX 和 Atlas 边缘端，请按[部署指南](DEPLOY.md)操作。
+- 校园、园区和工厂的多点位视频巡检与异常事件管理
+- 需要在边缘侧运行视觉模型，并集中管理设备和事件的场景
+- 需要将视频流、模型版本、告警规则和处置记录纳入统一工作流的试点项目
 
-“云哨·边缘智枢”是一套面向园区、工厂、企业、校园等场所的 **AIoT 边缘视频智能平台**，围绕设备、视频、异常事件、告警处置和基础统计组织云边端协同。MCP 与原生移动客户端属于后续规划。
+## 核心能力
 
-团队自主研发的垂直领域计算机视觉算法，首发部署于华为 Atlas 200I DK A2 开发者套件。通过分析摄像头采集的实时视频流，平台能够感知异常事件。边缘设备集群既可以通过流媒体技术，将算法处理后的视频流实时传输至监控大屏，也可以将检测到的异常事件上传至平台数据库。
-
-工作台已实现设备、监控、事件、处置、通知设置和基础统计页面。用户可以浏览告警列表，查看授权截图、地点与时间并记录处置结果；截图上传后保留 24 小时。实时视频播放与 PWA 手机实际通知仍需相应环境验收，Android、iOS 原生 App 尚未实现。
-
-**基础数据分析已实现**：支持今天、近 7 天、近 30 天的事件趋势、等级、类型、位置和处置状态统计。本机浏览器已验证从真实后端读取模拟事件统计；AI 自动研判不属于当前已交付能力。
-
-平台后续计划通过 MCP 向 AI Agent 提供受控查询与分析能力。当前 `mcp-service` 为占位目录，尚未实现工具、权限与调用审计，不能作为现有功能演示。
-
-产品介绍页：[云哨·边缘智枢展示页](https://atomgit.com/milo-ally-stu/Yunshao/blob/main/readme/yunshao-exhibit.html)。
-
-## 网络拓扑
-
-现状图展示首发单园区部署中的网络边界，以及浏览器、云端服务、Atlas 边缘设备和摄像头之间的主要通信链路。
-
-![首发单园区网络拓扑](readme/assets/system-network-current.svg)
-
-可编辑源文件：[首发单园区网络拓扑（draw.io）](readme/assets/system-network-current.drawio)。
-
-下图是公有云上线规划，当前尚未部署。跨园区边缘接入建议通过 VPN；公网 WebRTC 和中继端口需经网络评审，评审通过前可按 HTTPS HLS 方案规划。
-
-![公有云部署拓扑规划](readme/assets/system-network-online-proposed.svg)
-
-可编辑源文件：[公有云部署拓扑规划（draw.io）](readme/assets/system-network-online-proposed.drawio)。
-
-## 项目亮点
-
-1. **云边端协同**：边缘设备连接摄像头，在本地运行计算机视觉算法，实时分析视频流并识别异常；云端平台统一管理设备状态与位置，汇聚并存储异常事件；监控大屏和手机客户端展示设备画面与告警信息，支持查看和处置，形成从边缘感知、云端汇聚到终端响应的协同链路。
-2. **事件闭环**：围绕监控、事件、处置与基础统计组织工作台；账号隔离、授权截图和处置记录已有本机验收证据。PWA 订阅和 Web Push 投递代码已实现，手机实际显示与点击另行验收。
-3. **可扩展架构**：复用设备、事件和规则合同接入更多场景；MCP 和原生 App 按后续规划推进。
-
-## 首发场景：教室行为检测
-
-首发以 **教室行为检测** 验证边缘推理、视频展示、设备管理和云端业务链路。课堂模型流程定义 `hand-raising`、`reading`、`writing` 三类检测，输入尺寸为 640；已有模型产物和 Atlas OM 合成流测试记录，真实课堂精度与完整摄像头链路尚待验收。行为类别只描述画面中的可见行为，不代表学生身份、成绩或专注度。
-
-### 最小业务闭环
-
-1. **接入点位**：登记 Atlas 200I DK A2、教室摄像头和位置，使用经授权的 H.264 教室视频源。
-2. **边缘推理与展示**：在 Atlas 上运行已登记版本的课堂行为模型，实时输出行为类别、边界框和置信度；设备状态与算法状态分开展示。
-3. **告警规则**：三类检测的告警初始全部关闭。只有用户显式启用并配置类别规则后，边缘端才将满足规则的行为作为异常事件上报；单帧检测本身不自动等于告警。
-4. **查询与处置**：云端按账号隔离保存已生成的异常事件，允许查询、查看授权截图、记录处置结果；截图上传后保存 24 小时。
-5. **PWA 与统计**：仅对已启用规则产生的事件创建通知意图和告警统计；推送点击后先鉴权再打开详情。
-
-MVP 阶段采用 **华为 Atlas 200I DK A2（Ascend 310B4）**。端侧模型链路为 PyTorch → ONNX → CANN ATC → OM，使用 AscendCL 推理。模型产物与板端既有记录见[课堂检测任务](project/docs/Specification/classroom_behavior_detection/tasks.md)；合成流结果不能替代真实摄像头、精度和长期稳定性验收。消防通道检测作为后续场景保留，不属于首发范围。
-
-## 当前交付与证据（2026-10-22）
-
-| 内容 | 当前状态 |
+| 能力域 | 说明 |
 |---|---|
-| 认证、设备、事件、媒体、推送 | 五个业务服务已有实现；本轮在本机重新构建并运行 |
-| Web 工作台 | 8 类业务页面，主题与产品展示页统一；13 项测试、类型检查和构建通过 |
-| 账号与事件闭环 | 本机真实 HTTPS/MQTT/PostgreSQL 联调；模拟设备、事件与截图；跨账号拒绝与浏览器处置已验证 |
-| 推送 | 两账号模拟事件进入真实 Push inbox；10 项隔离数据库测试通过；手机实际通知后补 |
-| 模型与容量 | 课堂、车辆、仓储三套准备流程；既有 Atlas 合成流证据；最多 12 路为容量目标，未完成本轮并发验收 |
-| MCP / 原生 App / CodeArts | MCP、原生 App 后续规划；CodeArts 实际操作证据由用户后补 |
+| 边缘视频分析 | 在 Atlas 边缘设备上运行 AscendCL 推理程序，接入视频流并输出检测结果。 |
+| 设备管理 | 在 Web 工作台登记和查看设备、位置、连接状态及算法状态。 |
+| 视频与媒体服务 | 通过 MediaMTX 管理媒体流接入与分发，支持云端服务和边缘设备协同。 |
+| 事件闭环 | 汇聚边缘事件，按账号隔离查询，查看授权证据并记录处置结果。 |
+| 规则与通知 | 按已启用的告警规则生成事件及通知意图；Web Push 的手机端实际投递仍需目标环境验收。 |
+| 运行分析 | 提供事件趋势、等级、类型、位置和处置状态等基础统计。 |
 
-- [本机推送调试工具](project/src/tools/push-debug/README.md)：独立表单与逻辑后端，不改变生产服务 API。
-- [本轮浏览器与链路证据](project/docs/Specification/web_pwa_client/evidence/delivery_20261022.json)。
-- [汇报材料、大纲与截图清单](ppt/README.md)。
+## 系统架构
+
+### 当前单园区部署
+
+下图展示浏览器、云端服务、Atlas 边缘设备和摄像头之间的主要通信链路。
+
+![云哨单园区部署网络拓扑](readme/assets/system-network-current.svg)
+
+可编辑源文件：[system-network-current.drawio](readme/assets/system-network-current.drawio)
+
+### 公有云部署规划
+
+下图是后续公有云上线规划，**尚未部署**。跨园区边缘接入建议通过 VPN；公网 WebRTC 与中继端口需要先完成网络评审。
+
+![云哨公有云部署规划拓扑](readme/assets/system-network-online-proposed.svg)
+
+可编辑源文件：[system-network-online-proposed.drawio](readme/assets/system-network-online-proposed.drawio)
+
+## 首发示范：教室行为检测
+
+首发示范用于验证边缘推理、视频呈现、设备管理和云端事件链路。课堂检测流程定义 `hand-raising`、`reading`、`writing` 三类目标，模型输入尺寸为 640；模型部署链路为 **PyTorch → ONNX → CANN ATC → OM → AscendCL**。
+
+告警规则默认关闭。只有用户明确启用并配置相应规则后，边缘检测结果才会作为异常事件上报；单帧目标检测本身不等于告警。行为类别只描述画面中可见的动作，不代表学生身份、成绩或专注度。
+
+已有模型产物与 Atlas 合成流测试记录见[课堂行为检测规格与任务记录](project/docs/Specification/classroom_behavior_detection/tasks.md)。合成流结果不能替代真实摄像头画质、模型精度、网络条件和长期稳定性验收。消防通道检测属于后续场景，不在当前首发范围内。
+
+## 当前交付状态
+
+| 模块 | 状态与验证边界 |
+|---|---|
+| 后端服务 | 认证、设备、事件、媒体和推送服务已有实现；部署及环境配置见[部署指南](DEPLOY.md)。 |
+| Web 工作台 | 已实现设备、监控、事件、处置、通知设置和基础统计页面；相关构建与浏览器证据见[交付记录](project/docs/Specification/web_pwa_client/evidence/delivery_20261022.json)。 |
+| 账号与事件 | 已有本机 HTTPS、MQTT、PostgreSQL 联调记录，覆盖模拟设备与事件、授权截图、跨账号隔离和处置流程。 |
+| 边缘模型 | 仓库包含课堂、车辆、仓储等模型研发流程及 Atlas 端合成流记录；本轮并发容量目标尚未完成验收。 |
+| 视频链路 | 提供局域网演示和推流验证流程；实时播放效果仍取决于现场设备、网络和媒体配置。 |
+| Web Push | 订阅、投递代码和隔离测试已有；手机系统上的实际通知及点击流程需要在目标设备上验收。 |
+| MCP / 原生客户端 | 后续规划。当前 `mcp-service` 尚未实现可供生产使用的工具、权限与调用审计；Android、iOS 原生 App 尚未实现。 |
+
+## 快速开始
+
+### 环境要求
+
+- Linux 主机或服务器，用于运行云端服务与 Web 工作台
+- Docker Engine 与 Docker Compose 插件
+- 华为 Atlas 200I DK A2，用于边缘推理演示
+- 摄像头或经授权的视频源；具体编码、网络和端口要求见部署指南
+
+### 获取代码
+
+```bash
+git clone https://atomgit.com/milo-ally-stu/Yunshao.git
+cd Yunshao
+```
+
+### 部署
+
+请按[部署指南](DEPLOY.md)配置服务地址、证书、密钥、MediaMTX、云端服务和 Atlas 运行时。生产或试点部署时，应为目标环境生成独立密钥并限制管理接口与媒体端口的网络访问；不要将真实密钥提交到仓库。
+
+## 仓库结构
+
+```text
+project/
+├── docs/Specification/       # 产品与系统规格、设计、任务和验收记录
+├── preparation/              # 模型训练、导出、转换、验证和部署工程
+└── src/
+    ├── clients/web/          # Web 工作台
+    ├── device_sides/          # Atlas 边缘端运行时
+    ├── services/              # 云端后端与媒体服务
+    └── tools/                 # 开发与调试工具
+readme/                       # 项目素材、网络图和辅助说明
+ppt/                           # 项目汇报材料
+video/                         # 演示视频
+```
+
+## 文档入口
+
+- [部署指南](DEPLOY.md)：本机/局域网部署、云端服务、MediaMTX 与 Atlas 端联调
+- [服务端说明](project/src/services/README.md)：服务启动、检查、日志与数据维护
+- [Atlas 边缘运行时](project/src/device_sides/atlas200idka2/README.md)：边缘端构建、模型接入和视频测试
+- [课堂行为检测任务](project/docs/Specification/classroom_behavior_detection/tasks.md)：首发模型任务与验证记录
+- [产品展示页](readme/yunshao-exhibit.html)
+- [汇报材料索引](ppt/README.md)
+- [协作与提交约定](ONBOARDING.md)
+
+## 安全与数据边界
+
+- 设备凭据、服务密钥和个人访问令牌应通过目标环境的安全配置注入，不应写入源码或提交到 Git。
+- 事件、截图和媒体访问应遵循部署方的授权、留存和访问控制要求。当前授权截图的默认留存时间为 24 小时，部署方仍需依据实际制度确认配置。
+- 账号隔离已通过本机测试覆盖；上线前仍须结合实际身份体系、网络边界、备份策略和运维流程完成安全验收。
+- AI 推理结果用于辅助巡检和告警，不应直接作为人员身份、纪律处分或其他高影响决策的唯一依据。
+
+## 参与贡献
+
+欢迎通过 Issue 或 Pull Request 报告问题、提交改进和补充部署验证。提交前请阅读[协作与提交约定](ONBOARDING.md)，并在变更说明中记录影响范围、验证方式和未覆盖项。
+
+## 许可证
+
+本项目采用 [Apache License 2.0](LICENSE)。
