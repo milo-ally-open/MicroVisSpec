@@ -62,6 +62,7 @@ struct ActivationOptions {
     std::string device_id;
     std::string api_ca;
     std::string mqtt_ca;
+    bool ticket_from_stdin = false;
 };
 
 std::string trim(std::string value) {
@@ -113,9 +114,13 @@ ActivationOptions parse_options(int argc, char** argv) {
     for (int index = 2; index < argc; ++index) {
         const std::string key = argv[index];
         if (key == "--help" || key == "-h") {
-            std::cout << "用法：sudo yunshao-agent activate --server https://<Atlas可达的云端地址> --device-id <UUID> [--api-ca <CA文件>] [--mqtt-ca <CA文件>]\n"
-                      << "票据会在终端中隐藏输入；成功后将安全写入 agent.env 并启动 agent。\n";
+            std::cout << "用法：sudo yunshao-agent activate --server https://<Atlas可达的云端地址> --device-id <UUID> [--api-ca <CA文件>] [--mqtt-ca <CA文件>] [--ticket-stdin]\n"
+                      << "默认从终端隐藏读取票据；--ticket-stdin 从标准输入读取，供受控的远程部署流程使用。\n";
             std::exit(0);
+        }
+        if (key == "--ticket-stdin") {
+            options.ticket_from_stdin = true;
+            continue;
         }
         if (index + 1 >= argc) throw std::runtime_error("activate 命令缺少参数值");
         const std::string value = argv[++index];
@@ -130,6 +135,19 @@ ActivationOptions parse_options(int argc, char** argv) {
     }
     while (!options.server.empty() && options.server.back() == '/') options.server.pop_back();
     return options;
+}
+
+SensitiveString read_ticket_from_stdin() {
+    std::string ticket;
+    if (!std::getline(std::cin, ticket)) throw std::runtime_error("无法从标准输入读取激活票据");
+    if (!ticket.empty() && ticket.back() == '\r') ticket.pop_back();
+    if (ticket.size() < 32 || ticket.size() > 128) {
+        wipe(ticket);
+        throw std::runtime_error("激活票据长度无效");
+    }
+    SensitiveString secret(std::move(ticket));
+    wipe(ticket);
+    return secret;
 }
 
 SensitiveString read_hidden_ticket() {
@@ -511,7 +529,7 @@ int activation_command(int argc, char** argv) {
             throw std::runtime_error("找不到 TLS CA 文件；请先将受信任 CA 安装到 /etc/yunshao/mqtt-ca.pem，或通过参数指定");
         }
 
-        SensitiveString ticket{read_hidden_ticket()};
+        SensitiveString ticket = options.ticket_from_stdin ? read_ticket_from_stdin() : read_hidden_ticket();
         if (::curl_global_init(CURL_GLOBAL_DEFAULT) != CURLE_OK) throw std::runtime_error("无法初始化 HTTPS 客户端");
         SensitiveString body = exchange_ticket(options, api_ca, ticket.value);
         wipe(ticket.value);

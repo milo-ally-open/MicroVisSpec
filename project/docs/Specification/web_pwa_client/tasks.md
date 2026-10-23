@@ -18,6 +18,7 @@
 - [ ] **T-12 Web/PWA 展品视觉统一** — 以 `readme/yunshao-exhibit.html` 为视觉参照，统一暖纸色、墨色导航、森林绿强调色和标题层级；检查业务页、认证页、离线提示及更新提示，保持页面行为不变；覆盖 REQ-06 / AC-06.6。
 - [ ] **T-13 Web/PWA 局域网入口配置** — Web Compose 绑定 Wi‑Fi 地址并以 override 保留 Atlas 直连接口；HTTPS 端口跳转、证书 SAN、PUBLIC_ORIGIN、MediaMTX 来源/WebRTC candidates 与部署防火墙说明保持一致；覆盖 REQ-07 / AC-07.1–07.3。
 - [ ] **T-15 网页激活与设备期限续期** — 设备详情提供无限期/自定义分钟、小时、天选择；提交无秘密值的激活请求并轮询 `pending`、`syncing`、完成状态；移除用户可见票据和命令行，MQTT 凭据仅由 Atlas agent 经 HTTPS 领取并由 agent 确认；覆盖 REQ-02 / AC-02.6–02.8；依赖 device-service T-08 与 Atlas agent 轮询流程。
+- [ ] **T-16 网页 SSH 设备首次接入** — 设备详情提供 SSH 用户名/密码表单、设备指纹确认和安全阶段进度；仅通过设备服务启动登记 IP 的固定端口 SSH 任务，清空密码且不持久化；覆盖 REQ-08 / AC-08.1–08.4；依赖 device-service T-09。
 
 ## 验收记录
 

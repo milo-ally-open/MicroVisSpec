@@ -10,11 +10,13 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"os"
 	"os/signal"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -32,24 +34,27 @@ const (
 )
 
 type Config struct {
-	DatabaseURL          string
-	ListenAddress        string
-	BrokerURL            string
-	AdvertisedBrokerURL  string
-	BrokerAdminUsername  string
-	BrokerAdminPassword  string
-	BrokerAdminClientID  string
-	BrokerCAFile         string
-	BrokerClientCertFile string
-	BrokerClientKeyFile  string
-	BrokerServiceUser    string
-	BrokerServicePass    string
-	BrokerServiceClient  string
-	AtlasActivationOrigin string
-	InternalToken        string
-	MediaServiceURL      string
-	MediaServiceToken    string
-	ActivationRatePerMin int
+	DatabaseURL              string
+	ListenAddress            string
+	BrokerURL                string
+	AdvertisedBrokerURL      string
+	BrokerAdminUsername      string
+	BrokerAdminPassword      string
+	BrokerAdminClientID      string
+	BrokerCAFile             string
+	BrokerClientCertFile     string
+	BrokerClientKeyFile      string
+	BrokerServiceUser        string
+	BrokerServicePass        string
+	BrokerServiceClient      string
+	AtlasActivationOrigin    string
+	AtlasActivationCAFile    string
+	AtlasBootstrapBundleFile string
+	AtlasSSHAllowedCIDRs     []netip.Prefix
+	InternalToken            string
+	MediaServiceURL          string
+	MediaServiceToken        string
+	ActivationRatePerMin     int
 }
 
 func LoadConfig() (Config, error) {
@@ -66,28 +71,35 @@ func LoadConfig() (Config, error) {
 		return value
 	}
 	c := Config{
-		DatabaseURL:          read("DATABASE_URL"),
-		ListenAddress:        env("DEVICE_LISTEN_ADDRESS", ":8080"),
-		BrokerURL:            env("MQTT_BROKER_URL", "ssl://mosquitto:8883"),
-		AdvertisedBrokerURL:  env("MQTT_ADVERTISED_BROKER_URL", ""),
-		BrokerAdminUsername:  read("MQTT_ADMIN_USERNAME"),
-		BrokerAdminPassword:  read("MQTT_ADMIN_PASSWORD"),
-		BrokerAdminClientID:  env("MQTT_ADMIN_CLIENT_ID", "yunshao-device-service-dynsec"),
-		BrokerCAFile:         os.Getenv("MQTT_CA_FILE"),
-		BrokerClientCertFile: os.Getenv("MQTT_CLIENT_CERT_FILE"),
-		BrokerClientKeyFile:  os.Getenv("MQTT_CLIENT_KEY_FILE"),
-		BrokerServiceUser:    read("MQTT_DEVICE_SERVICE_USERNAME"),
-		BrokerServicePass:    read("MQTT_DEVICE_SERVICE_PASSWORD"),
-		BrokerServiceClient:  env("MQTT_DEVICE_SERVICE_CLIENT_ID", "yunshao-device-service"),
-		AtlasActivationOrigin: strings.TrimRight(os.Getenv("ATLAS_ACTIVATION_ORIGIN"), "/"),
-		InternalToken:        read("DEVICE_INTERNAL_SERVICE_TOKEN"),
-		MediaServiceURL:      strings.TrimRight(os.Getenv("MEDIA_SERVICE_INTERNAL_URL"), "/"),
-		MediaServiceToken:    read("MEDIA_SERVICE_INTERNAL_TOKEN"),
-		ActivationRatePerMin: envPositiveInt("DEVICE_ACTIVATION_RATE_PER_MINUTE", 10),
+		DatabaseURL:              read("DATABASE_URL"),
+		ListenAddress:            env("DEVICE_LISTEN_ADDRESS", ":8080"),
+		BrokerURL:                env("MQTT_BROKER_URL", "ssl://mosquitto:8883"),
+		AdvertisedBrokerURL:      env("MQTT_ADVERTISED_BROKER_URL", ""),
+		BrokerAdminUsername:      read("MQTT_ADMIN_USERNAME"),
+		BrokerAdminPassword:      read("MQTT_ADMIN_PASSWORD"),
+		BrokerAdminClientID:      env("MQTT_ADMIN_CLIENT_ID", "yunshao-device-service-dynsec"),
+		BrokerCAFile:             os.Getenv("MQTT_CA_FILE"),
+		BrokerClientCertFile:     os.Getenv("MQTT_CLIENT_CERT_FILE"),
+		BrokerClientKeyFile:      os.Getenv("MQTT_CLIENT_KEY_FILE"),
+		BrokerServiceUser:        read("MQTT_DEVICE_SERVICE_USERNAME"),
+		BrokerServicePass:        read("MQTT_DEVICE_SERVICE_PASSWORD"),
+		BrokerServiceClient:      env("MQTT_DEVICE_SERVICE_CLIENT_ID", "yunshao-device-service"),
+		AtlasActivationOrigin:    strings.TrimRight(os.Getenv("ATLAS_ACTIVATION_ORIGIN"), "/"),
+		AtlasActivationCAFile:    env("ATLAS_ACTIVATION_CA_FILE", "/run/secrets/atlas_activation_ca_certificate"),
+		AtlasBootstrapBundleFile: env("ATLAS_BOOTSTRAP_BUNDLE_FILE", "/opt/yunshao/atlas200idka2-bootstrap.tar.gz"),
+		InternalToken:            read("DEVICE_INTERNAL_SERVICE_TOKEN"),
+		MediaServiceURL:          strings.TrimRight(os.Getenv("MEDIA_SERVICE_INTERNAL_URL"), "/"),
+		MediaServiceToken:        read("MEDIA_SERVICE_INTERNAL_TOKEN"),
+		ActivationRatePerMin:     envPositiveInt("DEVICE_ACTIVATION_RATE_PER_MINUTE", 10),
 	}
 	if configErr != nil {
 		return c, configErr
 	}
+	allowedCIDRs, err := parseAtlasSSHAllowedCIDRs(env("ATLAS_SSH_ALLOWED_CIDRS", "192.168.0.0/16"))
+	if err != nil {
+		return c, err
+	}
+	c.AtlasSSHAllowedCIDRs = allowedCIDRs
 	if c.DatabaseURL == "" {
 		return c, errors.New("DATABASE_URL is required")
 	}
@@ -140,20 +152,21 @@ func envPositiveInt(key string, fallback int) int {
 }
 
 type Device struct {
-	ID                  uuid.UUID       `gorm:"type:uuid;primaryKey" json:"device_id"`
-	AccountID           uuid.UUID       `gorm:"type:uuid;not null;index:idx_devices_account_active,priority:1" json:"-"`
-	Name                string          `gorm:"size:120;not null" json:"name"`
-	IP                  string          `gorm:"size:45;not null" json:"ip"`
-	Location            string          `gorm:"size:256;not null" json:"location"`
-	ActivationState     string          `gorm:"size:24;not null;default:pending;index" json:"activation_state"`
-	Active              bool            `gorm:"not null;default:true;index:idx_devices_account_active,priority:2" json:"active"`
-	ActivationExpiresAt *time.Time      `gorm:"index" json:"activation_expires_at"`
-	LastSeenAt          *time.Time      `gorm:"index" json:"last_seen_at,omitempty"`
-	ReportedAt          *time.Time      `gorm:"index" json:"reported_at,omitempty"`
-	ReportedState       json.RawMessage `gorm:"type:jsonb;not null;default:'{}'" json:"reported_state"`
-	CreatedAt           time.Time       `gorm:"not null;index:idx_devices_created" json:"created_at"`
-	UpdatedAt           time.Time       `gorm:"not null" json:"updated_at"`
-	DisabledAt          *time.Time      `json:"disabled_at,omitempty"`
+	ID                    uuid.UUID       `gorm:"type:uuid;primaryKey" json:"device_id"`
+	AccountID             uuid.UUID       `gorm:"type:uuid;not null;index:idx_devices_account_active,priority:1" json:"-"`
+	Name                  string          `gorm:"size:120;not null" json:"name"`
+	IP                    string          `gorm:"size:45;not null" json:"ip"`
+	Location              string          `gorm:"size:256;not null" json:"location"`
+	ActivationState       string          `gorm:"size:24;not null;default:pending;index" json:"activation_state"`
+	Active                bool            `gorm:"not null;default:true;index:idx_devices_account_active,priority:2" json:"active"`
+	ActivationExpiresAt   *time.Time      `gorm:"index" json:"activation_expires_at"`
+	LastSeenAt            *time.Time      `gorm:"index" json:"last_seen_at,omitempty"`
+	ReportedAt            *time.Time      `gorm:"index" json:"reported_at,omitempty"`
+	ReportedState         json.RawMessage `gorm:"type:jsonb;not null;default:'{}'" json:"reported_state"`
+	SSHHostKeyFingerprint string          `gorm:"size:128" json:"-"`
+	CreatedAt             time.Time       `gorm:"not null;index:idx_devices_created" json:"created_at"`
+	UpdatedAt             time.Time       `gorm:"not null" json:"updated_at"`
+	DisabledAt            *time.Time      `json:"disabled_at,omitempty"`
 }
 
 func (Device) TableName() string { return "device.devices" }
@@ -268,6 +281,21 @@ type BrokerCredential struct {
 
 func (BrokerCredential) TableName() string { return "device.broker_credentials" }
 
+type ProvisioningJob struct {
+	ID         uuid.UUID  `gorm:"type:uuid;primaryKey" json:"job_id"`
+	AccountID  uuid.UUID  `gorm:"type:uuid;not null;index" json:"-"`
+	DeviceID   uuid.UUID  `gorm:"type:uuid;not null;index" json:"device_id"`
+	Status     string     `gorm:"size:24;not null;index" json:"status"`
+	Stage      string     `gorm:"size:40;not null" json:"stage"`
+	ErrorCode  string     `gorm:"size:64" json:"error_code,omitempty"`
+	Message    string     `gorm:"size:240" json:"message"`
+	CreatedAt  time.Time  `gorm:"not null;index" json:"created_at"`
+	UpdatedAt  time.Time  `gorm:"not null" json:"updated_at"`
+	FinishedAt *time.Time `json:"finished_at,omitempty"`
+}
+
+func (ProvisioningJob) TableName() string { return "device.provisioning_jobs" }
+
 func openDatabase(dsn string) (*gorm.DB, error) {
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Warn), TranslateError: true})
 	if err != nil {
@@ -276,7 +304,10 @@ func openDatabase(dsn string) (*gorm.DB, error) {
 	if err := db.Exec("CREATE SCHEMA IF NOT EXISTS device").Error; err != nil {
 		return nil, err
 	}
-	if err := db.AutoMigrate(&Device{}, &Camera{}, &AlgorithmAssignment{}, &ActivationTicket{}, &CommandRecord{}, &ConfigSnapshot{}, &Outbox{}, &BrokerCredential{}); err != nil {
+	if err := db.AutoMigrate(&Device{}, &Camera{}, &AlgorithmAssignment{}, &ActivationTicket{}, &CommandRecord{}, &ConfigSnapshot{}, &Outbox{}, &BrokerCredential{}, &ProvisioningJob{}); err != nil {
+		return nil, err
+	}
+	if err := db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_device_provisioning_one_active_per_device ON device.provisioning_jobs (device_id) WHERE status IN ('queued', 'running')").Error; err != nil {
 		return nil, err
 	}
 	// Remove the account-only unique index left by an early schema draft; it
@@ -291,19 +322,22 @@ func openDatabase(dsn string) (*gorm.DB, error) {
 }
 
 type App struct {
-	db                *gorm.DB
-	config            Config
-	broker            DeviceBroker
-	messages          DeviceMessagePlane
-	outboxHTTP        *http.Client
-	activationLimiter *windowLimiter
+	db                 *gorm.DB
+	config             Config
+	broker             DeviceBroker
+	messages           DeviceMessagePlane
+	outboxHTTP         *http.Client
+	activationLimiter  *windowLimiter
+	provisionMu        sync.Mutex
+	activeProvisioning map[uuid.UUID]bool
 }
 
 type DeviceView struct {
 	Device
-	Online     bool                  `json:"online"`
-	Cameras    []Camera              `json:"cameras"`
-	Algorithms []AlgorithmAssignment `json:"algorithms"`
+	Online      bool                  `json:"online"`
+	Provisioned bool                  `json:"provisioned"`
+	Cameras     []Camera              `json:"cameras"`
+	Algorithms  []AlgorithmAssignment `json:"algorithms"`
 }
 
 func NewHandler(db *gorm.DB) http.Handler {
@@ -319,7 +353,7 @@ func NewHandlerWithServices(config Config, db *gorm.DB, broker DeviceBroker, mes
 }
 
 func NewApp(config Config, db *gorm.DB, broker DeviceBroker, messages DeviceMessagePlane) *App {
-	return &App{db: db, config: config, broker: broker, messages: messages, outboxHTTP: &http.Client{Timeout: 5 * time.Second}, activationLimiter: newWindowLimiter(config.ActivationRatePerMin)}
+	return &App{db: db, config: config, broker: broker, messages: messages, outboxHTTP: &http.Client{Timeout: 5 * time.Second}, activationLimiter: newWindowLimiter(config.ActivationRatePerMin), activeProvisioning: make(map[uuid.UUID]bool)}
 }
 
 func (app *App) Handler() http.Handler {
@@ -339,6 +373,10 @@ func (app *App) Handler() http.Handler {
 	api.POST("/:device_id/activation-tickets", app.createActivationTicket)
 	api.POST("/:device_id/activation-requests", app.createActivationRequest)
 	api.GET("/:device_id/activation-requests/:request_id", app.getActivationRequest)
+	api.POST("/:device_id/provisioning/ssh-host-key", app.getProvisioningSSHHostKey)
+	api.POST("/:device_id/provisioning", app.startProvisioning)
+	api.GET("/:device_id/provisioning", app.getLatestProvisioningJob)
+	api.GET("/:device_id/provisioning/:job_id", app.getProvisioningJob)
 	api.POST("/:device_id/cameras", app.createCamera)
 	api.GET("/:device_id/algorithms", app.listAlgorithms)
 	api.PUT("/:device_id/algorithms/:assignment_id/parameters", app.updateAlgorithmParameters)
@@ -560,6 +598,11 @@ func decodeCursor(token string) (time.Time, uuid.UUID, error) {
 
 func (a *App) deviceView(device Device) (DeviceView, error) {
 	view := DeviceView{Device: device, Online: isOnline(device, time.Now().UTC()), Cameras: []Camera{}, Algorithms: []AlgorithmAssignment{}}
+	var credentialCount int64
+	if err := a.db.Model(&BrokerCredential{}).Where("device_id = ?", device.ID).Count(&credentialCount).Error; err != nil {
+		return DeviceView{}, err
+	}
+	view.Provisioned = credentialCount > 0
 	if err := a.db.Where("account_id = ? AND device_id = ? AND active = ?", device.AccountID, device.ID, true).Order("created_at ASC").Find(&view.Cameras).Error; err != nil {
 		return DeviceView{}, err
 	}

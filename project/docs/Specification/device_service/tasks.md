@@ -12,6 +12,7 @@
 - [ ] **T-06 镜像、凭据与运维恢复** — 容器构建、迁移、broker 与数据库恢复对账、指标/日志脱敏；覆盖 REQ-01、REQ-04 / AC-01.2、AC-04.2；依赖 T-01–T-05。
 - [ ] **T-07 设备详情摄像头来源配置契约联调** — 确认设备详情仅暴露 RTSP URL 字段，前端调用 media-service 读写，media-service 通过本服务验证摄像头所有权且 device schema 不增加流来源数据；覆盖 REQ-05 / AC-05.1、AC-05.2；依赖 T-01、media-service 和 web_pwa_client。
 - [ ] **T-08 网页激活、设备授权期限与过期撤权** — 无限期/自定义期限由网页请求设定；Atlas agent 认证轮询并接收 MQTT 凭据，页面等待 agent 确认新身份；响应丢失时旧身份可安全重领同一凭据；调度器停用到期设备、写 `device.disabled` outbox 并撤销 MQTT 权限；保留过期资产，网页续期后写 `device.activated` outbox 并恢复已保存媒体来源；覆盖 REQ-02 / AC-02.5–02.9；依赖 T-02、Atlas agent、media-service。
+- [ ] **T-09 网页 SSH 首次接入** — 设备私网 SSH 指纹挑战与固定、账号范围校验、凭据一次性传递、任务状态、agent-only 源码包构建/安装、CA 配置和激活票据兑换；覆盖 REQ-06 / AC-06.1–06.6；依赖 T-02、Atlas agent、device-service 镜像和 Web 设备详情页。
 
 ## 验收证据
 

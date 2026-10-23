@@ -52,6 +52,7 @@
 - 技术栈与 API 归属以 `package.json`、`vite.config.ts` 和全局技术 SPEC 为准。所有浏览器 API 同源 `/api/v1`，由 Nginx 路由；浏览器不直连服务端口或 MediaMTX 管理 API。
 - 安全约束：Cookie 会话、CSRF、账号内对象校验，证据经 event-service 鉴权读取。摄像头来源配置只需一个无 URL userinfo 的 RTSP 地址；不收集来源用户名/密码。
 - 本次变更：设备详情为账号所拥有的摄像头提供 RTSP 地址配置和回显；地址由 media-service 保存及对账，设备/摄像头主数据仍由 device-service 管理。
+- 本次变更：设备详情识别首次接入状态；园区用户在网页核对已登记设备 IP 和 SSH 指纹、输入管理员提供的设备 SSH 账号密码、选择期限后即可完成 Atlas agent 部署及首次激活，并查看安全阶段进度。SSH 密码只用于一次服务端会话，不保存在浏览器持久存储或服务端数据中。
 - 未确认视觉稿时采用响应式的中性管理台风格，不改变 PRD 承诺。
 
 ## 备选方案与建议

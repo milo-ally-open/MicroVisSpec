@@ -124,13 +124,16 @@ services:
 
   device-service:
     build:
-      context: ./device-service
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: services/device-service/Dockerfile
     environment:
       DATABASE_URL_FILE: /run/secrets/device_database_url
       MQTT_BROKER_URL: ssl://mosquitto:8883
       MQTT_ADVERTISED_BROKER_URL: ${MQTT_ADVERTISED_BROKER_URL:?set MQTT_ADVERTISED_BROKER_URL in project/src/services/.env}
       ATLAS_ACTIVATION_ORIGIN: ${ATLAS_ACTIVATION_ORIGIN:-}
+      ATLAS_ACTIVATION_CA_FILE: /run/secrets/atlas_activation_ca_certificate
+      ATLAS_BOOTSTRAP_BUNDLE_FILE: /opt/yunshao/atlas200idka2-bootstrap.tar.gz
+      ATLAS_SSH_ALLOWED_CIDRS: ${ATLAS_SSH_ALLOWED_CIDRS:-192.168.0.0/16}
       MQTT_CA_FILE: /run/secrets/mqtt_ca_certificate
       MQTT_ADMIN_USERNAME: admin
       MQTT_ADMIN_PASSWORD_FILE: /run/secrets/mqtt_admin_password
@@ -142,6 +145,7 @@ services:
     secrets:
       - device_database_url
       - mqtt_ca_certificate
+      - atlas_activation_ca_certificate
       - mqtt_admin_password
       - mqtt_device_service_password
       - device_internal_service_token
@@ -358,6 +362,8 @@ secrets:
     file: ./device-service/.secret-mqtt-event-service-password
   mqtt_ca_certificate:
     file: ./device-service/.secret-mqtt-ca-certificate.pem
+  atlas_activation_ca_certificate:
+    file: ./device-service/.secret-atlas-activation-ca-certificate.pem
   mqtt_tls_certificate:
     file: ./device-service/.secret-mqtt-tls-certificate.pem
   mqtt_tls_private_key:
