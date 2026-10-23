@@ -1475,6 +1475,34 @@ a {
   grid-column: 1/-1;
 }
 
+.activation-duration-note {
+  margin: 8px 0 14px;
+  color: #71807a;
+  font-size: 12px;
+}
+
+.activation-command {
+  grid-column: 1/-1;
+  padding-top: 10px;
+  border-top: 1px solid #dfece6;
+}
+
+.activation-command code {
+  display: block;
+  margin-top: 7px;
+  padding: 9px;
+  border-radius: 6px;
+  background: #eaf3ef;
+  color: #255c52;
+  font-size: 11px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.activation-command .button {
+  margin-top: 8px;
+}
+
 .icon-button {
   padding: 4px 7px;
   border: 1px solid #d8e8e2;

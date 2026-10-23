@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import AppIcon from '../components/AppIcon.vue'
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { deviceApi, type Device } from '../api/devices'
 import { mediaApi } from '../api/media'
@@ -15,8 +15,12 @@ const busy = ref(true)
 const saving = ref(false)
 const error = ref('')
 const notice = ref('')
-const ticket = ref('')
-const ticketExpires = ref('')
+const activationRequest = ref<{ request_id: string; status: string; expires_at: string } | null>(null)
+let activationPollTimer: number | undefined
+let activationPollGeneration = 0
+const durationMode = ref<'unlimited' | 'custom'>('unlimited')
+const durationValue = ref(30)
+const durationUnit = ref<'minutes' | 'hours' | 'days'>('days')
 const addCamera = ref(false)
 const confirmDisable = ref(false)
 const cameraForm = ref({ name: '', camera_key: '' })
@@ -25,7 +29,14 @@ const sourceStates = reactive<Record<string, string>>({})
 const edit = reactive({ name: '', ip: '', location: '' })
 const rules = ref(createDefaultClassroomRules())
 const classroom = computed(() => device.value?.algorithms.find((item) => item.algorithm_key === 'classroom_behavior_detection'))
-
+const durationUnitSeconds = computed(() => ({ minutes: 60, hours: 3600, days: 86400 }[durationUnit.value]))
+const maxDurationValue = computed(() => Math.floor(9_223_372_036 / durationUnitSeconds.value))
+const selectedDurationSeconds = computed(() => durationMode.value === 'unlimited' ? null : durationValue.value * durationUnitSeconds.value)
+const durationSummary = computed(() => {
+  if (durationMode.value === 'unlimited') return '无限期'
+  const unitName = { minutes: '分钟', hours: '小时', days: '天' }[durationUnit.value]
+  return `${durationValue.value} ${unitName}`
+})
 function applyDevice(value: Device) {
   device.value = value
   edit.name = value.name
@@ -48,6 +59,10 @@ async function load() {
     await Promise.all(current.cameras.map(async (camera) => {
       const form = { rtsp_url: '' }
       sourceForms[camera.camera_id] = form
+      if (!current.active) {
+        sourceStates[camera.camera_id] = '设备授权到期；重新激活后可管理视频来源。'
+        return
+      }
       sourceStates[camera.camera_id] = '正在读取来源配置…'
       try {
         const status = await mediaApi.status(camera.camera_id)
@@ -82,10 +97,66 @@ async function disableDevice() {
   }
 }
 
-async function issueTicket() {
+function stopActivationPolling() {
+  activationPollGeneration++
+  if (activationPollTimer !== undefined) window.clearTimeout(activationPollTimer)
+  activationPollTimer = undefined
+}
+
+async function pollActivationRequest(deviceId: string, requestId: string, generation: number) {
+  if (generation !== activationPollGeneration) return
+  try {
+    const result = await deviceApi.getActivationRequest(deviceId, requestId)
+    if (generation !== activationPollGeneration) return
+    error.value = ''
+    if (result.status === 'syncing') {
+      notice.value = ''
+      activationRequest.value = { request_id: requestId, status: 'syncing', expires_at: result.expires_at }
+      activationPollTimer = window.setTimeout(() => void pollActivationRequest(deviceId, requestId, generation), 2500)
+      return
+    }
+    if (result.status === 'pending' && Date.parse(result.expires_at) > Date.now()) {
+      activationRequest.value = { request_id: requestId, status: 'pending', expires_at: result.expires_at }
+      activationPollTimer = window.setTimeout(() => void pollActivationRequest(deviceId, requestId, generation), 2500)
+      return
+    }
+    activationRequest.value = null
+    if (result.status === 'activated') {
+      notice.value = '设备已激活，新的授权期限已生效。'
+      await load()
+    } else if (result.status === 'expired') {
+      error.value = '设备暂未领取激活请求，请确认设备在线后重新提交。'
+    } else {
+      error.value = '这条激活请求已被新的请求替代，请重新提交。'
+    }
+  } catch (cause) {
+    if (generation !== activationPollGeneration) return
+    error.value = errorMessage(cause)
+    activationPollTimer = window.setTimeout(() => void pollActivationRequest(deviceId, requestId, generation), 5000)
+  }
+}
+
+async function activateFromWeb() {
   error.value = ''
-  ticket.value = ''
-  try { const result = await deviceApi.activationTicket(String(route.params.deviceId)); ticket.value = result.activation_ticket; ticketExpires.value = result.expires_at } catch (cause) { error.value = errorMessage(cause) }
+  notice.value = ''
+  if (activationRequest.value) return
+  if (durationMode.value === 'custom' && (!Number.isSafeInteger(durationValue.value) || durationValue.value < 1 || durationValue.value > maxDurationValue.value)) {
+    error.value = `自定义期限需为 1 至 ${maxDurationValue.value} ${durationUnit.value === 'minutes' ? '分钟' : durationUnit.value === 'hours' ? '小时' : '天'}。`
+    return
+  }
+  const deviceId = String(route.params.deviceId)
+  saving.value = true
+  try {
+    const result = await deviceApi.createActivationRequest(deviceId, selectedDurationSeconds.value)
+    activationRequest.value = { request_id: result.request_id, status: result.status, expires_at: result.expires_at }
+    notice.value = '请求已提交，Atlas agent 会在后台安全领取凭据；激活进度会自动刷新。'
+    const generation = ++activationPollGeneration
+    activationPollTimer = window.setTimeout(() => void pollActivationRequest(deviceId, result.request_id, generation), 1500)
+  } catch (cause) {
+    error.value = errorMessage(cause)
+  } finally {
+    saving.value = false
+  }
 }
 
 async function registerCamera() {
@@ -129,18 +200,18 @@ async function saveRules() {
   } catch (cause) { error.value = errorMessage(cause); if ((cause as { status?: number })?.status === 409) await load() } finally { saving.value = false }
 }
 
-function copyTicket() { void navigator.clipboard?.writeText(ticket.value) }
-watch(() => route.params.deviceId, load)
+watch(() => route.params.deviceId, () => { stopActivationPolling(); activationRequest.value = null; void load() })
 onMounted(load)
+onBeforeUnmount(stopActivationPolling)
 </script>
 
 <template>
-  <section class="page-heading page-heading--split"><div><RouterLink class="back-link" to="/devices">← 返回设备</RouterLink><span class="eyebrow">DEVICE DETAIL</span><h1>{{ device?.name ?? '设备详情' }}</h1><p>{{ device?.location }} · {{ device?.ip }}</p></div><div v-if="device" class="detail-heading-actions"><span class="status-pill" :class="device.online ? 'status-pill--online' : 'status-pill--offline'"><i></i>{{ device.online ? '设备在线' : device.activation_state === 'active' ? '设备离线' : '待激活' }}</span><button v-if="device.active" class="button button--quiet" @click="confirmDisable = true">停用设备</button></div></section>
-  <div v-if="error" class="notice notice--error" role="alert">{{ error }}</div><div v-if="notice" class="notice notice--success" role="status">{{ notice }}</div>
+  <section class="page-heading page-heading--split"><div><RouterLink class="back-link" to="/devices">← 返回设备</RouterLink><span class="eyebrow">DEVICE DETAIL</span><h1>{{ device?.name ?? '设备详情' }}</h1><p>{{ device?.location }} · {{ device?.ip }}</p></div><div v-if="device" class="detail-heading-actions"><span class="status-pill" :class="device.online ? 'status-pill--online' : 'status-pill--offline'"><i></i>{{ device.online ? '设备在线' : device.activation_state === 'expired' ? '授权已到期' : device.activation_state === 'active' ? '设备离线' : device.activation_state === 'disabled' ? '已停用' : '待激活' }}</span><button v-if="device.active" class="button button--quiet" @click="confirmDisable = true">停用设备</button></div></section>
+  <div v-if="device?.activation_state === 'disabled'" class="notice notice--soft" role="status">此设备已由管理员停用，不能在网页续期；请联系管理员重新登记设备。</div><div v-if="error" class="notice notice--error" role="alert">{{ error }}</div><div v-if="notice" class="notice notice--success" role="status">{{ notice }}</div><div v-if="device?.activation_state === 'expired'" class="notice notice--soft" role="status">设备授权已到期，设备业务访问和 MQTT 权限已停用。选择新期限并在本页续期即可恢复；设备 agent 会在后台自动同步。</div>
   <div v-if="busy" class="panel loading-panel">正在加载设备服务数据…</div>
   <template v-else-if="device">
-    <section class="detail-grid"><article class="panel"><div class="panel-heading"><div><span class="eyebrow">ASSET PROFILE</span><h2>设备资料</h2></div><span class="small-label">{{ device.active ? '有效设备' : '已停用' }}</span></div><form class="form-stack" @submit.prevent="saveDevice"><label class="field"><span>设备名称</span><input v-model="edit.name" required maxlength="120"></label><div class="field-row"><label class="field"><span>IP 地址</span><input v-model="edit.ip" required maxlength="45"></label><label class="field"><span>位置</span><input v-model="edit.location" required maxlength="256"></label></div><button class="button button--secondary" type="submit" :disabled="saving">保存设备资料</button></form><div class="device-meta"><span>最近心跳<strong>{{ formatDate(device.last_seen_at) }}</strong></span><span>激活状态<strong>{{ device.activation_state }}</strong></span></div></article>
-      <article class="panel activation-panel"><div class="panel-heading"><div><span class="eyebrow">SECURE ACTIVATION</span><h2>设备激活</h2></div><span class="activation-icon"><AppIcon name="shield" /></span></div><p class="panel-intro">签发 10 分钟有效的一次性票据，在目标边缘设备上完成绑定。票据只显示一次。</p><button class="button button--primary" @click="issueTicket">签发激活票据 <span aria-hidden="true">→</span></button><div v-if="ticket" class="ticket-box"><div><small>一次性激活票据</small><code>{{ ticket }}</code></div><button class="icon-button" title="复制票据" @click="copyTicket">复制</button><small>有效期至 {{ formatDate(ticketExpires) }}</small></div><div v-else class="activation-note"><span>!</span>请在安全的设备终端上使用，不要分享给他人。</div></article></section>
+    <section class="detail-grid"><article class="panel"><div class="panel-heading"><div><span class="eyebrow">ASSET PROFILE</span><h2>设备资料</h2></div><span class="small-label">{{ device.activation_state === 'expired' ? '授权已到期' : device.active ? '有效设备' : '已停用' }}</span></div><form class="form-stack" @submit.prevent="saveDevice"><label class="field"><span>设备名称</span><input v-model="edit.name" required maxlength="120" :disabled="!device.active"></label><div class="field-row"><label class="field"><span>IP 地址</span><input v-model="edit.ip" required maxlength="45" :disabled="!device.active"></label><label class="field"><span>位置</span><input v-model="edit.location" required maxlength="256" :disabled="!device.active"></label></div><button class="button button--secondary" type="submit" :disabled="saving || !device.active">保存设备资料</button></form><div class="device-meta"><span>最近心跳<strong>{{ formatDate(device.last_seen_at) }}</strong></span><span>激活状态<strong>{{ device.activation_state }}</strong></span><span v-if="device.activation_expires_at">授权到期<strong>{{ formatDate(device.activation_expires_at) }}</strong></span></div></article>
+      <article v-if="device.activation_state !== 'disabled'" class="panel activation-panel"><div class="panel-heading"><div><span class="eyebrow">SECURE ACTIVATION</span><h2>{{ device.activation_state === 'expired' ? '续期并重新激活' : '设备激活' }}</h2></div><span class="activation-icon"><AppIcon name="shield" /></span></div><p class="panel-intro">选择设备使用期限。到期后云端会停用设备业务访问、撤销 MQTT 权限；设备在线时会在后台自动领取续期，不需要操作 Atlas 终端。</p><label class="field"><span>使用期限</span><select v-model="durationMode" :disabled="Boolean(activationRequest)"><option value="unlimited">无限期</option><option value="custom">自定义期限</option></select></label><div v-if="durationMode === 'custom'" class="field-row activation-duration"><label class="field"><span>时长</span><input v-model.number="durationValue" type="number" min="1" :max="maxDurationValue" step="1" required :disabled="Boolean(activationRequest)"></label><label class="field"><span>单位</span><select v-model="durationUnit" :disabled="Boolean(activationRequest)"><option value="minutes">分钟</option><option value="hours">小时</option><option value="days">天</option></select></label></div><p class="activation-duration-note">本次设备授权：{{ durationSummary }}</p><button class="button button--primary" :disabled="saving || Boolean(activationRequest)" @click="activateFromWeb">{{ saving ? '正在提交…' : activationRequest ? (activationRequest.status === 'syncing' ? '正在同步到设备…' : '正在等待设备…') : device.activation_state === 'expired' ? '网页续期并激活' : '网页激活设备' }} <span aria-hidden="true">→</span></button><div v-if="activationRequest?.status === 'syncing'" class="activation-note" role="status"><span>…</span>云端已确认授权，正在等待 Atlas 保存新凭据。设备联网后会自动完成，请勿重复提交。</div><div v-else-if="activationRequest" class="activation-note" role="status"><span>…</span>请求已提交，Atlas agent 在线时会自动领取新凭据；请求等待期限至 {{ formatDate(activationRequest.expires_at) }}。</div><div v-else class="activation-note"><span>✓</span>用户只需在网页操作；设备需预先完成 agent 安装和可信接入。MQTT 凭据始终留在设备侧，不会显示在浏览器中。</div></article></section>
 
     <section class="panel camera-panel"><div class="panel-heading"><div><span class="eyebrow">CAMERA SOURCES</span><h2>摄像头与媒体来源 <span class="heading-count">{{ device.cameras.length }}</span></h2></div><button class="button button--secondary" @click="addCamera = !addCamera">{{ addCamera ? '取消' : '+ 添加摄像头' }}</button></div><form v-if="addCamera" class="camera-create-form" @submit.prevent="registerCamera"><label class="field"><span>摄像头名称</span><input v-model="cameraForm.name" required placeholder="前端摄像头"></label><label class="field"><span>摄像头标识</span><input v-model="cameraForm.camera_key" required placeholder="camera-01"></label><button class="button button--primary" type="submit" :disabled="saving">登记摄像头</button></form>
       <div v-if="!device.cameras.length" class="empty-state empty-state--compact"><span class="empty-state__icon"><AppIcon name="camera" /></span><strong>还没有摄像头</strong><p>登记摄像头后，可配置 RTSP 地址并在桌面监控页查看。</p></div>

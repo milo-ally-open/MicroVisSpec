@@ -4,7 +4,7 @@
 >
 > 责任边界：device-service 拥有设备、摄像头、算法能力、期望配置与运行实报；event-service 查询其归属，media-service 查询摄像头归属并独立保存流来源。
 >
-> 首发边界：Atlas 200I DK A2 设备由账号用户手动登记，经一次性票据激活；业务状态、事件和配置使用 MQTT。SSH 只供人工运维，不参与业务通信。
+> 首发边界：设备由账号用户登记；首次部署由管理员预置 Atlas agent 的 HTTPS Origin、CA 和可信 MQTT 身份。设备上线后，账号用户仅在网页发起激活/续期；agent 自动领取 MQTT 凭据，用户不需要在 Atlas 终端运行命令。业务状态、事件和配置使用 MQTT。
 
 ## 稳定需求与验收索引
 
@@ -25,6 +25,11 @@
 - **AC-02.2**：设备凭据不能访问其他设备主题。
 - **AC-02.3**：激活响应中的 MQTT broker 地址来自独立的边缘可达配置；不得返回服务容器内部的 broker DNS 地址；设备使用该地址通过 TLS 接入。
 - **AC-02.4**：激活响应中的 MQTT `client_id` 与 Mosquitto Dynamic Security 为该设备登记的固定 client ID 完全一致；端侧连接合同使用该原值。
+- **AC-02.5**：签发票据时 `duration_seconds` 为 `null` 表示无限期，正整数表示自激活成功时起的授权秒数；缺省字段兼容旧客户端并按无限期处理，超出支持范围的值拒绝。
+- **AC-02.6**：激活期限到达后，服务在最多 15 秒调度间隔内将设备置为 `active=false`、`activation_state=expired`，写入 `device.disabled` outbox 并立即尝试撤销 MQTT 权限；撤销失败由既有对账循环重试。已过期设备的事件、状态、媒体和设备业务认证均拒绝。
+- **AC-02.7**：账号所有者仍可在列表/详情中查看 `expired` 设备并在网页提交新租期请求；agent 领取后使用新 MQTT 密码恢复设备，按新请求期限覆盖到期时间，`null` 清除到期时间，并通过 `device.activated` 通知恢复已保存媒体来源。手动 `disabled` 设备不允许通过此流程恢复。
+- **AC-02.8**：已预置可信设备身份的所有者可在网页提交 `duration_seconds` 并查询激活请求状态；网页响应不含激活票据或 MQTT 凭据。Atlas agent 使用现有设备凭据通过 TLS 轮询领取请求，成功后服务端轮换 MQTT 身份并将期限写入设备记录；页面在设备确认保存新凭据前显示 `syncing`。
+- **AC-02.9**：Atlas agent 在激活请求期间或已过期时仍可使用原设备身份访问唯一的 HTTPS 激活轮询路由；该例外只可读取并领取本设备待处理激活请求，不恢复旧 MQTT ACL，也不开放设备业务认证。已提交但未确认的新凭据可由旧 HTTPS 身份幂等重领；收到新密码后，agent 下一次轮询确认并使旧身份失效。手动停用设备不可轮询续期。
 
 ### REQ-03 状态与配置
 
@@ -109,8 +114,11 @@
 
 | 方法与路径 | 任务与返回 |
 | --- | --- |
-| `POST /api/v1/devices/{deviceId}/activation-tickets` | 当前账号签发一次性票据，返回只显示一次的凭据及 10 分钟到期时间；重签使旧票据失效。 |
-| `POST /edge/v1/activate` | 边缘设备提交 `device_id` 和票据；成功后取得独立 MQTT `client_id`、设备密码与 broker 接入信息。端侧必须原样使用返回的 `client_id`。`mqtt.broker_url` 必须取自 `MQTT_ADVERTISED_BROKER_URL`，不能泄露/复用服务容器内部的 `MQTT_BROKER_URL`。 |
+| `POST /api/v1/devices/{deviceId}/activation-tickets` | 当前账号提交 `{"duration_seconds": null}`（无限期）或正整数秒数（自定义期限），签发只显示一次的票据及 10 分钟票据到期时间；重签使旧票据失效。缺省 `duration_seconds` 兼容旧客户端并按无限期处理。 |
+| `POST /api/v1/devices/{deviceId}/activation-requests` | 当前账号提交 `{"duration_seconds": null}` 或正整数秒数；返回不含秘密值的请求 ID、状态和 10 分钟等待期限。只有已预置可信设备身份的设备可通过网页流程激活。 |
+| `GET /api/v1/devices/{deviceId}/activation-requests/{requestId}` | 当前账号查询 `pending`、`syncing`、`activated`、`expired` 或 `superseded` 状态；服务端已激活但设备尚未确认保存新凭据时返回 `syncing`；成功时附服务器确认的 `activation_expires_at`。 |
+| `POST /edge/v1/activate` | 边缘设备提交 `device_id` 和票据；成功后取得独立 MQTT `client_id`、设备密码、broker 接入信息及 `activation_expires_at`（无限期时为 `null`）。期限从成功兑换时开始。端侧必须原样使用返回的 `client_id`。`mqtt.broker_url` 必须取自 `MQTT_ADVERTISED_BROKER_URL`，不能泄露/复用服务容器内部的 `MQTT_BROKER_URL`。 |
+| `GET /edge/v1/devices/{deviceId}/activation` | Atlas agent 使用设备 MQTT username/password 的 HTTPS Basic 身份轮询。存在待处理网页请求时返回新的 MQTT 凭据及租期；响应丢失时旧身份可重领同一凭据，agent 用新身份再次轮询后确认并清除旧身份；已激活且无待处理请求时仅返回租期同步状态；无请求的过期设备返回 `204`。该路由不得记录 Authorization。 |
 
 ### 4.2 实现任务
 
@@ -188,4 +196,5 @@
 | 日期 | 变更 |
 | --- | --- |
 | 2026-10-21 | 在设备详情工作区增加单字段 RTSP 配置入口的产品合同；摄像头归属仍由本服务提供，来源 URL 与媒体状态由 media-service 持有。 | 用户要求从系统配置边缘设备并精简来源配置。 |
+| 2026-10-23 | 增加无限期/自定义期限设备授权、到期停用撤权及过期设备续期合同。 | 用户要求用户可选择设备使用期限，并确认到期自动停用及撤销 MQTT 权限。 |
 | 2026-10-04 | 从总技术规格拆分 device-service 阶段任务、边缘接入合同与验收。 |

@@ -28,6 +28,11 @@
 #include <string>
 #include <thread>
 
+int activation_command(int argc, char** argv);
+bool poll_activation_once(const std::string& device_id, const std::string& server,
+                          const std::string& username, const std::string& password,
+                          const std::string& api_ca_path, const std::string& mqtt_ca_path);
+
 namespace {
 
 using yunshao::EventOutbox;
@@ -200,9 +205,18 @@ public:
 
     bool enqueue(const Json& event, std::string* error) { return outbox_.enqueue(event, error); }
 
-    void run() {
+    bool run() {
         start_mqtt();
+        auto next_activation_poll = std::chrono::steady_clock::time_point{};
         while (!stopping.load()) {
+            const auto now = std::chrono::steady_clock::now();
+            if (now >= next_activation_poll) {
+                if (poll_activation_once(device_id_, env("YUNSHAO_EDGE_API_ORIGIN"),
+                                         env("YUNSHAO_MQTT_USERNAME"), env("YUNSHAO_MQTT_PASSWORD"),
+                                         env("YUNSHAO_EDGE_API_CA", env("YUNSHAO_MQTT_CA")),
+                                         env("YUNSHAO_MQTT_CA"))) return true;
+                next_activation_poll = now + std::chrono::seconds(15);
+            }
             if (connected_.load()) {
                 process_commands();
                 acknowledge_applied_rules();
@@ -212,6 +226,7 @@ public:
             }
             std::this_thread::sleep_for(std::chrono::seconds(5));
         }
+        return false;
     }
 
 private:
@@ -251,7 +266,7 @@ private:
             const auto url = origin + "/edge/v1/devices/" + device_id_ + "/events/" + event_id + "/evidence";
             const auto username = env("YUNSHAO_MQTT_USERNAME");
             const auto password = env("YUNSHAO_MQTT_PASSWORD");
-            const auto ca = env("YUNSHAO_MQTT_CA");
+            const auto ca = env("YUNSHAO_EDGE_API_CA", env("YUNSHAO_MQTT_CA"));
             auto* headers = curl_slist_append(nullptr, "Content-Type: image/jpeg");
             curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
             curl_easy_setopt(curl, CURLOPT_PROXY, "");
@@ -507,6 +522,9 @@ int model_command(int argc, char** argv) {
 
 int main(int argc, char** argv) {
     try {
+        if (argc >= 2 && std::string(argv[1]) == "activate") {
+            return activation_command(argc, argv);
+        }
         if (argc >= 2 && std::string(argv[1]) == "model") {
             load_cann_environment();
             return model_command(argc, argv);
@@ -521,9 +539,10 @@ int main(int argc, char** argv) {
         std::signal(SIGINT, stop_signal);
         std::signal(SIGTERM, stop_signal);
         std::thread socket_thread(serve_socket, std::ref(agent), socket_path);
-        agent.run();
+        const bool credentials_updated = agent.run();
+        if (credentials_updated) stopping.store(true);
         if (socket_thread.joinable()) socket_thread.join();
-        return 0;
+        return credentials_updated ? 75 : 0;
     } catch (const std::exception& exception) {
         std::cerr << "agent stopped: " << exception.what() << '\n';
         return 1;

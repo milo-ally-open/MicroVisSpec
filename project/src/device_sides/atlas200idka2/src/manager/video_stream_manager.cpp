@@ -27,6 +27,19 @@ namespace {
 
 struct LetterboxInfo { float scale; int left; int top; };
 
+bool activation_lease_expired() {
+    const char* configured = std::getenv("YUNSHAO_ACTIVATION_LEASE_FILE");
+    const std::filesystem::path path = configured && *configured ? configured : "/var/lib/yunshao/activation-lease.json";
+    if (!std::filesystem::exists(path)) return false;  // Legacy deployments without a lease remain unchanged.
+    try {
+        const auto lease = yunshao::read_json_file(path);
+        if (!lease.contains("expires_at_unix") || lease["expires_at_unix"].is_null()) return false;
+        return lease.at("expires_at_unix").get<std::int64_t>() <= std::time(nullptr);
+    } catch (...) {
+        return true;  // A corrupt lease fails closed and pauses local video processing.
+    }
+}
+
 LetterboxInfo letterbox_for(int width, int height, int target_width, int target_height) {
     const float scale = std::min(static_cast<float>(target_width) / width,
                                  static_cast<float>(target_height) / height);
@@ -104,6 +117,10 @@ void VideoStreamManager::run(const StreamProfile& stream, const std::string& inp
 
     int reconnect_delay_ms = stream.reconnect_initial_delay_ms;
     while (true) {
+        if (activation_lease_expired()) {
+            std::cout << "device activation expired; local video runtime is paused" << std::endl;
+            return;
+        }
         try {
             MediaPipeline pipeline(input_uri, output_h264.string(), stream.output_fps,
                                    model_profile.input_width, model_profile.input_height,
@@ -114,7 +131,12 @@ void VideoStreamManager::run(const StreamProfile& stream, const std::string& inp
             std::vector<RegionOsdDetection> overlay;
             std::size_t frames = 0;
             hi_video_frame_info inference_frame{};
-            while (pipeline.next_inference_frame(inference_frame)) {
+            while (true) {
+                if (activation_lease_expired()) {
+                    std::cout << "device activation expired; local video runtime is paused" << std::endl;
+                    return;
+                }
+                if (!pipeline.next_inference_frame(inference_frame)) break;
                 hi_video_frame_info output_frame{};
                 if (!pipeline.get_output_frame(output_frame)) {
                     pipeline.release_inference_frame(inference_frame);

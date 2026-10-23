@@ -374,9 +374,9 @@ func (a *App) receiveInbox(c *gin.Context) {
 		SessionID string `json:"session_id"`
 	}
 	switch envelope.EventType {
-	case "device.disabled":
+	case "device.disabled", "device.activated":
 		if json.Unmarshal(envelope.Payload, &devicePayload) != nil || !validUUIDString(devicePayload.AccountID) || !validUUIDString(devicePayload.DeviceID) {
-			writeError(c, http.StatusUnprocessableEntity, "invalid_request", "device.disabled payload is invalid")
+			writeError(c, http.StatusUnprocessableEntity, "invalid_request", "device lifecycle payload is invalid")
 			return
 		}
 	case "session.revoked":
@@ -384,6 +384,15 @@ func (a *App) receiveInbox(c *gin.Context) {
 			writeError(c, http.StatusUnprocessableEntity, "invalid_request", "session.revoked payload is invalid")
 			return
 		}
+	}
+	ignoreLifecycle := false
+	if envelope.EventType == "device.disabled" || envelope.EventType == "device.activated" {
+		currentActive, err := a.deviceLifecycleActive(c.Request.Context(), devicePayload.DeviceID, devicePayload.AccountID)
+		if err != nil {
+			writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "device lifecycle state could not be checked")
+			return
+		}
+		ignoreLifecycle = envelope.EventType == "device.disabled" && currentActive || envelope.EventType == "device.activated" && !currentActive
 	}
 	var affectedStreams []uuid.UUID
 	duplicate := false
@@ -402,6 +411,9 @@ func (a *App) receiveInbox(c *gin.Context) {
 		now := time.Now().UTC()
 		switch envelope.EventType {
 		case "device.disabled":
+			if ignoreLifecycle {
+				break
+			}
 			deviceID, _ := uuid.Parse(devicePayload.DeviceID)
 			accountID, _ := uuid.Parse(devicePayload.AccountID)
 			if err := tx.Model(&Stream{}).Where("device_id = ? AND account_id = ? AND active = ?", deviceID, accountID, true).Pluck("id", &affectedStreams).Error; err != nil {
@@ -412,6 +424,20 @@ func (a *App) receiveInbox(c *gin.Context) {
 					return err
 				}
 				if err := tx.Model(&ViewerLease{}).Where("stream_id IN ? AND released_at IS NULL", affectedStreams).Update("released_at", now).Error; err != nil {
+					return err
+				}
+			}
+		case "device.activated":
+			if ignoreLifecycle {
+				break
+			}
+			deviceID, _ := uuid.Parse(devicePayload.DeviceID)
+			accountID, _ := uuid.Parse(devicePayload.AccountID)
+			if err := tx.Model(&Stream{}).Where("device_id = ? AND account_id = ? AND active = ? AND disabled_at IS NOT NULL", deviceID, accountID, false).Pluck("id", &affectedStreams).Error; err != nil {
+				return err
+			}
+			if len(affectedStreams) > 0 {
+				if err := tx.Model(&Stream{}).Where("id IN ?", affectedStreams).Updates(map[string]any{"active": true, "config_status": "pending", "disabled_at": nil, "config_version": gorm.Expr("config_version + 1"), "updated_at": now}).Error; err != nil {
 					return err
 				}
 			}
@@ -428,7 +454,7 @@ func (a *App) receiveInbox(c *gin.Context) {
 		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "internal event could not be persisted")
 		return
 	}
-	if !duplicate && envelope.EventType == "device.disabled" {
+	if !duplicate && (envelope.EventType == "device.disabled" || envelope.EventType == "device.activated") {
 		for _, streamID := range affectedStreams {
 			ctx, cancel := context.WithTimeout(c.Request.Context(), 4*time.Second)
 			_ = a.reconcileStream(ctx, streamID)
@@ -444,7 +470,31 @@ func (a *App) receiveInbox(c *gin.Context) {
 }
 
 func validProducerEvent(producer, eventType string) bool {
-	return (producer == "device-service" && eventType == "device.disabled") || (producer == "auth-service" && eventType == "session.revoked")
+	return (producer == "device-service" && (eventType == "device.disabled" || eventType == "device.activated")) || (producer == "auth-service" && eventType == "session.revoked")
+}
+
+func (a *App) deviceLifecycleActive(ctx context.Context, rawDeviceID, rawAccountID string) (bool, error) {
+	deviceID, _ := uuid.Parse(rawDeviceID)
+	accountID, _ := uuid.Parse(rawAccountID)
+	var camera struct{ CameraID uuid.UUID }
+	err := a.db.WithContext(ctx).Model(&Stream{}).Select("camera_id").Where("device_id = ? AND account_id = ?", deviceID, accountID).Order("updated_at DESC").Take(&camera).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if a.device == nil {
+		return false, errors.New("device ownership service is unavailable")
+	}
+	ownership, err := a.device.ResolveCamera(ctx, camera.CameraID.String())
+	if errors.Is(err, errOwnershipNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return ownership.DeviceID == deviceID.String() && ownership.AccountID == accountID.String() && ownership.CameraID == camera.CameraID.String(), nil
 }
 
 func validUUIDString(value string) bool {

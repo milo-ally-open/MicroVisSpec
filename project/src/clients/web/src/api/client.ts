@@ -76,7 +76,11 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     }
     const message = code === 'capacity_full'
       ? '观看容量已满，请关闭其他监控画面后重试。'
-      : statusMessage[response.status] ?? problem.error?.message ?? '请求失败，请稍后重试。'
+      : code === 'device_not_provisioned'
+        ? '此设备尚未完成可信接入，请联系管理员完成部署后再网页激活。'
+      : code === 'activation_sync_pending'
+        ? '设备正在同步上一次激活，请稍候片刻再提交。'
+        : statusMessage[response.status] ?? problem.error?.message ?? '请求失败，请稍后重试。'
     throw new ApiError(
       response.status,
       code,

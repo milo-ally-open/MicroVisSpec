@@ -232,7 +232,7 @@ func (a *App) retryBrokerRevocations(ctx context.Context) {
 	err := a.db.WithContext(ctx).Table("device.broker_credentials AS credentials").
 		Select("credentials.*").
 		Joins("JOIN device.devices AS devices ON devices.id = credentials.device_id").
-		Where("devices.active = ? AND credentials.revoked_at IS NULL", false).
+		Where("credentials.revoked_at IS NULL AND (devices.active = ? OR (devices.activation_expires_at IS NOT NULL AND devices.activation_expires_at <= ?))", false, time.Now().UTC()).
 		Order("credentials.created_at ASC").Limit(100).Scan(&credentials).Error
 	if err != nil {
 		slog.Error("broker_revocation_reconciliation_failed", "error", err.Error())

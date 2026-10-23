@@ -11,6 +11,7 @@
 - [ ] **T-05 device-service 服务内集成测试** — 隔离 PostgreSQL + 测试 Mosquitto Dynamic Security，覆盖 A/B 账号资产隔离、重复/过期激活、topic ACL、标准及 Atlas 实机状态 payload、未知字段拒绝、心跳离线、配置版本 ACK、规则默认关闭/拒绝越界/校验历史规则版本、停用后身份撤销与 outbox 恢复；覆盖 REQ-01、REQ-02、REQ-03、REQ-04 / AC-01.1、AC-01.2、AC-02.1、AC-02.2、AC-03.1、AC-03.2、AC-03.3、AC-04.1、AC-04.2；依赖 T-01–T-04。
 - [ ] **T-06 镜像、凭据与运维恢复** — 容器构建、迁移、broker 与数据库恢复对账、指标/日志脱敏；覆盖 REQ-01、REQ-04 / AC-01.2、AC-04.2；依赖 T-01–T-05。
 - [ ] **T-07 设备详情摄像头来源配置契约联调** — 确认设备详情仅暴露 RTSP URL 字段，前端调用 media-service 读写，media-service 通过本服务验证摄像头所有权且 device schema 不增加流来源数据；覆盖 REQ-05 / AC-05.1、AC-05.2；依赖 T-01、media-service 和 web_pwa_client。
+- [ ] **T-08 网页激活、设备授权期限与过期撤权** — 无限期/自定义期限由网页请求设定；Atlas agent 认证轮询并接收 MQTT 凭据，页面等待 agent 确认新身份；响应丢失时旧身份可安全重领同一凭据；调度器停用到期设备、写 `device.disabled` outbox 并撤销 MQTT 权限；保留过期资产，网页续期后写 `device.activated` outbox 并恢复已保存媒体来源；覆盖 REQ-02 / AC-02.5–02.9；依赖 T-02、Atlas agent、media-service。
 
 ## 验收证据
 
