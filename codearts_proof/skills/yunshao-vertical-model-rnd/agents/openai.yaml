@@ -1,4 +1,0 @@
-interface:
-  display_name: "Yunshao Vertical Model R&D"
-  short_description: "Run any vertical detection model from dataset to Atlas demo with seven gates"
-  default_prompt: "Use $yunshao-vertical-model-rnd to build the requested detection scenario in this Yunshao repository and report every gate."
