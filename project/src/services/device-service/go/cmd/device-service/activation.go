@@ -144,34 +144,14 @@ func (a *App) createActivationJob(c *gin.Context, exposeTicket bool) {
 		writeError(c, http.StatusUnprocessableEntity, "invalid_request", "duration_seconds must be null or a positive value within the supported range")
 		return
 	}
-	now := time.Now().UTC()
-	if !a.activationLimiter.allow("ticket:"+accountID(c).String()+":"+device.ID.String(), now) {
-		writeError(c, http.StatusTooManyRequests, "rate_limited", "too many activation tickets were requested")
-		return
-	}
-	token, err := randomOpaque(32)
-	if err != nil {
-		writeError(c, http.StatusInternalServerError, "internal_error", "activation ticket could not be issued")
-		return
-	}
-	ticket := ActivationTicket{ID: uuid.New(), DeviceID: device.ID, TokenHash: hashOpaque(token), ExpiresAt: now.Add(activationTicketLifetime), UsageDurationSeconds: input.DurationSeconds, CreatedAt: now}
-	err = a.db.Transaction(func(tx *gorm.DB) error {
-		var inFlight ActivationTicket
-		inFlightErr := tx.Where("device_id = ? AND consumed_at IS NULL AND revoked_at IS NULL AND claim_expires_at > ?", device.ID, now).First(&inFlight).Error
-		if inFlightErr == nil {
-			return errActivationInProgress
-		}
-		if !errors.Is(inFlightErr, gorm.ErrRecordNotFound) {
-			return inFlightErr
-		}
-		if err := tx.Model(&ActivationTicket{}).Where("device_id = ? AND consumed_at IS NULL AND revoked_at IS NULL", device.ID).Update("revoked_at", now).Error; err != nil {
-			return err
-		}
-		return tx.Create(&ticket).Error
-	})
+	ticket, token, err := a.issueActivationTicket(c.Request.Context(), accountID(c), device.ID, input.DurationSeconds)
 	if err != nil {
 		if errors.Is(err, errActivationInProgress) {
 			writeError(c, http.StatusConflict, "activation_in_progress", "device activation is already being processed")
+			return
+		}
+		if errors.Is(err, errActivationRateLimited) {
+			writeError(c, http.StatusTooManyRequests, "rate_limited", "too many activation tickets were requested")
 			return
 		}
 		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "activation ticket could not be issued")
@@ -182,6 +162,41 @@ func (a *App) createActivationJob(c *gin.Context, exposeTicket bool) {
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"device_id": device.ID, "request_id": ticket.ID, "status": "pending", "expires_at": ticket.ExpiresAt, "duration_seconds": ticket.UsageDurationSeconds})
+}
+
+var errActivationRateLimited = errors.New("activation rate limited")
+
+func (a *App) issueActivationTicket(ctx context.Context, account, deviceID uuid.UUID, duration *int64) (ActivationTicket, string, error) {
+	if a.broker == nil {
+		return ActivationTicket{}, "", errors.New("MQTT management is not ready")
+	}
+	now := time.Now().UTC()
+	if !a.activationLimiter.allow("ticket:"+account.String()+":"+deviceID.String(), now) {
+		return ActivationTicket{}, "", errActivationRateLimited
+	}
+	token, err := randomOpaque(32)
+	if err != nil {
+		return ActivationTicket{}, "", err
+	}
+	ticket := ActivationTicket{ID: uuid.New(), DeviceID: deviceID, TokenHash: hashOpaque(token), ExpiresAt: now.Add(activationTicketLifetime), UsageDurationSeconds: duration, CreatedAt: now}
+	err = a.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var inFlight ActivationTicket
+		inFlightErr := tx.Where("device_id = ? AND consumed_at IS NULL AND revoked_at IS NULL AND claim_expires_at > ?", deviceID, now).First(&inFlight).Error
+		if inFlightErr == nil {
+			return errActivationInProgress
+		}
+		if !errors.Is(inFlightErr, gorm.ErrRecordNotFound) {
+			return inFlightErr
+		}
+		if err := tx.Model(&ActivationTicket{}).Where("device_id = ? AND consumed_at IS NULL AND revoked_at IS NULL", deviceID).Update("revoked_at", now).Error; err != nil {
+			return err
+		}
+		return tx.Create(&ticket).Error
+	})
+	if err != nil {
+		return ActivationTicket{}, "", err
+	}
+	return ticket, token, nil
 }
 
 func (a *App) getActivationRequest(c *gin.Context) {

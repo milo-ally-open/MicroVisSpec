@@ -20,6 +20,7 @@
 - **AC-01.4** Given 激活响应包含 MQTT `client_id`、username、password 和 TLS broker 信息，When agent 建立 MQTT 连接，Then 必须逐项使用激活返回的 `client_id` 与设备凭据；client_id 缺失时失败关闭，不按 device_id 自行派生。
 - **AC-01.5** Given agent 已预置设备 ID、可信 HTTPS Origin/CA 和当前设备凭据，When 所有者在网页提交激活或续期请求，Then agent 通过 TLS HTTPS 后台轮询并领取仅属于本设备的 MQTT 凭据；凭据原子写入 `/var/lib/yunshao/activation.env` 后自动重启 systemd 服务，浏览器和用户命令行均不接触 MQTT 密码。
 - **AC-01.6** Given 云端租期到期，When Atlas 本地租期到期，Then classroom runtime 暂停推理/视频处理；agent 继续用设备 HTTPS 身份轮询。网页续期后 agent 持久化新租期和凭据并自动重启，runtime 按新租期恢复。HTTPS 租期同步失败不延长本地旧租期。
+- **AC-01.7** Given 设备已登记、具备 Atlas 驱动/CANN、SSH 和 systemd，When 园区用户在网页提交管理员提供的 SSH 用户名/密码并确认设备指纹，Then 云端通过固定私网设备地址和 TCP/22 部署 agent-only 版本、Web/MQTT CA 并兑换一次性激活票据；密码、票据和 MQTT 凭据不得写入任务记录或回显浏览器。设备持久保存激活身份并启动 agent 后网页显示完成；用户无需打开板端命令行。
 
 **验证方式**：设备激活与主题 ACL 集成测试、凭据撤销测试、Atlas 设备轮询/落盘/自动重启与到期暂停实机验收。
 

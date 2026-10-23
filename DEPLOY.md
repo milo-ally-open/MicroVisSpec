@@ -83,7 +83,7 @@ COMPOSE_PROJECT_NAME=yunshao
 BACKEND_NETWORK=yunshao_backend
 PUBLIC_HOST=192.168.0.1
 PUBLIC_ORIGIN=https://172.50.53.131:19080
-# Legacy administrator commissioning endpoint; normal user activation is requested in Web.
+# HTTPS origin reachable by Atlas for web-based first-time onboarding and activation.
 ATLAS_ACTIVATION_ORIGIN=https://192.168.0.1:19080
 MQTT_BIND_ADDRESS=192.168.0.1
 MQTT_TLS_PORT=8883
@@ -128,6 +128,7 @@ mkcert -install
 mkcert -cert-file project/src/clients/web/.secret-nginx-tls-certificate.pem -key-file project/src/clients/web/.secret-nginx-tls-private-key.pem 172.50.53.131 192.168.0.1
 mkcert -cert-file project/src/services/device-service/.secret-mqtt-tls-certificate.pem -key-file project/src/services/device-service/.secret-mqtt-tls-private-key.pem 192.168.0.1
 cp "$(mkcert -CAROOT)/rootCA.pem" project/src/services/device-service/.secret-mqtt-ca-certificate.pem
+cp "$(mkcert -CAROOT)/rootCA.pem" project/src/services/device-service/.secret-atlas-activation-ca-certificate.pem
 chmod 600 project/src/clients/web/.secret-nginx-tls-private-key.pem
 chmod 600 project/src/services/device-service/.secret-mqtt-tls-private-key.pem
 ```
@@ -144,7 +145,7 @@ cp "$(mkcert -CAROOT)/rootCA.pem" /mnt/c/Users/Administrator/Downloads/yunshao-r
 certutil -addstore -user Root "%USERPROFILE%\Downloads\yunshao-rootCA.pem"
 ```
 
-在每位同事的 Windows 设备上，通过可信的内部渠道提供 `rootCA.pem` 并执行导入命令；macOS、Linux 和手机也需将该公开证书加入系统信任库。不要复制或分享 `rootCA-key.pem`。生产环境应改用组织信任的正式证书。Atlas 信任 CA 的步骤在第 6 节。
+在每位同事的 Windows 设备上，通过可信的内部渠道提供 `rootCA.pem` 并执行导入命令；macOS、Linux 和手机也需将该公开证书加入系统信任库。不要复制或分享 `rootCA-key.pem`。生产环境应改用组织信任的正式证书。Atlas 首次网页接入所需 CA 已由后端 Compose 提供，设备端自动安装；第 6 节说明的是已有设备如何单独信任 CA。
 
 ## 3. 生成服务密钥
 

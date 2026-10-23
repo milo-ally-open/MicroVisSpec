@@ -2,7 +2,7 @@
 import AppIcon from '../components/AppIcon.vue'
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { deviceApi, type Device } from '../api/devices'
+import { deviceApi, type Device, type ProvisioningHostKey, type ProvisioningJob } from '../api/devices'
 import { mediaApi } from '../api/media'
 import { errorMessage } from '../api/client'
 import { formatDate } from '../lib/format'
@@ -18,6 +18,15 @@ const notice = ref('')
 const activationRequest = ref<{ request_id: string; status: string; expires_at: string } | null>(null)
 let activationPollTimer: number | undefined
 let activationPollGeneration = 0
+const sshUsername = ref('root')
+const sshPassword = ref('')
+const sshHostKey = ref<ProvisioningHostKey | null>(null)
+const sshHostKeyConfirmed = ref(false)
+const checkingSSH = ref(false)
+const provisioningJob = ref<ProvisioningJob | null>(null)
+const provisioningInProgress = computed(() => provisioningJob.value?.status === 'queued' || provisioningJob.value?.status === 'running')
+let provisioningPollTimer: number | undefined
+let provisioningPollGeneration = 0
 const durationMode = ref<'unlimited' | 'custom'>('unlimited')
 const durationValue = ref(30)
 const durationUnit = ref<'minutes' | 'hours' | 'days'>('days')
@@ -56,6 +65,13 @@ async function load() {
   try {
     const current = await deviceApi.get(String(route.params.deviceId))
     applyDevice(current)
+    if (!current.provisioned && typeof deviceApi.getLatestProvisioningJob === 'function') {
+      const latestJob = await deviceApi.getLatestProvisioningJob(current.device_id)
+      if (latestJob) {
+        provisioningJob.value = latestJob
+        if (latestJob.status === 'queued' || latestJob.status === 'running') startProvisioningPolling(current.device_id, latestJob.job_id, 1200)
+      }
+    }
     await Promise.all(current.cameras.map(async (camera) => {
       const form = { rtsp_url: '' }
       sourceForms[camera.camera_id] = form
@@ -159,6 +175,87 @@ async function activateFromWeb() {
   }
 }
 
+function stopProvisioningPolling() {
+  provisioningPollGeneration++
+  if (provisioningPollTimer !== undefined) window.clearTimeout(provisioningPollTimer)
+  provisioningPollTimer = undefined
+}
+
+function startProvisioningPolling(deviceId: string, jobId: string, delay = 1200) {
+  stopProvisioningPolling()
+  const generation = ++provisioningPollGeneration
+  provisioningPollTimer = window.setTimeout(() => void pollProvisioningJob(deviceId, jobId, generation), delay)
+}
+
+async function checkSSHHostKey() {
+  if (!device.value) return
+  checkingSSH.value = true
+  error.value = ''
+  sshHostKey.value = null
+  sshHostKeyConfirmed.value = false
+  try {
+    sshHostKey.value = await deviceApi.getProvisioningHostKey(device.value.device_id)
+  } catch (cause) {
+    error.value = errorMessage(cause)
+  } finally {
+    checkingSSH.value = false
+  }
+}
+
+async function pollProvisioningJob(deviceId: string, jobId: string, generation: number) {
+  if (generation !== provisioningPollGeneration) return
+  try {
+    const result = await deviceApi.getProvisioningJob(deviceId, jobId)
+    if (generation !== provisioningPollGeneration) return
+    provisioningJob.value = result
+    if (result.status === 'queued' || result.status === 'running') {
+      provisioningPollTimer = window.setTimeout(() => void pollProvisioningJob(deviceId, jobId, generation), 1800)
+      return
+    }
+    provisioningPollTimer = undefined
+    if (result.status === 'succeeded') {
+      error.value = ''
+      notice.value = '设备已完成首次接入和网页激活，现在可以使用。'
+    } else {
+      error.value = result.message || '设备接入未完成，请核对管理员提供的账号密码后重试。'
+    }
+    await load()
+  } catch (cause) {
+    if (generation !== provisioningPollGeneration) return
+    error.value = errorMessage(cause)
+    provisioningPollTimer = window.setTimeout(() => void pollProvisioningJob(deviceId, jobId, generation), 5000)
+  }
+}
+
+async function startWebProvisioning() {
+  if (!device.value || !sshHostKey.value || !sshHostKeyConfirmed.value || !sshUsername.value.trim() || !sshPassword.value || provisioningInProgress.value) return
+  if (durationMode.value === 'custom' && (!Number.isSafeInteger(durationValue.value) || durationValue.value < 1 || durationValue.value > maxDurationValue.value)) {
+    error.value = `自定义期限需为 1 至 ${maxDurationValue.value} ${durationUnit.value === 'minutes' ? '分钟' : durationUnit.value === 'hours' ? '小时' : '天'}。`
+    return
+  }
+  const deviceId = device.value.device_id
+  saving.value = true
+  error.value = ''
+  notice.value = ''
+  try {
+    const job = await deviceApi.startProvisioning(deviceId, {
+      ssh_username: sshUsername.value.trim(),
+      ssh_password: sshPassword.value,
+      host_key_fingerprint: sshHostKey.value.fingerprint,
+      duration_seconds: selectedDurationSeconds.value,
+    })
+    provisioningJob.value = job
+    sshPassword.value = ''
+    notice.value = '已安全连接设备；账号密码不会保存，接入进度会在本页自动更新。'
+    startProvisioningPolling(deviceId, job.job_id)
+  } catch (cause) {
+    error.value = errorMessage(cause)
+  } finally {
+    sshPassword.value = ''
+    saving.value = false
+  }
+}
+
 async function registerCamera() {
   if (!device.value) return
   saving.value = true
@@ -200,9 +297,9 @@ async function saveRules() {
   } catch (cause) { error.value = errorMessage(cause); if ((cause as { status?: number })?.status === 409) await load() } finally { saving.value = false }
 }
 
-watch(() => route.params.deviceId, () => { stopActivationPolling(); activationRequest.value = null; void load() })
+watch(() => route.params.deviceId, () => { stopActivationPolling(); stopProvisioningPolling(); activationRequest.value = null; provisioningJob.value = null; sshHostKey.value = null; sshHostKeyConfirmed.value = false; sshPassword.value = ''; void load() })
 onMounted(load)
-onBeforeUnmount(stopActivationPolling)
+onBeforeUnmount(() => { stopActivationPolling(); stopProvisioningPolling() })
 </script>
 
 <template>
@@ -211,7 +308,34 @@ onBeforeUnmount(stopActivationPolling)
   <div v-if="busy" class="panel loading-panel">正在加载设备服务数据…</div>
   <template v-else-if="device">
     <section class="detail-grid"><article class="panel"><div class="panel-heading"><div><span class="eyebrow">ASSET PROFILE</span><h2>设备资料</h2></div><span class="small-label">{{ device.activation_state === 'expired' ? '授权已到期' : device.active ? '有效设备' : '已停用' }}</span></div><form class="form-stack" @submit.prevent="saveDevice"><label class="field"><span>设备名称</span><input v-model="edit.name" required maxlength="120" :disabled="!device.active"></label><div class="field-row"><label class="field"><span>IP 地址</span><input v-model="edit.ip" required maxlength="45" :disabled="!device.active"></label><label class="field"><span>位置</span><input v-model="edit.location" required maxlength="256" :disabled="!device.active"></label></div><button class="button button--secondary" type="submit" :disabled="saving || !device.active">保存设备资料</button></form><div class="device-meta"><span>最近心跳<strong>{{ formatDate(device.last_seen_at) }}</strong></span><span>激活状态<strong>{{ device.activation_state }}</strong></span><span v-if="device.activation_expires_at">授权到期<strong>{{ formatDate(device.activation_expires_at) }}</strong></span></div></article>
-      <article v-if="device.activation_state !== 'disabled'" class="panel activation-panel"><div class="panel-heading"><div><span class="eyebrow">SECURE ACTIVATION</span><h2>{{ device.activation_state === 'expired' ? '续期并重新激活' : '设备激活' }}</h2></div><span class="activation-icon"><AppIcon name="shield" /></span></div><p class="panel-intro">选择设备使用期限。到期后云端会停用设备业务访问、撤销 MQTT 权限；设备在线时会在后台自动领取续期，不需要操作 Atlas 终端。</p><label class="field"><span>使用期限</span><select v-model="durationMode" :disabled="Boolean(activationRequest)"><option value="unlimited">无限期</option><option value="custom">自定义期限</option></select></label><div v-if="durationMode === 'custom'" class="field-row activation-duration"><label class="field"><span>时长</span><input v-model.number="durationValue" type="number" min="1" :max="maxDurationValue" step="1" required :disabled="Boolean(activationRequest)"></label><label class="field"><span>单位</span><select v-model="durationUnit" :disabled="Boolean(activationRequest)"><option value="minutes">分钟</option><option value="hours">小时</option><option value="days">天</option></select></label></div><p class="activation-duration-note">本次设备授权：{{ durationSummary }}</p><button class="button button--primary" :disabled="saving || Boolean(activationRequest)" @click="activateFromWeb">{{ saving ? '正在提交…' : activationRequest ? (activationRequest.status === 'syncing' ? '正在同步到设备…' : '正在等待设备…') : device.activation_state === 'expired' ? '网页续期并激活' : '网页激活设备' }} <span aria-hidden="true">→</span></button><div v-if="activationRequest?.status === 'syncing'" class="activation-note" role="status"><span>…</span>云端已确认授权，正在等待 Atlas 保存新凭据。设备联网后会自动完成，请勿重复提交。</div><div v-else-if="activationRequest" class="activation-note" role="status"><span>…</span>请求已提交，Atlas agent 在线时会自动领取新凭据；请求等待期限至 {{ formatDate(activationRequest.expires_at) }}。</div><div v-else class="activation-note"><span>✓</span>用户只需在网页操作；设备需预先完成 agent 安装和可信接入。MQTT 凭据始终留在设备侧，不会显示在浏览器中。</div></article></section>
+      <article v-if="device.activation_state !== 'disabled'" class="panel activation-panel">
+        <div class="panel-heading"><div><span class="eyebrow">SECURE ACTIVATION</span><h2>{{ device.provisioned ? (device.activation_state === 'expired' ? '续期并重新激活' : '设备激活') : '首次接入设备' }}</h2></div><span class="activation-icon"><AppIcon name="shield" /></span></div>
+        <template v-if="!device.provisioned">
+          <p class="panel-intro">首次使用时，在这里完成设备接入和激活。请向园区管理员询问这台 Atlas 的 SSH 用户名和密码（root 或有 sudo 权限的账号）；不需要打开开发板命令行。</p>
+          <label class="field"><span>设备 SSH 用户名</span><input v-model="sshUsername" autocomplete="off" placeholder="root 或管理员提供的账号" :disabled="provisioningInProgress"></label>
+          <label class="field"><span>设备 SSH 密码</span><input v-model="sshPassword" type="password" autocomplete="off" placeholder="向园区管理员获取" :disabled="provisioningInProgress"></label>
+          <p class="activation-security-note">密码只用于本次加密连接，不会保存到系统或浏览器。首次连接的指纹会固定到平台；如指纹变化，请联系管理员核验后再处理。</p>
+          <button class="button button--secondary" type="button" :disabled="checkingSSH || provisioningInProgress" @click="checkSSHHostKey">{{ checkingSSH ? '正在检查设备…' : sshHostKey?.pinned ? '重新检查设备指纹' : '检查设备并显示安全指纹' }}</button>
+          <div v-if="sshHostKey" class="ssh-fingerprint"><span>{{ sshHostKey.pinned ? '平台已登记的设备 SSH 指纹' : '首次连接的设备 SSH 指纹' }}</span><code>{{ sshHostKey.fingerprint }}</code></div>
+          <label v-if="sshHostKey" class="ssh-confirm"><input v-model="sshHostKeyConfirmed" type="checkbox" :disabled="provisioningInProgress"><span>我已确认这是登记 IP 对应的设备，并同意本次安全连接。</span></label>
+          <label class="field activation-duration-field"><span>接入后的使用期限</span><select v-model="durationMode" :disabled="provisioningInProgress"><option value="unlimited">无限期</option><option value="custom">自定义期限</option></select></label>
+          <div v-if="durationMode === 'custom'" class="field-row activation-duration"><label class="field"><span>时长</span><input v-model.number="durationValue" type="number" min="1" :max="maxDurationValue" step="1" required :disabled="provisioningInProgress"></label><label class="field"><span>单位</span><select v-model="durationUnit" :disabled="provisioningInProgress"><option value="minutes">分钟</option><option value="hours">小时</option><option value="days">天</option></select></label></div>
+          <p class="activation-duration-note">本次设备授权：{{ durationSummary }}</p>
+          <button class="button button--primary" :disabled="saving || provisioningInProgress || !sshHostKey || !sshHostKeyConfirmed || !sshUsername.trim() || !sshPassword" @click="startWebProvisioning">{{ provisioningInProgress ? '正在接入设备…' : saving ? '正在提交…' : '开始网页接入并激活' }} <span aria-hidden="true">→</span></button>
+          <div v-if="provisioningJob" class="provisioning-status" :class="`provisioning-status--${provisioningJob.status}`" role="status"><strong>{{ provisioningJob.status === 'succeeded' ? '接入完成' : provisioningJob.status === 'failed' ? '接入未完成' : '正在处理' }}</strong><span>{{ provisioningJob.message }}</span></div>
+          <div class="activation-note"><span>✓</span>系统会自动安装或更新 Yunshao agent、配置安全证书并启动服务。设备身份和 MQTT 密钥保存在设备侧。</div>
+        </template>
+        <template v-else>
+          <p class="panel-intro">选择设备使用期限。到期后云端会停用设备业务访问、撤销 MQTT 权限；设备在线时会在后台自动领取续期，不需要操作 Atlas 终端。</p>
+          <label class="field"><span>使用期限</span><select v-model="durationMode" :disabled="Boolean(activationRequest)"><option value="unlimited">无限期</option><option value="custom">自定义期限</option></select></label>
+          <div v-if="durationMode === 'custom'" class="field-row activation-duration"><label class="field"><span>时长</span><input v-model.number="durationValue" type="number" min="1" :max="maxDurationValue" step="1" required :disabled="Boolean(activationRequest)"></label><label class="field"><span>单位</span><select v-model="durationUnit" :disabled="Boolean(activationRequest)"><option value="minutes">分钟</option><option value="hours">小时</option><option value="days">天</option></select></label></div>
+          <p class="activation-duration-note">本次设备授权：{{ durationSummary }}</p>
+          <button class="button button--primary" :disabled="saving || Boolean(activationRequest)" @click="activateFromWeb">{{ saving ? '正在提交…' : activationRequest ? (activationRequest.status === 'syncing' ? '正在同步到设备…' : '正在等待设备…') : device.activation_state === 'expired' ? '网页续期并激活' : '网页激活设备' }} <span aria-hidden="true">→</span></button>
+          <div v-if="activationRequest?.status === 'syncing'" class="activation-note" role="status"><span>…</span>云端已确认授权，正在等待 Atlas 保存新凭据。设备联网后会自动完成，请勿重复提交。</div>
+          <div v-else-if="activationRequest" class="activation-note" role="status"><span>…</span>请求已提交，Atlas agent 在线时会自动领取新凭据；请求等待期限至 {{ formatDate(activationRequest.expires_at) }}。</div>
+          <div v-else class="activation-note"><span>✓</span>网页激活和续期无需再次输入设备密码；MQTT 凭据始终留在设备侧，不会显示在浏览器中。</div>
+        </template>
+      </article></section>
 
     <section class="panel camera-panel"><div class="panel-heading"><div><span class="eyebrow">CAMERA SOURCES</span><h2>摄像头与媒体来源 <span class="heading-count">{{ device.cameras.length }}</span></h2></div><button class="button button--secondary" @click="addCamera = !addCamera">{{ addCamera ? '取消' : '+ 添加摄像头' }}</button></div><form v-if="addCamera" class="camera-create-form" @submit.prevent="registerCamera"><label class="field"><span>摄像头名称</span><input v-model="cameraForm.name" required placeholder="前端摄像头"></label><label class="field"><span>摄像头标识</span><input v-model="cameraForm.camera_key" required placeholder="camera-01"></label><button class="button button--primary" type="submit" :disabled="saving">登记摄像头</button></form>
       <div v-if="!device.cameras.length" class="empty-state empty-state--compact"><span class="empty-state__icon"><AppIcon name="camera" /></span><strong>还没有摄像头</strong><p>登记摄像头后，可配置 RTSP 地址并在桌面监控页查看。</p></div>
@@ -229,4 +353,5 @@ onBeforeUnmount(stopActivationPolling)
 
 <style scoped>
 .detail-heading-actions{display:flex;align-items:center;gap:9px}.confirm-backdrop{position:fixed;z-index:100;inset:0;display:grid;place-items:center;padding:22px;background:#1c19177a;backdrop-filter:blur(3px)}.confirm-panel{width:min(100%,440px);padding:22px}.confirm-panel h2{margin:0;color:#1c1917;font-family:"Songti SC","STSong","SimSun",Georgia,serif;font-size:18px;font-weight:400}.confirm-panel p{margin:12px 0 20px;color:#6d655b;font-size:12px;line-height:1.7}.confirm-panel>div{display:flex;justify-content:flex-end;gap:8px}.button--danger{border-color:#a84f49;background:#a84f49;color:#fff}.button--danger:hover:not(:disabled){background:#873d38}
+.activation-security-note{margin:-2px 0 13px;color:#81786d;font-size:12px;line-height:1.65}.ssh-fingerprint{display:grid;gap:7px;margin-top:13px;padding:12px;border:1px solid #d8e8e3;border-radius:10px;background:#f4f8f6;color:#4f766e;font-size:11px}.ssh-fingerprint code{overflow-wrap:anywhere;color:#345e56;font-size:11px}.ssh-confirm{display:flex;align-items:flex-start;gap:8px;margin:12px 0 16px;color:#6d655b;font-size:12px;line-height:1.5}.ssh-confirm input{margin:2px 0 0;accent-color:#286255}.activation-duration-field{margin-top:15px}.provisioning-status{display:grid;gap:4px;margin-top:14px;padding:12px;border-radius:9px;background:#f1f6f3;color:#456b5e;font-size:12px;line-height:1.55}.provisioning-status--failed{background:#fff4f2;color:#9b4f48}.provisioning-status--succeeded{background:#eef7f1;color:#397052}.provisioning-status strong{font-size:12px}
 </style>

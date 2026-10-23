@@ -53,6 +53,17 @@
 - **AC-05.1**：摄像头所有者可从设备详情打开该摄像头的视频来源配置；页面只提供 RTSP 地址字段并调用 media-service，不在 device-service 中复制来源配置或建立第二份持久化。
 - **AC-05.2**：配置请求仍经 media-service 核对 device-service 中的摄像头归属；其他账号的摄像头不可读取或更新来源地址。
 
+### REQ-06 网页 SSH 引导首次设备接入
+
+设备所有者可在网页使用管理员提供的板端 SSH 账号完成 agent 首次部署和可信激活，不需要复制激活票据或登录 Atlas 终端。
+
+- **AC-06.1**：接入接口仅使用当前账号拥有设备记录中的私网 IP 和 TCP/22；不接受请求方传入主机地址、端口或远端命令。目标 IP 必须匹配部署配置的 Atlas SSH CIDR allowlist。
+- **AC-06.2**：首次 SSH 连接先显示主机公钥 SHA-256 指纹，用户确认后才发送密码；服务端仅接受该次确认指纹，后续连接必须匹配设备已保存指纹。密钥变化时拒绝连接并提示重新核验。
+- **AC-06.3**：SSH 用户名与密码只存在于单次 HTTPS 请求和执行进程内；不得写入设备资料、任务记录、文件、命令行参数、响应或日志。任务状态仅保存阶段、时间、安全错误码及完成状态。
+- **AC-06.4**：无 agent 时使用镜像内的仓库 agent-only 源码包在目标板构建并安装 agent；保留已有 `/etc/yunshao` 环境配置和业务 JSON，校验 CANN 环境后才继续。CA 使用部署机提供的 API TLS 与 MQTT CA，临时文件使用受限权限并在成功/失败后清理。
+- **AC-06.5**：服务端为当前设备及所选授权期限签发一次性票据，由固定 agent 命令经 SSH 标准输入兑换；票据与 MQTT 凭据不返回浏览器。Agent 成功启动后，设备进入既有 MQTT 心跳与状态上报链路。
+- **AC-06.6**：接入任务异步报告安全阶段；只允许同一设备一个未完成任务。任务查询按 `account_id` 校验。网络/认证/指纹/缺依赖/构建/激活错误可区分；所有失败均可安全重试，远端临时文件清理。
+
 ## 一、任务目标
 
 交付可管理当前账号边缘设备的 Go/Gin/GORM 服务，并让 Atlas 200I DK A2 通过受控 MQTT 身份上报状态、接收受支持的算法参数命令。设备在线、算法运行和视频可播放须分别呈现，不能以其中一个状态代替另外两个。
@@ -119,6 +130,11 @@
 | `GET /api/v1/devices/{deviceId}/activation-requests/{requestId}` | 当前账号查询 `pending`、`syncing`、`activated`、`expired` 或 `superseded` 状态；服务端已激活但设备尚未确认保存新凭据时返回 `syncing`；成功时附服务器确认的 `activation_expires_at`。 |
 | `POST /edge/v1/activate` | 边缘设备提交 `device_id` 和票据；成功后取得独立 MQTT `client_id`、设备密码、broker 接入信息及 `activation_expires_at`（无限期时为 `null`）。期限从成功兑换时开始。端侧必须原样使用返回的 `client_id`。`mqtt.broker_url` 必须取自 `MQTT_ADVERTISED_BROKER_URL`，不能泄露/复用服务容器内部的 `MQTT_BROKER_URL`。 |
 | `GET /edge/v1/devices/{deviceId}/activation` | Atlas agent 使用设备 MQTT username/password 的 HTTPS Basic 身份轮询。存在待处理网页请求时返回新的 MQTT 凭据及租期；响应丢失时旧身份可重领同一凭据，agent 用新身份再次轮询后确认并清除旧身份；已激活且无待处理请求时仅返回租期同步状态；无请求的过期设备返回 `204`。该路由不得记录 Authorization。 |
+
+| `POST /api/v1/devices/{deviceId}/provisioning/ssh-host-key` | 当前账号获取登记私网设备 TCP/22 的 SSH 主机指纹；无账号密码认证，也不接受目标地址。返回设备已固定指纹或待首次确认的指纹。 |
+| `POST /api/v1/devices/{deviceId}/provisioning` | 当前账号提交 SSH 用户名/密码、已确认的主机指纹和 `duration_seconds`；密码仅用于此请求。服务在后台执行 agent-only 安装和票据激活，返回不含秘密的 `job_id` 与状态。 |
+| `GET /api/v1/devices/{deviceId}/provisioning` | 当前账号读取该设备最近一次接入任务；无任务时返回空值，使页面刷新或重新进入后能恢复任务进度。 |
+| `GET /api/v1/devices/{deviceId}/provisioning/{jobId}` | 返回账号范围内的 `queued`、阶段、`succeeded` 或 `failed` 状态及安全错误代码；不返回远端原始输出或任何凭据。 |
 
 ### 4.2 实现任务
 
