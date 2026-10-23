@@ -113,3 +113,4 @@ backups/
 # ignore 
 .opencode/ 
 wsl-test.sh 
+wsl-sts.sh 
