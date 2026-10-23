@@ -14,6 +14,8 @@
   <img src="https://img.shields.io/badge/Status-MVP%20%2F%20Pilot%20Development-2563eb" alt="MVP and pilot development" />
 </p>
 
+> 项目链接: https://atomgit.com/milo-ally-stu/Yunshao
+
 云哨·边缘智枢（Yunshao）将视频接入、边缘 AI 推理、设备管理、事件处置与运行分析整合在一个可部署的平台中。摄像头视频由边缘设备就近处理，结构化事件和经授权的证据再进入云端工作台，帮助组织统一查看设备与告警状态。
 
 项目首发部署目标为 **华为 Atlas 200I DK A2（Ascend 310B4）**。当前仓库处于 MVP 与试点验证阶段；本文会区分已实现能力和仍需现场验收的能力，不将规划功能描述为已交付功能。
