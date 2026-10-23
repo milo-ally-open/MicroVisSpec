@@ -1,0 +1,17 @@
+**/__pycache__/
+/model_train/datasets/
+/model_train/dataset_analysis/
+/model_train/runs/
+/model_train/runs_*/
+/model_train/train_result/
+/model_train/train_result_*/
+/model_convert/artifacts/
+/model_export/artifacts/
+/model_deployment/*.om
+/model_deployment/build/
+/model_deployment/build_*/
+/model_deployment/acceptance_*/
+!/model_deployment/run_records/
+!/model_deployment/run_records/**
+/model_val/runs_*/
+/model_val/reports/*

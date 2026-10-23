@@ -1,0 +1,42 @@
+name: yunshao
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+dependencies:
+  # Shared WSL Conda environment used by model_train.
+  - python=3.12
+  - pytorch=2.5.1
+  - torchvision=0.20.1
+  - pytorch-cuda=12.4
+  - mkl=2023.1.0
+  - pip
+
+  # model_train: training, data download and analysis.
+  - pip:
+      - ultralytics==8.4.118
+      - roboflow==1.1.53
+      - pandas==2.2.3
+      - matplotlib==3.9.2
+      - PyYAML==6.0.2
+
+      # model_export: ONNX export and media inspection, on the same WSL env.
+      - onnx==1.17.0
+      - opencv-python==4.10.0.84
+
+      # model_val: ONNX reference inference on WSL; OM comparison runs on board.
+      - numpy==2.3.1
+      - onnxruntime==1.20.1
+
+# Board-only toolchain and runtime inventory; these are preinstalled on the Atlas
+# image and are intentionally not passed to Conda as workstation packages.
+# model_convert (Atlas 200I DK A2, aarch64): Ubuntu 22.04; CANN/ATC 7.0.RC1;
+# Ascend 310B4; Miniconda base Python 3.9.2; NumPy 1.23.5. Initialize with
+# `source /usr/local/Ascend/ascend-toolkit/set_env.sh` before running ATC.
+# model_val OM (Atlas base): aclruntime and ais_bench are provided by the board's
+# CANN/ais_bench installation; use `/usr/local/miniconda3/bin/python` after
+# sourcing the CANN environment. No separate venv or pip install is used.
+# model_deployment (Atlas 200I DK A2, aarch64): GCC/G++ 11.3, CMake 3.22.1,
+# C++17, OpenCV C++ 4.5.4 (core, imgproc, imgcodecs, videoio, dnn), CANN/ACL
+# 7.0.RC1. OpenCV development headers/libs and ACL headers/libs come from the
+# board image. Build the standalone C++ video demo with CMake on the board.
