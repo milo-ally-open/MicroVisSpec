@@ -43,7 +43,6 @@ router.beforeEach(async (to) => {
     return true
   }
   if (!authenticated) return { name: 'login', query: { next: to.fullPath } }
-  if (to.name === 'monitor' && window.matchMedia('(max-width: 760px)').matches) return { name: 'devices' }
   return true
 })
 
