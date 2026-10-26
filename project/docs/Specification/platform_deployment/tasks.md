@@ -12,7 +12,7 @@
 - [x] **T-06 密钥和运行配置**：各服务 env 样例只含非机密值和 `*_FILE` 路径；部署文档说明 `/etc/microvisspec` 文件权限和密钥生成。覆盖 REQ-06。
 - [ ] **T-07 文档与部署验证**：更新 DEPLOY.md、README、STRUCTURE、全局 SPEC 和 service README；删除 Compose/Dockerfile 部署入口；Go build 与 Web production build 已通过。Nginx 语法检查及目标 Linux 主机 smoke 尚未执行。覆盖 REQ-07 AC-07.1–07.4。
 - [x] **T-08 本机 Docker 清理与磁盘记录**：移除确认属于本项目的 22 个已退出容器和未引用项目镜像；不删除数据卷或构建缓存，记录清理前后占用。覆盖 REQ-07 AC-07.5。
-- [ ] **T-09 默认分支交付**：确认改动、生成本地 commit，并推送至项目远程仓库默认 `main`；不将运行时密钥或生成的 Go 二进制加入 Git。
+- [x] **T-09 默认分支交付**：变更已在本地提交并推送至 GitHub 默认 `main`；运行时密钥与生成的 Go 二进制未纳入 Git。
 
 ## 验收记录
 
