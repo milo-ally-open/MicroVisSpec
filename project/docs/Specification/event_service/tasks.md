@@ -17,9 +17,9 @@
 | REQ/AC | 检查方法 | 当前证据 | 状态 |
 |---|---|---|---|
 | REQ-01/AC-01.1–01.3 | MQTT 重复、永久拒绝、临时依赖故障及业务 ACK 测试 | `go test ./...` 和隔离 PostgreSQL integration suite 通过，覆盖重复摄取/ACK、设备依赖 stub、拒绝与重试；实际 Mosquitto 链路待部署验收 | 部分通过 |
-| REQ-02/AC-02.1–02.2 | 上传授权、内容校验、到期与清理测试 | 数据库/临时证据集成测试通过；设备凭据实际 HTTPS 上传及 24 小时运行清理待容器验证 | 部分通过 |
+| REQ-02/AC-02.1–02.2 | 上传授权、内容校验、到期与清理测试 | 数据库/临时证据集成测试通过；设备凭据实际 HTTPS 上传及 24 小时运行清理待目标主机验证 | 部分通过 |
 | REQ-03/AC-03.1–03.2 | 多账号、非法/并发处置、统计集成测试 | API integration suite 的多账号查询、处置和统计用例通过；完整浏览器与跨服务流程待联调 | 部分通过 |
-| REQ-04/AC-04.1–04.2 | outbox 原子性、重复投递、恢复测试 | PostgreSQL/outbox 与 push stub 集成用例通过；Compose 重启和真实 push-service 补投待部署验证 | 部分通过 |
+| REQ-04/AC-04.1–04.2 | outbox 原子性、重复投递、恢复测试 | PostgreSQL/outbox 与 push stub 集成用例通过；systemd 重启和真实 push-service 补投待部署验证 | 部分通过 |
 
 ## 环境与执行入口
 

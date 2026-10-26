@@ -6,11 +6,11 @@
 
 - 当前源码为 Vue 3、Vite、TypeScript；已有八类业务页面及认证、设备、媒体、事件、统计、通知 API 模块。PWA、更新与离线代码已有实现，真实媒体与手机通知仍独立验收。
 - 目标在既有 SPA 中按 `auth`、`devices`、`events`、`media`、`push` 拆 API 模块，按公用 dashboard 布局组织页面与导航。
-- 部署归 Web 客户端源码：`src/clients/web/Dockerfile` 构建静态站点与 Nginx 镜像，`src/clients/web/docker-compose.yaml` 单独运行名为 `web` 的入口容器。该 Compose 加入后端 Compose 创建的 external `BACKEND_NETWORK`（默认 `yunshao_backend`），仅发布 Web HTTP/HTTPS 与挂载 Web 自有 TLS/header secrets；不会创建 `web-service` 目录，也不管理后端服务的生命周期。
+- 部署时 Web/PWA 由 Node.js 构建为静态文件，系统 Nginx 托管静态资源并代理 API、edge 与媒体授权请求；Go 服务监听 loopback，由各自 systemd unit 独立运行。完整安装与升级步骤见仓库根目录 [DEPLOY.md](../../../../DEPLOY.md)。
 
-2026-10-22 展品视觉对齐：`readme/yunshao-exhibit.html` 是配色与排版层级的依据。工作台沿用自己的信息架构，将底色调整为 `#faf8f4` 暖纸色、公共导航调整为 `#1c1917` 墨色、交互强调调整为 `#1f4d3a` 森林绿；业务标题采用本地系统衬线字体，正文继续使用系统无衬线字体。保留卡片、表格和表单的原有内容与行为，使用局部样式覆盖统一边框、圆角、焦点和状态色，不引入远程字体或新依赖。
+2026-10-22 展品视觉对齐：`readme/microvisspec-exhibit.html` 是配色与排版层级的依据。工作台沿用自己的信息架构，将底色调整为 `#faf8f4` 暖纸色、公共导航调整为 `#1c1917` 墨色、交互强调调整为 `#1f4d3a` 森林绿；业务标题采用本地系统衬线字体，正文继续使用系统无衬线字体。保留卡片、表格和表单的原有内容与行为，使用局部样式覆盖统一边框、圆角、焦点和状态色，不引入远程字体或新依赖。
 
-2026-10-22 局域网访问：Linux 部署时 Web Compose 的 `WEB_BIND_ADDRESS` 绑定团队 Wi‑Fi 接口，附加 `docker-compose.atlas.yaml` 将同一 Nginx 端口发布到 Atlas 直连接口；不使用 `0.0.0.0`。Windows/WSL 部署保留 Compose loopback 绑定，由 Windows portproxy 映射 Wi‑Fi 地址。Nginx 启动时以 `WEB_HTTPS_REDIRECT_PORT` 渲染 HTTP→HTTPS 重定向，支持端口转发后的外部 HTTPS 端口。`PUBLIC_ORIGIN`、MediaMTX HLS/WebRTC 来源使用团队 Wi‑Fi HTTPS Origin，Web TLS SAN 同时包含 Wi‑Fi 与 Atlas 地址，WebRTC candidates 同时公布两个可达地址。防火墙范围由部署方配置并限制为 Wi‑Fi 客户端网段与 Atlas；当前网段不是 RFC 1918 私网，不能把接口绑定视为网络边界。
+2026-10-26 部署调整：Web 不再由 Compose 发布，主机 Nginx 直接监听配置的 HTTPS 地址；Go 服务与主机 Nginx 通过 loopback 通信。实际部署需按访问网络配置证书 SAN、`PUBLIC_ORIGIN`、MediaMTX 来源/WebRTC candidates 与主机防火墙；不要把接口绑定当作访问控制替代品。
 
 ## 方案
 

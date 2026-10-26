@@ -40,7 +40,7 @@
 
 ## 一、任务目标
 
-在 `project/src/services/media-service/` 实现独立的 Go/Gin/GORM 控制面，并将 MediaMTX 原生可执行文件与 `mediamtx.yml` 配置保存在同一目录；不将 MediaMTX 打包为自定义 Docker 镜像或 Compose 容器，也不增加包装启动器。运维直接使用该二进制和配置文件启动；本地含凭据配置文件由 Git 忽略，仓库只提供无敏感值的示例配置。Atlas 200I DK A2 处理后的 RTSP 流经 MediaMTX 向桌面浏览器提供 WebRTC，失败时回退 HTTPS HLS。完整链路为：
+在 `project/src/services/media-service/` 实现独立的 Go/Gin/GORM 控制面；Go 控制面发布为独立二进制，由 systemd 管理。MediaMTX 使用官方原生可执行文件和 `mediamtx.yml` 配置运行。真实配置与凭据由部署者保存在主机，仓库只提供无敏感值的示例配置。Atlas 200I DK A2 处理后的 RTSP 流经 MediaMTX 向桌面浏览器提供 WebRTC，失败时回退 HTTPS HLS。完整链路为：
 
 **摄像头归属 → 流来源登记 → MediaMTX 配置/拉流 → 账号授权与观看配额 → WebRTC/HLS 播放 → 状态与故障反馈**。
 
@@ -50,7 +50,7 @@
 
 ### 2.1 实现任务
 
-1. 在现有 `go/` 占位目录内建立 Go module、入口、配置、健康接口和数据库迁移；实现后把占位 Dockerfile 补为可构建镜像。`/health/live` 表示进程存活，`/health/ready` 反映 PostgreSQL 与必需的 MediaMTX 控制面状态。
+1. 在现有 `go/` 目录内建立 Go module、入口、配置、健康接口和数据库迁移；发布时构建为独立 Go 二进制。`/health/live` 表示进程存活，`/health/ready` 反映 PostgreSQL 与必需的 MediaMTX 控制面状态。
 2. 由 media-service 独占 PostgreSQL `media` schema，至少保存 `streams`、`viewer_leases` 与 `inbox`。`streams` 保存 `stream_id`、`account_id`、经 device-service 核对的 `device_id`、唯一 `camera_id`、加密的 RTSP URL/凭据、配置版本及状态；`viewer_leases` 保存 `session_id`、流 ID、到期时间和播放器关联；`inbox` 对 `session.revoked`、`device.disabled`、`device.activated` 去重。
 3. RTSP URL 使用现有部署密钥加密保存，密钥不写仓库、镜像或普通日志。数据库账号仅有 `media` schema 所需权限；不直接读取 device-service 的表。
 4. 日志和指标携带请求 ID、camera_id、stream_id；不输出 RTSP URL、浏览器 Cookie、内部服务凭据或可复用播放凭据。
@@ -133,7 +133,7 @@
 
 ### 5.2 实现任务
 
-1. MediaMTX 原生进程直接监听宿主机 UDP 8189；仅向配置的园区网段开放该端口。MediaMTX API、RTSP、HLS 与 WHEP 端口通过宿主机网关供本机 Compose 容器调用，宿主机防火墙拒绝其他来源。首发不部署 STUN/TURN，也不向公网开放 WebRTC UDP。Nginx 以 HTTPS 提供信令和 HLS。[MediaMTX WebRTC 网络配置](https://mediamtx.org/docs/features/webrtc-specific-features)
+1. MediaMTX API、RTSP、HLS 与 WHEP 控制端口只绑定 loopback，供 media-service 与 Nginx 在本机访问；WebRTC UDP 8189 仅向配置的园区网段开放。首发不部署 STUN/TURN，也不向公网开放 WebRTC UDP。Nginx 以 HTTPS 提供信令和 HLS。[MediaMTX WebRTC 网络配置](https://mediamtx.org/docs/features/webrtc-specific-features)
 2. `/monitor` 页面每格先尝试 WebRTC，连接失败再用 HLS；UI 区分连接中、设备离线、RTSP 拉流失败、编码不兼容、UDP 不通、HLS 回退和额度已满。
 3. 两个完整 12 分屏在园区内网观看时，12 路约为 18 Mb/s 入站净载荷、36 Mb/s 服务端下行净载荷；后端使用千兆内网接口。若两个大屏经公网 HLS，园区公网可用上行至少 100 Mb/s。实际联调检查 CPU、内存、带宽和浏览器解码负载，不把参数表当作已测性能结果。
 4. 手机 PWA 不呈现监控大屏；历史告警依靠 event-service 的事件和 24 小时截图，不在本服务提供录像回放。
@@ -157,7 +157,7 @@
 
 ### 6.2 最终交付物与验收
 
-- media-service 源码、数据库迁移、可运行 Docker 镜像、Nginx/MediaMTX 受控配置、接口合同与部署说明。
+- media-service 源码、数据库迁移、独立 Go 二进制、Nginx/MediaMTX 受控配置、接口合同与部署说明。
 - 可复现记录：账号越权、MediaMTX 重启、RTSP 中断、浏览器 UDP 阻断、HLS 回退、配额竞争、登出会话终止和租约回收。
 - 视频能力只覆盖实时监控；录像回放、云转码、移动端大屏和跨园区媒体网络明确不在首发交付范围。
 

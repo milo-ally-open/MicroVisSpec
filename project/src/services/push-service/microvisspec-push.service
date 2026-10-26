@@ -1,0 +1,25 @@
+[Unit]
+Description=MicroVisSpec push service
+After=network-online.target postgresql.service
+Wants=network-online.target
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=microvisspec
+Group=microvisspec
+EnvironmentFile=/etc/microvisspec/push-service.env
+ExecStart=/usr/local/bin/microvisspec/push-service
+Restart=on-failure
+RestartSec=3
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+CapabilityBoundingSet=
+LockPersonality=true
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

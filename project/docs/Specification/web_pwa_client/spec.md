@@ -15,7 +15,7 @@
 - **AC-06.3** Given 进入概览或切换统计范围，When 显示日期、问候和事件数量标题，Then 使用上海时区的当前日期/时段及已选范围，数据仍来自既有服务，不伪造在线状态或统计。
 - **AC-06.4** Given 登录表单密码已填写，When 点击显示/隐藏密码，Then 仅切换当前输入框类型并保留内容，使用原有登录接口和会话合同。
 - **AC-06.5** Given 用户在桌面或手机 Web/PWA 查看工作台、登录页或注册页，When 页面展示品牌区，Then 使用仓库项目 Logo，并显示完整座右铭“边缘智能识别，云端统一处置”；平台品牌文案不绑定单一行业。
-- **AC-06.6** Given 用户查看产品工作台，When 在桌面或手机打开任一业务页面、认证页、离线提示或更新提示，Then 使用 `readme/yunshao-exhibit.html` 的暖纸色、墨色与森林绿视觉基调和清晰标题层级；不加载远程字体，且不改变现有页面结构、路由、API 或交互行为。
+- **AC-06.6** Given 用户查看产品工作台，When 在桌面或手机打开任一业务页面、认证页、离线提示或更新提示，Then 使用 `readme/microvisspec-exhibit.html` 的暖纸色、墨色与森林绿视觉基调和清晰标题层级；不加载远程字体，且不改变现有页面结构、路由、API 或交互行为。
 
 ### REQ-07：局域网部署入口
 
@@ -127,13 +127,13 @@
 |---|---|---|---|---|---|
 | PRD §2–§5 账号、设备、规则、媒体、事件 | REQ-01、REQ-02、REQ-03 | Web + auth/device/media/event | T-01/T-02/T-03/T-04/T-07/T-10 | AC-01.1、AC-01.2、AC-01.3、AC-02.1、AC-02.2、AC-02.3、AC-02.4、AC-02.5、AC-03.1、AC-03.2、AC-03.3、AC-03.4 | 待执行 |
 | PRD §4 PWA 与统计 | REQ-04、REQ-05 | Web + device/event/push | T-05/T-06/T-07 | AC-04.1、AC-04.2、AC-04.3、AC-05.1、AC-05.2 | 待执行 |
-| 用户要求团队 Wi‑Fi 使用 Web/PWA，同时保留 Atlas 直连 | REQ-07 | Web Compose/Nginx、auth/media-service、MediaMTX、TLS 与网络 ACL | T-13 | AC-07.1–07.3 | 配置与证书已更新；服务运行和网络 ACL 待现场验证 |
+| 用户要求团队 Wi‑Fi 使用 Web/PWA，同时保留 Atlas 直连 | REQ-07 | 系统 Nginx、auth/media-service、MediaMTX、TLS 与主机网络 ACL | T-13 | AC-07.1–07.3 | 原生部署配置已调整；服务运行和网络 ACL 待现场验证 |
 | 用户要求用户可选择设备使用期限并续期，且无需在 Atlas 执行命令 | REQ-02 | Web 设备详情、device-service 请求 API、Atlas agent 轮询 | T-15 | AC-02.6–02.8 | 本次实现后记录 |
 | 用户要求园区用户只需从管理员取得板端 SSH 凭据并在网页完成首次接入 | REQ-08、device_service REQ-06 | Web 设备详情、device-service SSH orchestrator、Atlas agent | T-16、device_service T-09 | AC-08.1–08.5、AC-06.1–06.6 | 待验收 |
 
 ## 假设与未决问题
 
-- 页面视觉依据为仓库内 `readme/yunshao-exhibit.html`；展品页的市场介绍布局不复制到工作台，视觉调整不改变交互合同。
+- 页面视觉依据为仓库内 `readme/microvisspec-exhibit.html`；展品页的市场介绍布局不复制到工作台，视觉调整不改变交互合同。
 - `[待核验]` 当前团队 Wi‑Fi `172.50.53.0/24` 的入口 ACL 和客户端隔离状态；该地址段非 RFC 1918，需由部署网络确认仅向团队开放并为主机保留地址。
 - `[待核验]` 目标浏览器与园区网络对 WebRTC、HLS、Push 的真实支持。
 

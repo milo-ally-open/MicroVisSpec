@@ -1,0 +1,26 @@
+[Unit]
+Description=MicroVisSpec device service
+After=network-online.target postgresql.service mosquitto.service microvisspec-media.service
+Wants=network-online.target
+Requires=postgresql.service mosquitto.service
+
+[Service]
+Type=simple
+User=microvisspec
+Group=microvisspec
+SupplementaryGroups=mosquitto
+EnvironmentFile=/etc/microvisspec/device-service.env
+ExecStart=/usr/local/bin/microvisspec/device-service
+Restart=on-failure
+RestartSec=3
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+CapabilityBoundingSet=
+LockPersonality=true
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

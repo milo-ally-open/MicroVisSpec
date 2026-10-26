@@ -50,14 +50,14 @@
 
 ### 2.1 实现任务
 
-1. 在 `project/src/services/push-service` 中建立 Go 模块、Gin 入口、配置、迁移和可构建 Dockerfile。提供内部 `/health/live`、`/health/ready`，就绪状态反映 PostgreSQL 和投递任务所需配置。
+1. 在 `project/src/services/push-service` 中建立 Go 模块、Gin 入口、配置和迁移；发布时构建为独立 Go 二进制，由 systemd 管理。提供内部 `/health/live`、`/health/ready`，就绪状态反映 PostgreSQL 和投递任务所需配置。
 2. 在独占的 PostgreSQL `push` schema 中建立 `subscriptions`、`inbox`、`deliveries`。`endpoint` 全局唯一；inbox 以 `(producer,event_id,event_type)` 去重；delivery 以 `(event_id,subscription_id)` 唯一。
 3. 订阅保存 `account_id`、创建时 `source_session_id`、endpoint、加密后的 `p256dh`/`auth` 密钥、启用/停用时间；投递保存尝试次数、下次重试时间、响应类别与最终状态。数据库账号不得访问 event/auth 的 schema。
 4. 生成或导入 VAPID 密钥对；私钥与订阅密钥的加密主密钥由部署机密提供，不写入仓库、镜像和日志。日志也不记录完整 Web Push endpoint。
 
 ### 2.2 交付物与阶段验收
 
-- 交付容器、迁移、健康接口、VAPID 公钥配置和机密轮换说明。
+- 交付服务二进制、迁移、健康接口、VAPID 公钥配置和机密轮换说明。
 - 空库可迁移；服务重启后订阅与待投递任务仍存在；VAPID 私钥不会经公开 API 返回。
 - 用受限数据库账号不能读写其他服务 schema；数据库/关键配置缺失时就绪状态如实显示。
 

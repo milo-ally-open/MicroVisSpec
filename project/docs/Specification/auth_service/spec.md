@@ -50,15 +50,15 @@
 
 ### 2.1 实现任务
 
-1. 在 `project/src/services/auth-service` 内建立 Go 模块、Gin 入口、配置加载和可构建的 Dockerfile。服务提供内部 `/health/live` 与 `/health/ready`；就绪状态反映必需的 PostgreSQL 依赖。
+1. 在 `project/src/services/auth-service` 内建立 Go 模块、Gin 入口和配置加载；发布时构建为独立 Go 二进制，由 systemd 管理。服务提供内部 `/health/live` 与 `/health/ready`；就绪状态反映必需的 PostgreSQL 依赖。
 2. 在 PostgreSQL `auth` schema 中建立 `accounts`、`sessions` 和 `outbox`，由本服务独占迁移和数据库账号。账号 ID、会话 ID 与 outbox 事件 ID 为 UUID；用户名规范化值、会话 token 哈希分别建唯一索引。时间存为 `timestamptz`。
 3. 明确配置与机密注入：数据库凭据、会话 Cookie 配置、内部服务凭据和加密/签名材料来自部署环境，不写入仓库、镜像或日志。
 4. 对外 API 使用 `/api/v1`，内部会话校验与服务间事件入口使用 `/internal/v1`；错误响应遵守总 SPEC 的 `error.code`、`error.message`、`request_id` 合同。
 
 ### 2.2 交付物与阶段验收
 
-- 交付可启动容器、迁移、配置示例和健康接口说明。
-- 重启容器后账号与会话记录仍由持久化数据库保存；服务不可连接数据库时 `/health/ready` 不报告成功。
+- 交付可启动二进制、迁移、配置示例和健康接口说明。
+- 重启服务后账号与会话记录仍由 PostgreSQL 保存；服务不可连接数据库时 `/health/ready` 不报告成功。
 - 使用受限数据库账号无法读写其他服务 schema；空库可按确定顺序迁移。
 
 ---
@@ -94,7 +94,7 @@
 ### 4.1 实现任务
 
 1. 提供内部会话校验接口，仅接受 Nginx 的 `AUTH_INTERNAL_SERVICE_TOKEN` 或 media-service 的专用 `AUTH_MEDIA_SERVICE_TOKEN`；有效会话返回可信 `account_id`、`session_id`，无效会话返回 401。接口路径和头字段在 OpenAPI/部署配置中固定，内部端口不对公网开放。
-2. Nginx 对受保护的 `/api/v1` 请求发起 `auth_request`，先清除客户端传入的 `X-Account-ID`、`X-Session-ID` 等身份头，再写入校验后的值。Gin 配置只信任 Nginx 容器代理地址。
+2. Nginx 对受保护的 `/api/v1` 请求发起 `auth_request`，先清除客户端传入的 `X-Account-ID`、`X-Session-ID` 等身份头，再写入校验后的值。Gin 只信任本机 Nginx 反向代理。
 3. 所有带 Cookie 的写请求校验 `Origin`，并要求与当前会话关联的 `X-CSRF-Token`；注册/登录等尚无会话的入口按同源 `Origin` 检查与限流处理。前端请求客户端在登录后或重载后获取 token 并附于写请求。
 4. 内部调用使用按服务区分的可轮换凭据；业务服务仍须在资源查询中加 `account_id` 条件，不因有可信身份头就放过跨账号资源 ID。
 

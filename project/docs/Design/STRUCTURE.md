@@ -15,7 +15,7 @@
 | 设计约束 | 架构落点 |
 | --- | --- |
 | 六个业务服务边界 | auth、device、event、media、push 在首发运行；mcp-service 保留边界，系统稳定后启用。 |
-| Go + Gin + GORM，每个业务服务独立容器 | 业务服务分别构建和部署；Mosquitto、PostgreSQL 是后端 Compose 中的基础设施容器，Nginx 由 Web 客户端的独立 Compose 部署，MediaMTX 是由 media-service 管理文件的宿主机原生进程。 |
+| Go + Gin + GORM，每个业务服务独立二进制 | 五个服务分别以单个 Go 二进制和 systemd unit 部署；Nginx、PostgreSQL、Mosquitto 与 MediaMTX 在主机原生运行。 |
 | 最多 12 路并发视频通道 | 首发每台 Atlas 200I DK A2 默认处理并输出 1 路视频；平台最多同时拉取 12 路，支持 2 个桌面端同时观看完整 12 分屏。边缘输出 720p/15 fps/H.264 Baseline，目标 1.5 Mb/s；WebRTC 优先，HLS 回退。 |
 | 设备通信使用 MQTT | Mosquitto 2.x、MQTT 3.1.1、设备独立身份、TLS、最小主题权限、QoS 1；业务事件按事件 ID 去重。[调研决策](../Research/RESEARCH.md) |
 | 截图暂存后端服务器 | 私有文件卷保存图片，上传成功起保留 24 小时，过期删除；事件元数据与处置记录另行保留。 |
@@ -44,8 +44,8 @@ flowchart LR
         AG --> EQ
     end
 
-    subgraph Cloud[园区后端：容器化部署]
-        N[Nginx：Web Compose 管理；HTTPS、静态资源、API 与媒体入口]
+    subgraph Cloud[园区后端：Linux 主机原生部署]
+        N[Nginx：HTTPS、静态资源、API 与媒体入口]
         A[auth-service<br/>Go / Gin / GORM]
         D[device-service<br/>Go / Gin / GORM]
         V[event-service<br/>Go / Gin / GORM]
@@ -100,34 +100,33 @@ flowchart LR
 | 桌面 Web → MediaMTX | WebRTC 信令经 Nginx；园区内网 UDP 传媒体，失败后 HLS 经 HTTPS | 浏览器会话及摄像头归属校验，MediaMTX 禁止未经受控代理的 HTTP 读取。 |
 | push-service → 浏览器 Push 服务 | 出站 HTTPS | VAPID 签名；投递对象来自当前账号的有效订阅。 |
 
-### 2.2 容器与部署单元
+### 2.2 运行进程与部署单元
 
 | 部署单元 | 作用 | 首发 |
 | --- | --- | --- |
 | Nginx | 提供 Vue 构建产物、TLS、同源 API 路由、媒体 HTTP 入口和请求鉴权子请求。 | 是 |
-| auth-service、device-service、event-service、media-service、push-service | 各自独立的 Go/Gin 应用容器，使用 GORM 访问自身数据。 | 是 |
-| MediaMTX 原生进程 | 官方 `mediamtx` 可执行文件与 `mediamtx.yml` 位于 media-service 目录；拉取 RTSP 并提供 WebRTC/HLS，由 media-service 管理流配置和访问；不进入 Compose。 | 是 |
-| Mosquitto 2.x | 设备 MQTT 消息交换、会话及待传消息的持久化。 | 是 |
-| PostgreSQL | 单实例部署，服务分 schema、账号和迁移；业务服务不能直接读写别人的 schema。 | 是 |
+| auth-service、device-service、event-service、media-service、push-service | 各自一个 Go/Gin 二进制，由 systemd 管理并绑定独立 loopback 端口，使用 GORM 访问自身数据。 | 是 |
+| Web/PWA 与 Nginx | Node/Vite 生成静态目录，由系统 Nginx 提供 HTTPS、API 和媒体代理。 | 是 |
+| MediaMTX 原生进程 | 官方 `mediamtx` 可执行文件与 `mediamtx.yml` 位于 media-service 目录；拉取 RTSP 并提供 WebRTC/HLS，由 systemd 管理运行、media-service 管理流配置和访问。 | 是 |
+| Mosquitto 2.x | 系统服务，提供设备 MQTT/TLS 消息交换、会话及待传消息持久化。 | 是 |
+| PostgreSQL | 系统服务，单实例部署；服务分 schema、账号和迁移，业务服务不能读写其他服务 schema。 | 是 |
 | mcp-service | 面向 AI Agent 的受控业务能力入口；具体工具、授权与审计以后确定。 | 否 |
 
-首发在园区一台后端服务器上以容器编排部署，截图落在私有文件卷。边缘代理、算法进程和 RTSP 输出运行在 Atlas 200I DK A2 设备，不属于后端容器。单机部署降低首发运维复杂度；服务器仍是单点，数据库与配置通过备份恢复，24 小时截图不做长期备份。
+首发在园区一台 Linux 后端服务器上以原生服务运行，截图落在私有文件目录。边缘代理、算法进程和 RTSP 输出运行在 Atlas 200I DK A2 设备。单机部署降低首发运维复杂度；服务器仍是单点，数据库与配置通过备份恢复，24 小时截图不做长期备份。
 
 ### 2.3 源码与部署文件布局
 
-部署入口与构建文件属于源码树，开发者从源码检出即可准备本地配置并构建完整服务。后端和 Web 分别由 `src/services/docker-compose.yaml` 与 `src/clients/web/docker-compose.yaml` 管理；各 Compose 使用其源码目录作为项目目录，内部路径均相对该目录解析。Atlas 的 agent、模型入库代码和课堂 AI 推理代码均属于 `src/device_sides/atlas200idka2/` 产品工程。
+部署入口与构建文件属于源码树，开发者从源码检出即可准备本地配置并构建完整服务。`src/services/build.sh` 将五个 Go 模块构建为独立 Linux amd64 二进制；各 `*-service` 保存自己的 systemd unit、环境样例与服务配置。Web 客户端通过 Node/Vite 构建静态文件，Nginx 从源码配置部署。Atlas 的 agent、模型入库代码和课堂 AI 推理代码均属于 `src/device_sides/atlas200idka2/` 产品工程。
 
 ```mermaid
 flowchart TB
     subgraph WebSource[project/src/clients/web]
-        WebCompose[docker-compose.yaml：独立部署 Web/Nginx]
-        WebDocker[Dockerfile：Node 构建 Vue/PWA，再封装 Nginx 镜像]
+        WebBuild[package.json：Node 构建 Vue/PWA 静态文件]
         WebNginx[nginx/：Nginx 主配置与片段]
         WebApp[src/、public/、package.json、lockfile]
-        WebSecrets[.secret-*：本地 TLS 与敏感 header 文件；Git/Docker 忽略]
-        WebDocker --> WebApp
-        WebCompose --> WebDocker
-        WebDocker --> WebNginx
+        WebSecrets[部署机 TLS 与敏感 header 文件：Git 忽略]
+        WebBuild --> WebApp
+        WebBuild --> WebNginx
     end
 
     subgraph EdgeSource[project/src/device_sides/atlas200idka2]
@@ -153,27 +152,26 @@ flowchart TB
     end
 
     subgraph ServiceSource[project/src/services]
-        Compose[docker-compose.yaml：后端服务、依赖、端口与卷]
-        EnvTemplate[.env.example：非敏感部署参数]
+        Build[build.sh：五个 Go 服务各构建一个二进制]
+        EnvTemplate[各服务 .env.example：非敏感配置及机密文件路径]
         Ops[README：运维命令、机密文件准备、smoke、备份与恢复说明]
         AuthFiles[auth-service：DB 初始化与账号服务凭据]
         DeviceFiles[device-service：Mosquitto 配置/初始化和 broker 凭据]
         MediaFiles[media-service：Go 服务、mediamtx 可执行文件、mediamtx.yml 和媒体凭据]
         EventPush[event-service、push-service：各自源码和凭据]
         OpsFiles[备份存放在仓库外；smoke 命令写在 README]
-        LocalOnly[.env、各 *-service 根下 .secret-* 文件：Git/Docker 忽略]
+        LocalOnly[运行环境文件与 .secret-*：Git 忽略]
     end
 
-    Compose --> AuthFiles
-    Compose --> DeviceFiles
-    Compose --> MediaFiles
-    Compose --> EventPush
-    WebCompose --> WebSecrets
+    Build --> AuthFiles
+    Build --> DeviceFiles
+    Build --> MediaFiles
+    Build --> EventPush
     Ops --> OpsFiles
     EnvTemplate -.复制后配置.-> LocalOnly
 ```
 
-`project/src/services/docker-compose.yaml` 只部署五个 Go 服务、PostgreSQL、Mosquitto 和初始化任务；`project/src/clients/web/docker-compose.yaml` 单独部署 Web/Nginx。后端 Compose 创建默认名为 `yunshao_backend` 的 backend 网络，Web Compose 以 external network 加入；先启动并确认后端健康，再启动 Web。两个 Compose 可分别构建、升级和停止，Web 操作不改变后端容器。`project/src/services` 下的目录清一色为 `*-service`；不建立独立 `postgres/`、`mosquitto/`、`mediamtx/`、`scripts/`、`secrets/` 或 `web-service/` 目录。Postgres 初始化文件归 `auth-service`，备份与恢复按本目录 README 中的运维命令执行；Mosquitto 配置归 `device-service`，MediaMTX 可执行文件与 YAML 归 `media-service`。Web Dockerfile、Nginx 配置、Compose 与运行时 TLS/敏感 header 文件都归 Web 客户端源码目录；机密以 `.secret-*` 命名并由 Git 与 Docker build context 忽略。Atlas 边缘工程内的 `config/models.json` 只存非机密模型 profiles，已校验 OM 包装入设备状态目录，不提交到源码或镜像；推理实现留在 Atlas 工程，`preparation/` 只保留转换/评估和验证工具。其余 service 机密放在各自 `*-service` 根目录。Compose、service 初始化文件与操作文档均使用源码相对路径；运维说明用简洁命令文档，不提供 PowerShell 脚本。
+`project/src/services/build.sh` 为五个 Go 服务分别生成一个 Linux amd64 二进制；各 service unit、环境样例和专属初始化文件归对应 `*-service`。系统 Nginx 托管 `clients/web` 生成的静态站点，前后端分别升级但共享主机网络，通过 loopback 端口通信。PostgreSQL、Mosquitto 使用主机原生服务；MediaMTX 单文件与 YAML 归 `media-service`。不建立独立 `postgres/`、`mosquitto/`、`mediamtx/`、`scripts/`、`secrets/` 或 `web-service/` 目录。机密由部署者保存在 `/etc/microvisspec`，环境样例只记录密钥文件路径。Atlas 工程内 `config/models.json` 只存非机密模型 profiles，推理实现留在 Atlas 工程，`preparation/` 只保留转换/评估和验证工具。仓库部署不依赖 Docker；运维说明使用简洁命令，不提供 PowerShell 脚本。
 
 ## 3. 业务服务职责与数据所有权
 
@@ -344,7 +342,7 @@ event-service 维护待处置 → 处理中 → 已解除/误报的状态流转�
 
 ## 8. 运行、故障与交付顺序
 
-首发部署由两个独立 Compose 项目和一个原生媒体进程组成：Web Compose 位于 `src/clients/web/docker-compose.yaml`，运行 Nginx 与 Vue/PWA；后端 Compose 位于 `src/services/docker-compose.yaml`，运行五个 Go 服务、Mosquitto 和 PostgreSQL；MediaMTX 由 media-service 目录的二进制和 YAML 原生运行。Web Compose 加入后端 Compose 创建的稳定命名 backend network，两个 Compose 分别构建、启停和升级；部署顺序先准备并启动 MediaMTX、启动后端并确认健康，再启动 Web。容器使用独立持久化卷；Go 服务提供存活与就绪探针。园区内网须允许 Atlas 200I DK A2 访问 MQTT/TLS、后端拉取边缘 RTSP、桌面终端连接 MediaMTX UDP 8189；Nginx HTTPS 面向手机 PWA，push-service 可出站连接浏览器推送服务。数据库迁移由对应服务负责，发布顺序先兼容旧字段、再切换调用方、最后清理旧字段。单机首发定期备份 PostgreSQL 及 Mosquitto 必要配置，并实际演练恢复；截图按 24 小时过期规则管理，不做长期备份。[PRD 风险](../Analysis/PRD.md)
+首发部署由主机原生服务组成：系统 Nginx 托管 Vue/PWA 静态文件并反向代理五个 loopback Go 端口；五个 Go 服务各为一个二进制并由 systemd 管理；PostgreSQL、Mosquitto 和 MediaMTX 作为系统进程运行。启动顺序为配置/启动 PostgreSQL 与 Mosquitto、启动 MediaMTX、启动 push/auth/device/media/event、最后构建并发布 Web 静态文件及 Nginx。Go 服务提供存活与就绪探针。园区内网须允许 Atlas 200I DK A2 访问 MQTT/TLS、后端拉取边缘 RTSP、桌面终端连接 MediaMTX UDP 8189；Nginx HTTPS 面向手机 PWA，push-service 可出站连接浏览器推送服务。数据库迁移由对应服务负责，发布顺序先兼容旧字段、再切换调用方、最后清理旧字段。单机首发定期备份 PostgreSQL 及 Mosquitto 必要配置，并实际演练恢复；截图按 24 小时过期规则管理，不做长期备份。[部署规格](../Specification/platform_deployment/spec.md)
 
 | 故障 | 用户可见表现与恢复策略 |
 | --- | --- |

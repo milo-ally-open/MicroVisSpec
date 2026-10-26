@@ -23,7 +23,7 @@
 
 - **AC-02.1**：激活票据有时效且只能消费一次。
 - **AC-02.2**：设备凭据不能访问其他设备主题。
-- **AC-02.3**：激活响应中的 MQTT broker 地址来自独立的边缘可达配置；不得返回服务容器内部的 broker DNS 地址；设备使用该地址通过 TLS 接入。
+- **AC-02.3**：激活响应中的 MQTT broker 地址来自独立的边缘可达配置；不得返回服务内部的 broker 地址；设备使用该地址通过 TLS 接入。
 - **AC-02.4**：激活响应中的 MQTT `client_id` 与 Mosquitto Dynamic Security 为该设备登记的固定 client ID 完全一致；端侧连接合同使用该原值。
 - **AC-02.5**：签发票据时 `duration_seconds` 为 `null` 表示无限期，正整数表示自激活成功时起的授权秒数；缺省字段兼容旧客户端并按无限期处理，超出支持范围的值拒绝。
 - **AC-02.6**：激活期限到达后，服务在最多 15 秒调度间隔内将设备置为 `active=false`、`activation_state=expired`，写入 `device.disabled` outbox 并立即尝试撤销 MQTT 权限；撤销失败由既有对账循环重试。已过期设备的事件、状态、媒体和设备业务认证均拒绝。
@@ -76,14 +76,14 @@
 
 ### 2.1 实现任务
 
-1. 在 `project/src/services/device-service` 下建立 Go 模块、Gin 入口、配置、数据库迁移和可构建 Dockerfile。提供内部 `/health/live`、`/health/ready`，就绪状态检查 PostgreSQL 与必需的 MQTT 管理依赖。
+1. 在 `project/src/services/device-service` 下建立 Go 模块、Gin 入口、配置和数据库迁移；发布时构建为独立 Go 二进制，由 systemd 管理。提供内部 `/health/live`、`/health/ready`，就绪状态检查 PostgreSQL 与必需的 MQTT 管理依赖。
 2. 在独占的 PostgreSQL `device` schema 中建立 `devices`、`cameras`、`algorithm_assignments`、`activation_tickets`、`outbox` 以及命令/回执记录。设备和摄像头使用 UUID；设备按 `(account_id,id)` 查询，`camera_key` 在设备内唯一；激活票据只保存哈希与失效时间。
 3. 设备记录包含登记的名称、IP、位置、激活状态、最后心跳和实报状态；登记 IP 是资产属性，不作为认证依据。边缘凭据、broker 管理凭据通过部署机密注入。
 4. 对外错误、时间、分页、账号身份和内部调用遵守总 SPEC。不得直接读写 auth、event、media 或 push 的数据库 schema。
 
 ### 2.2 交付物与阶段验收
 
-- 交付服务容器、迁移、配置说明和健康接口。
+- 交付服务二进制、迁移、配置说明和健康接口。
 - 空库可迁移并重启保持资产记录；服务无法履行登记/激活关键依赖时就绪状态如实显示。
 - 服务数据库账号不能修改其他服务 schema；日志不包含激活票据或 MQTT 明文密码。
 
@@ -128,7 +128,7 @@
 | `POST /api/v1/devices/{deviceId}/activation-tickets` | 当前账号提交 `{"duration_seconds": null}`（无限期）或正整数秒数（自定义期限），签发只显示一次的票据及 10 分钟票据到期时间；重签使旧票据失效。缺省 `duration_seconds` 兼容旧客户端并按无限期处理。 |
 | `POST /api/v1/devices/{deviceId}/activation-requests` | 当前账号提交 `{"duration_seconds": null}` 或正整数秒数；返回不含秘密值的请求 ID、状态和 10 分钟等待期限。只有已预置可信设备身份的设备可通过网页流程激活。 |
 | `GET /api/v1/devices/{deviceId}/activation-requests/{requestId}` | 当前账号查询 `pending`、`syncing`、`activated`、`expired` 或 `superseded` 状态；服务端已激活但设备尚未确认保存新凭据时返回 `syncing`；成功时附服务器确认的 `activation_expires_at`。 |
-| `POST /edge/v1/activate` | 边缘设备提交 `device_id` 和票据；成功后取得独立 MQTT `client_id`、设备密码、broker 接入信息及 `activation_expires_at`（无限期时为 `null`）。期限从成功兑换时开始。端侧必须原样使用返回的 `client_id`。`mqtt.broker_url` 必须取自 `MQTT_ADVERTISED_BROKER_URL`，不能泄露/复用服务容器内部的 `MQTT_BROKER_URL`。 |
+| `POST /edge/v1/activate` | 边缘设备提交 `device_id` 和票据；成功后取得独立 MQTT `client_id`、设备密码、broker 接入信息及 `activation_expires_at`（无限期时为 `null`）。期限从成功兑换时开始。端侧必须原样使用返回的 `client_id`。`mqtt.broker_url` 必须取自 `MQTT_ADVERTISED_BROKER_URL`，不能泄露/复用仅供 device-service 使用的 `MQTT_BROKER_URL`。 |
 | `GET /edge/v1/devices/{deviceId}/activation` | Atlas agent 使用设备 MQTT username/password 的 HTTPS Basic 身份轮询。存在待处理网页请求时返回新的 MQTT 凭据及租期；响应丢失时旧身份可重领同一凭据，agent 用新身份再次轮询后确认并清除旧身份；已激活且无待处理请求时仅返回租期同步状态；无请求的过期设备返回 `204`。该路由不得记录 Authorization。 |
 
 | `POST /api/v1/devices/{deviceId}/provisioning/ssh-host-key` | 当前账号获取登记私网设备 TCP/22 的 SSH 主机指纹；无账号密码认证，也不接受目标地址。返回设备已固定指纹或待首次确认的指纹。 |
@@ -140,7 +140,7 @@
 
 1. 票据用足够随机的值，数据库只存哈希；按设备绑定、10 分钟有效、一次消费，并对签发和兑换限流。无效、过期、重复兑换或已停用设备不能取得 broker 身份。
 2. 为每台 Atlas 200I DK A2 分配独立 MQTT client_id 和密码，使用 Mosquitto 2.x Dynamic Security 管理身份与 ACL；设备密码仅首次激活返回。轮换/停用设备身份时同步撤销 broker 权限，不依靠设备 IP 做可信判断。
-3. `MQTT_BROKER_URL` 是服务容器访问 broker 的 TLS URL；`MQTT_ADVERTISED_BROKER_URL` 是激活响应下发给边缘设备的 TLS URL。两项分别配置且均须为 `ssl://` URL；advertised 地址应解析/路由到运行 broker TLS listener 的部署端点。配置缺失或不合法时 device-service 启动失败，不得回退到内部地址或静默使用示例地址。
+3. `MQTT_BROKER_URL` 是 device-service 访问 broker 的 TLS URL；`MQTT_ADVERTISED_BROKER_URL` 是激活响应下发给边缘设备的 TLS URL。两项分别配置且均须为 `ssl://` URL；advertised 地址应解析/路由到运行 broker TLS listener 的部署端点。配置缺失或不合法时 device-service 启动失败，不得回退到内部地址或静默使用示例地址。
 4. MQTT 使用 TLS、3.1.1、固定 client_id 的持久会话。设备仅可发布自己的 `devices/{deviceId}/state`、`events`、`command-acks`，并仅可订阅自己的 `event-acks`、`commands`；后台服务使用独立的最小权限身份。
 5. 对 broker 开启持久化并限制连接、报文和离线队列大小。设备断网时本地保留未收到业务 ACK 的事件，重连仍用同一 event_id 重发；本服务只负责设备接入合同，不代替 event-service 的事件去重与 ACK。
 

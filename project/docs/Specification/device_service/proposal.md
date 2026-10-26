@@ -13,7 +13,7 @@
 
 ## 本次变更：边缘可达的 MQTT 接入地址
 
-Atlas 激活响应不得把 Compose 内部 DNS 地址下发给设备。device-service 继续用 `MQTT_BROKER_URL` 连接 Docker 网络内的 broker，并新增 `MQTT_ADVERTISED_BROKER_URL` 配置激活响应中的设备接入地址；两者均使用 TLS。运维负责将 advertised 地址路由到 broker TLS listener。该变化只影响激活响应与部署配置，不改变 MQTT topic/ACL 和设备身份合同。
+Atlas 激活响应不得把仅供后端使用的 MQTT 地址下发给设备。device-service 使用 `MQTT_BROKER_URL` 连接 Mosquitto，并用独立的 `MQTT_ADVERTISED_BROKER_URL` 配置激活响应中的设备接入地址；两者均使用 TLS。运维负责将 advertised 地址路由到 broker TLS listener。该变化只影响激活响应与部署配置，不改变 MQTT topic/ACL 和设备身份合同。
 
 ## 本次变更：Atlas 状态心跳字段兼容
 

@@ -24,8 +24,8 @@ device schema 由本服务独占；激活票据一次性；MQTT ACL 按设备隔
 
 ### MQTT 服务连接地址与设备下发地址分离（2026-10-20）
 
-- **决定**：`MQTT_BROKER_URL` 仅供 device-service 的容器内 MQTT 管理/消息连接；新增必需配置 `MQTT_ADVERTISED_BROKER_URL`，只用于 `/edge/v1/activate` 的 `mqtt.broker_url`。
-- **依据**：容器内部 DNS（例如 `mosquitto`）仅在 Compose 网络内解析，Atlas 不可达；复用同一配置会使设备激活成功但后续 MQTT 连接失败。
+- **决定**：`MQTT_BROKER_URL` 仅供 device-service 的 MQTT 管理/消息连接；`MQTT_ADVERTISED_BROKER_URL` 只用于 `/edge/v1/activate` 的 `mqtt.broker_url`。
+- **依据**：后端连接地址可能只在服务主机可达，Atlas 设备必须拿到独立、可路由的 broker 地址；复用同一配置会使设备激活成功但后续 MQTT 连接失败。
 - **安全与运维**：两个 URL 都必须为 `ssl://`。部署需保证 advertised host/port 路由到 broker TLS listener，并向设备提供信任 CA；缺配置或非法时服务拒绝启动，不回退到内部 URL。
 - **影响**：新增环境变量及启动校验；激活 API JSON 字段不变；既有 ACL、TLS 和 topic 权限不变。回滚时需同时回滚服务镜像和环境变量合同。
 
@@ -49,7 +49,7 @@ device schema 由本服务独占；激活票据一次性；MQTT ACL 按设备隔
 - **认证与秘密处理**：浏览器通过同源 HTTPS 传递 SSH 用户名/密码；device-service 不写请求体日志、不持久化密码，SSH 密码只作为 SSH password authentication 内存参数。激活票据只进入 SSH 标准输入；API/MQTT CA 来源于部署机密。任务表仅保存阶段和安全结果。SSH host key 首次成功认证后固定到设备记录，后续变化默认拒绝。
 - **安装策略**：device-service 镜像随附 Atlas 目录的源码包。目标板若没有 agent，在 Atlas CANN 已安装且配置完整的前提下，远程安装必要的 agent 构建依赖并构建 `YUNSHAO_AGENT_ONLY` target；不覆盖既有 `/etc/yunshao` 配置。若缺少不可由包管理器提供的 CANN SDK，任务失败并指出需修复板端 CANN 环境。
 - **任务与恢复**：使用只含非敏感字段的持久任务行跟踪异步步骤；每台设备同一时间仅有一个任务。阶段错误采用固定错误码，不存储任意 SSH stderr。远端压缩包/CA 临时文件经 trap 清理；任务失败保留已安装 agent，允许重新提交并签发新票据。
-- **部署影响**：device-service Docker build context 扩至 `src/`，并只纳入 Go 模块与 Atlas agent 构建所需目录；需要配置 Atlas HTTPS activation Origin、允许的 SSH CIDR、Web HTTPS CA secret 和 MQTT CA secret。首次接入按已登记私网 IP 连接固定 TCP/22；业务用户只提供管理员给的设备登录密码，服务端不保存密码。
+- **部署影响**：device-service 发布为单个 Go 二进制，由 systemd 管理；需要配置 Atlas HTTPS activation Origin、允许的 SSH CIDR、Web HTTPS CA 文件和 MQTT CA 文件。首次接入按已登记 IP 连接固定 TCP/22；业务用户只提供管理员给的设备登录密码，服务端不保存密码。
 
 ## 状态依据
 

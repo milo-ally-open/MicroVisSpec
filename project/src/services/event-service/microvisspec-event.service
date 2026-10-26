@@ -1,0 +1,26 @@
+[Unit]
+Description=MicroVisSpec event service
+After=network-online.target postgresql.service mosquitto.service microvisspec-device.service microvisspec-push.service
+Wants=network-online.target
+Requires=postgresql.service mosquitto.service microvisspec-device.service microvisspec-push.service
+
+[Service]
+Type=simple
+User=microvisspec
+Group=microvisspec
+EnvironmentFile=/etc/microvisspec/event-service.env
+ExecStart=/usr/local/bin/microvisspec/event-service
+Restart=on-failure
+RestartSec=3
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/microvisspec/evidence
+CapabilityBoundingSet=
+LockPersonality=true
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

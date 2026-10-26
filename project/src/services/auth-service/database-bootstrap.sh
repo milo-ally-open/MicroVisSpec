@@ -11,22 +11,16 @@ read_secret() {
 }
 
 umask 077
-export PGPASSWORD="$(read_secret "$POSTGRES_ADMIN_PASSWORD_FILE")"
 export AUTH_DB_PASSWORD="$(read_secret "$AUTH_DB_PASSWORD_FILE")"
 export DEVICE_DB_PASSWORD="$(read_secret "$DEVICE_DB_PASSWORD_FILE")"
 export EVENT_DB_PASSWORD="$(read_secret "$EVENT_DB_PASSWORD_FILE")"
 export MEDIA_DB_PASSWORD="$(read_secret "$MEDIA_DB_PASSWORD_FILE")"
 export PUSH_DB_PASSWORD="$(read_secret "$PUSH_DB_PASSWORD_FILE")"
 
-attempt=0
-until psql -X -v ON_ERROR_STOP=1 -c 'SELECT 1' >/dev/null 2>&1; do
-	attempt=$((attempt + 1))
-	if [ "$attempt" -ge 30 ]; then
-		echo "PostgreSQL did not accept bootstrap connections" >&2
-		exit 1
-	fi
-	sleep 2
-done
+if [ "$(id -un)" != postgres ]; then
+	echo "run this bootstrap as the postgres OS account" >&2
+	exit 1
+fi
 
 psql -X -v ON_ERROR_STOP=1 <<'SQL'
 \getenv database_name PGDATABASE
@@ -79,5 +73,5 @@ GRANT CREATE ON DATABASE :"database_name" TO auth_service, device_service, event
 REVOKE ALL ON SCHEMA public FROM PUBLIC;
 SQL
 
-unset PGPASSWORD AUTH_DB_PASSWORD DEVICE_DB_PASSWORD EVENT_DB_PASSWORD MEDIA_DB_PASSWORD PUSH_DB_PASSWORD
+unset AUTH_DB_PASSWORD DEVICE_DB_PASSWORD EVENT_DB_PASSWORD MEDIA_DB_PASSWORD PUSH_DB_PASSWORD
 echo "database roles and schemas are ready"

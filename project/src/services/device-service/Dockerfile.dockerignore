@@ -1,8 +1,0 @@
-**
-!services/
-!services/device-service/
-!services/device-service/go/
-!services/device-service/go/**
-!device_sides/
-!device_sides/atlas200idka2/
-!device_sides/atlas200idka2/**

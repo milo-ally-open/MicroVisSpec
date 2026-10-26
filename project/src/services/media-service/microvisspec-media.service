@@ -1,0 +1,25 @@
+[Unit]
+Description=MicroVisSpec media service
+After=network-online.target postgresql.service mediamtx.service
+Wants=network-online.target
+Requires=postgresql.service mediamtx.service
+
+[Service]
+Type=simple
+User=microvisspec
+Group=microvisspec
+EnvironmentFile=/etc/microvisspec/media-service.env
+ExecStart=/usr/local/bin/microvisspec/media-service
+Restart=on-failure
+RestartSec=3
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+CapabilityBoundingSet=
+LockPersonality=true
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

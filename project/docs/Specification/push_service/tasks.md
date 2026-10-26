@@ -22,7 +22,7 @@
 | REQ/AC | 检查方法 | 当前证据 | 状态 |
 |---|---|---|---|
 | REQ-01/AC-01.1–01.2 | 账号/endpoint 绑定、权限及密钥保护测试 | `go test ./...` 与隔离 PostgreSQL integration suite 通过，覆盖 endpoint 重绑、跨账号隔离与秘密处理 | 部分通过 |
-| REQ-02/AC-02.1–02.2 | inbox 去重、撤销和乱序恢复集成测试 | 数据库集成测试覆盖重复 event、session.revoked 和订阅取消；真实 producer 容器投递待联调 | 部分通过 |
+| REQ-02/AC-02.1–02.2 | inbox 去重、撤销和乱序恢复集成测试 | 数据库集成测试覆盖重复 event、session.revoked 和订阅取消；真实 producer 服务投递待联调 | 部分通过 |
 | REQ-03/AC-03.1–03.2 | mock endpoint 错误分类、重试和 accepted 语义测试 | fake Web Push sender 测试覆盖 429/410、退避、过期和 accepted 状态；外部浏览器 Push 仍待执行 | 部分通过 |
 | REQ-04/AC-04.1–04.2 | service worker 点击路由与通知载荷审查 | Web Vitest 覆盖通知路由/敏感路径策略；真实 service worker/browser Push 生命周期待手工验收 | 部分通过 |
 

@@ -2,7 +2,7 @@ logLevel: info
 logDestinations: [stdout]
 
 api: yes
-apiAddress: :9997
+apiAddress: 127.0.0.1:9997
 metrics: no
 pprof: no
 
@@ -26,16 +26,16 @@ authInternalUsers:
       - action: api
 
 rtsp: yes
-rtspAddress: :8554
+rtspAddress: 127.0.0.1:8554
 rtmp: no
 hls: yes
-hlsAddress: :8888
+hlsAddress: 127.0.0.1:8888
 hlsEncryption: no
 hlsAllowOrigins: ["__PUBLIC_ORIGIN__"]
 hlsVariant: fmp4
 hlsSegmentCount: 7
 webrtc: yes
-webrtcAddress: :8889
+webrtcAddress: 127.0.0.1:8889
 webrtcEncryption: no
 webrtcAllowOrigins: ["__PUBLIC_ORIGIN__"]
 webrtcLocalUDPAddress: :8189

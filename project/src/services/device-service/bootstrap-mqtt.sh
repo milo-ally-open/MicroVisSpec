@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-options=/run/secrets/mosquitto_ctrl_options
+options="${MOSQUITTO_CTRL_OPTIONS_FILE:-/etc/microvisspec/mosquitto-ctrl.options}"
 run_ctrl() {
 	mosquitto_ctrl -o "$options" -i yunshao-broker-bootstrap dynsec "$@"
 }
@@ -99,12 +99,12 @@ ensure_acl yunshao-device-service publishClientReceive 'devices/+/state'
 ensure_acl yunshao-device-service subscribePattern 'devices/+/command-acks'
 ensure_acl yunshao-device-service publishClientReceive 'devices/+/command-acks'
 ensure_acl yunshao-device-service publishClientSend 'devices/+/commands'
-ensure_service_client yunshao-device-service yunshao-device-service /run/secrets/mqtt_device_service_password yunshao-device-service
+ensure_service_client yunshao-device-service yunshao-device-service "${MQTT_DEVICE_SERVICE_PASSWORD_FILE:-/etc/microvisspec/mqtt-device-service-password}" yunshao-device-service
 
 ensure_role yunshao-event-service
 ensure_acl yunshao-event-service subscribePattern 'devices/+/events'
 ensure_acl yunshao-event-service publishClientReceive 'devices/+/events'
 ensure_acl yunshao-event-service publishClientSend 'devices/+/event-acks'
-ensure_service_client yunshao-event-service yunshao-event-service /run/secrets/mqtt_event_service_password yunshao-event-service
+ensure_service_client yunshao-event-service yunshao-event-service "${MQTT_EVENT_SERVICE_PASSWORD_FILE:-/etc/microvisspec/mqtt-event-service-password}" yunshao-event-service
 
 echo "Mosquitto Dynamic Security service identities are ready"

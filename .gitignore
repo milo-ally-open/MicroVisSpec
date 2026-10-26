@@ -110,10 +110,11 @@ backups/
 # Local proof-of-concept SDK archive
 /readme/assets/Ascend-hdk-310b-sdk-soc_23.0.rc3.zip
 
-# ignore 
-.opencode/ 
-wsl-test.sh 
-wsl-sts.sh 
-wsl-sts-direct.py 
-wsl-find-python.sh 
-wsl-run-sts.sh 
+# ignore
+.opencode/
+wsl-test.sh
+wsl-sts.sh
+wsl-sts-direct.py
+wsl-find-python.sh
+wsl-run-sts.sh
+wsl-net-check.sh

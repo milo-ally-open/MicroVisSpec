@@ -1,0 +1,24 @@
+[Unit]
+Description=MediaMTX media server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=microvisspec
+Group=microvisspec
+WorkingDirectory=/opt/microvisspec
+ExecStart=/opt/microvisspec/mediamtx /etc/microvisspec/mediamtx.yml
+Restart=on-failure
+RestartSec=3
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+CapabilityBoundingSet=
+LockPersonality=true
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

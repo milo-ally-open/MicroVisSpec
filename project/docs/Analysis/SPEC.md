@@ -8,7 +8,7 @@
 
 ## 1. 范围与需求追踪
 
-首发运行 auth、device、event、media、push 五个 Go 业务服务，以及 Nginx、PostgreSQL、Mosquitto 和 MediaMTX。mcp-service 仅保留目录和边界，不构建或部署。五个首发 Go 服务现有模块、HTTP handler、数据库迁移、健康接口、单测/集成测试和多阶段 Dockerfile；各服务完整验收状态以对应 `tasks.md` 和平台部署任务记录为准。[架构设计 §1–§3](../Design/STRUCTURE.md)
+首发运行 auth、device、event、media、push 五个 Go 业务服务，以及 Nginx、PostgreSQL、Mosquitto 和 MediaMTX。mcp-service 仅保留目录和边界，不构建或部署。五个首发 Go 服务分别交付为一个 Linux amd64 二进制，由 systemd 管理；Web/PWA 构建为静态文件，由主机 Nginx 提供。部署及验收状态以对应 `tasks.md` 和[平台部署任务记录](../Specification/platform_deployment/tasks.md)为准。[架构设计 §1–§3](../Design/STRUCTURE.md)
 
 本文件是跨服务的共同合同。各服务按对应规格组 `proposal → spec → design → tasks` 逐项实施与验收；五个 Go 服务的服务内集成测试均单独列入各自 `tasks.md`。边缘、课堂场景和 Web/PWA 的实现与验收任务见同目录领域组；mcp-service 尚待设计，本期不编写实现任务书。
 
@@ -42,8 +42,8 @@
 
 ### 2.1 部署和命名
 
-- 业务服务均采用 Go、Gin、GORM，各自独立容器。PostgreSQL 首发单实例，按 auth、device、event、media、push 分 schema、数据库账号与迁移；禁止跨服务直连别人的 schema。[架构设计 §2](../Design/STRUCTURE.md)
-- 浏览器 API 统一以 /api/v1 开头。Nginx 提供 Vue 静态文件、HTTPS、路由代理和授权子请求；服务内部接口使用 /internal/v1，只在容器网络可达；设备激活和截图上传使用 /edge/v1 的独立设备认证入口。
+- 业务服务均采用 Go、Gin、GORM，各自独立二进制进程，由 systemd 管理并绑定 loopback。PostgreSQL 首发单实例，按 auth、device、event、media、push 分 schema、数据库账号与迁移；禁止跨服务直连别人的 schema。[架构设计 §2](../Design/STRUCTURE.md)
+- 浏览器 API 统一以 /api/v1 开头。主机 Nginx 提供 Vue 静态文件、HTTPS、路由代理和授权子请求；服务内部接口使用 /internal/v1，仅通过 loopback 可达；设备激活和截图上传使用 /edge/v1 的独立设备认证入口。
 - 各实体 ID 为 UUID 字符串；设备侧 event_id、command_id 在首次产生时确定，重试不得更换。服务间只传稳定 ID，不把名称或设备 IP 当关联键。
 - API JSON 使用 snake_case 字段。时间戳统一为带时区的 RFC 3339 UTC；数据库用 timestamptz。分析大屏按 Asia/Shanghai 日界线分组。账号 ID 仅从可信会话或内部服务身份取得，不接受前端请求体中的 account_id。
 - 一般响应为业务对象或带 items、next_cursor 的列表；错误统一包含 error.code、error.message、request_id。401 表示未登录，403 表示无权，404 表示对象不存在或不属于当前账号，409 表示状态/版本冲突，410 表示证据过期，422 表示内容校验失败，429 表示限流，503 表示依赖暂不可用。外部错误不返回内部文件路径、RTSP 凭据和数据库细节。
@@ -52,7 +52,7 @@
 
 auth-service 用 Argon2id 保存密码哈希，不存明文密码。用户名统一规范化后建立唯一索引；首发用户名允许 3–32 位 ASCII 字母、数字和下划线，密码至少 12 个字符。注册、登录与设备激活分别限流，错误登录不透露用户名是否存在。会话使用随机不可猜测的 opaque token，仅以哈希存库；浏览器通过 Secure、HttpOnly、SameSite=Lax、Path=/ 的 Cookie 持有。会话闲置 7 天过期；退出或改密立即撤销对应会话。会话到期后，用户打开 PWA 页面或通知详情需重新登录。
 
-Nginx 对受保护 /api/v1 请求调用 auth-service 的内部会话校验，清除客户端自带的身份头后设置已验证的 X-Account-ID 和 X-Session-ID；服务仍须按账号限定每次读写。所有带 Cookie 的写请求校验 Origin，并要求会话关联的 X-CSRF-Token；登录后或页面重载时由 auth-service 向同源前端返回该 token。退出入口由 auth-service 自行验证有效会话及 CSRF，已撤销会话的同源重复退出只清 Cookie 并返回成功，不经过会抢先返回 401 的通用授权子请求。设备入口不用浏览器 Cookie 或 CSRF token，而使用设备凭据。Gin 仅信任 Nginx 容器的代理地址。[Nginx auth_request](https://nginx.org/en/docs/http/ngx_http_auth_request_module.html)、[Gin 可信代理](https://gin-gonic.com/en/docs/server-config/trusted-proxies/)
+Nginx 对受保护 /api/v1 请求调用 auth-service 的内部会话校验，清除客户端自带的身份头后设置已验证的 X-Account-ID 和 X-Session-ID；服务仍须按账号限定每次读写。所有带 Cookie 的写请求校验 Origin，并要求会话关联的 X-CSRF-Token；登录后或页面重载时由 auth-service 向同源前端返回该 token。退出入口由 auth-service 自行验证有效会话及 CSRF，已撤销会话的同源重复退出只清 Cookie 并返回成功，不经过会抢先返回 401 的通用授权子请求。设备入口不用浏览器 Cookie 或 CSRF token，而使用设备凭据。Gin 仅信任 loopback Nginx 反向代理。[Nginx auth_request](https://nginx.org/en/docs/http/ngx_http_auth_request_module.html)、[Gin 可信代理](https://gin-gonic.com/en/docs/server-config/trusted-proxies/)
 
 内部 HTTP 调用带按服务区分、可轮换的服务凭据，Nginx 不将内部接口暴露公网。服务调用设超时并使用稳定幂等键；失败由 outbox 或定期对账补偿。显式退出、改密时 auth-service 在撤销会话的同一事务内写入 session.revoked outbox，异步通知 push-service 停用该会话创建的订阅、media-service 结束该会话的播放。普通会话自然过期不自动取消用户已同意的后台 Push 订阅；通知点击时仍要求重新登录。
 
@@ -227,7 +227,7 @@ event.events 建 (account_id,occurred_at DESC,id DESC) 主列表索引，以及�
 
 ### 7.3 部署、健康与恢复
 
-首发在一个园区后端服务器运行 Nginx、五个 Go 业务容器、MediaMTX、Mosquitto 和 PostgreSQL；mcp-service 不构建。每个业务容器使用自己的多阶段 Dockerfile；五个服务镜像及独立 Web 镜像已完成构建验证，但 Compose 全栈健康、机密注入、媒体浏览器链路和备份恢复仍按平台部署任务验收。各服务提供内部 /health/live 与 /health/ready；ready 检查其必需的数据库或基础设施依赖，不能因为可选统计接口暂时失败而误判所有服务不可用。部署以固定镜像版本、独立持久化卷、受控机密和相互隔离的网络运行。
+首发在一个园区后端服务器运行系统 Nginx、五个 Go 二进制、MediaMTX、Mosquitto 和 PostgreSQL；mcp-service 不构建。Go 服务由 systemd 管理并分别绑定 loopback 端口；Web/PWA 以静态文件方式部署。原生运行、端口隔离、机密文件注入与数据恢复按[平台部署规格](../Specification/platform_deployment/spec.md)验收。各服务提供 `/health/live` 与 `/health/ready`；ready 检查其必需的数据库或基础设施依赖，不能因为可选统计接口暂时失败而误判所有服务不可用。
 
 PostgreSQL 做定期备份并验证恢复；Mosquitto 持久化与安全配置、MediaMTX 路径配置也需备份。截图卷仅保留 24 小时内容，不做长期备份；恢复后 event-service 对数据库证据记录和文件实际存在性对账。数据库迁移由所属服务执行，采用先兼容、后切换、再清理的顺序，禁止多个服务同时修改同一表。
 

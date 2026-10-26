@@ -49,7 +49,7 @@
 
 ### 2.1 实现任务
 
-1. 在现有占位目录内建立 Go module、服务入口、配置加载、数据库迁移、Dockerfile 构建及 `/health/live`、`/health/ready`。就绪状态应反映必需的 PostgreSQL、MQTT 和截图卷依赖。
+1. 在现有目录内建立 Go module、服务入口、配置加载及数据库迁移；发布时构建为独立 Go 二进制，由 systemd 管理。提供 `/health/live`、`/health/ready`，就绪状态应反映必需的 PostgreSQL、MQTT 和截图卷依赖。
 2. 由本服务独占 `event` schema 的表与迁移；数据库账号只具备本 schema 所需权限。迁移采用先兼容、后切换、再清理的顺序。
 3. 建立最小数据实体：`events`、`evidence`、`dispositions`、`outbox`。事件保存平台内部 UUID、`account_id`、`device_id`、`camera_id`、边缘 `event_id`、类型、等级、发生/接收时间、设备/摄像头/地点/算法快照、状态和版本。
 4. `events` 对 `(device_id, edge_event_id)` 建唯一约束；`evidence` 对事件唯一；处置历史和 outbox 有各自稳定 ID。针对账号、发生时间及常用筛选项建索引；到期清理由时间索引支持。

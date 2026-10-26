@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="assets/logo.png" alt="云哨·边缘智枢" width="168" />
+  <img src="assets/logo.png" alt="MicroVisSpec" width="168" />
 </p>
 
-<h1 align="center">云哨·边缘智枢</h1>
+<h1 align="center">MicroVisSpec</h1>
 
 <p align="center">
-  面向园区、校园与工厂的云边协同视频智能平台
+  面向校园、园区与工厂的云边协同边缘视觉平台
 </p>
 
 <p align="center">
@@ -14,9 +14,9 @@
   <img src="https://img.shields.io/badge/Status-MVP%20%2F%20Pilot%20Development-2563eb" alt="MVP and pilot development" />
 </p>
 
-> 项目链接: https://atomgit.com/milo-ally-stu/Yunshao
+> 项目链接：<https://github.com/milo-ally-open/MicroVisSpec>
 
-云哨·边缘智枢（Yunshao）将视频接入、边缘 AI 推理、设备管理、事件处置与运行分析整合在一个可部署的平台中。摄像头视频由边缘设备就近处理，结构化事件和经授权的证据再进入云端工作台，帮助组织统一查看设备与告警状态。
+**MicroVisSpec** 将视频接入、边缘 AI 推理、设备管理、事件处置与运行分析整合为一套云边协同视觉平台。摄像头视频由边缘设备就近处理，结构化事件和经授权的证据进入云端工作台，帮助组织统一查看设备与告警状态。
 
 项目首发部署目标为 **华为 Atlas 200I DK A2（Ascend 310B4）**。当前仓库处于 MVP 与试点验证阶段；本文会区分已实现能力和仍需现场验收的能力，不将规划功能描述为已交付功能。
 
@@ -24,7 +24,7 @@
 
 下图为 Web 工作台「运行总览」页面截图，内容来自演示环境。
 
-![云哨 Web 工作台运行总览首页（演示环境）](../ppt/assets/screenshots/PC/PC-overview.png)
+![MicroVisSpec Web 工作台运行总览首页（演示环境）](../ppt/assets/screenshots/PC/PC-overview.png)
 
 ## 适用场景
 
@@ -49,7 +49,7 @@
 
 下图展示浏览器、云端服务、Atlas 边缘设备和摄像头之间的主要通信链路。
 
-![云哨单园区部署网络拓扑](assets/system-network-current.svg)
+![MicroVisSpec 单园区部署网络拓扑](assets/system-network-current.svg)
 
 可编辑源文件：[system-network-current.drawio](assets/system-network-current.drawio)
 
@@ -57,7 +57,7 @@
 
 下图是后续公有云上线规划，**尚未部署**。跨园区边缘接入建议通过 VPN；公网 WebRTC 与中继端口需要先完成网络评审。
 
-![云哨公有云部署规划拓扑](assets/system-network-online-proposed.svg)
+![MicroVisSpec 公有云部署规划拓扑](assets/system-network-online-proposed.svg)
 
 可编辑源文件：[system-network-online-proposed.drawio](assets/system-network-online-proposed.drawio)
 
@@ -86,15 +86,15 @@
 ### 环境要求
 
 - Linux 主机或服务器，用于运行云端服务与 Web 工作台
-- Docker Engine 与 Docker Compose 插件
+- Go 1.27+、Node.js 24+、Nginx、PostgreSQL、Mosquitto；生产部署不依赖 Docker
 - 华为 Atlas 200I DK A2，用于边缘推理演示
 - 摄像头或经授权的视频源；具体编码、网络和端口要求见部署指南
 
 ### 获取代码
 
 ```bash
-git clone https://atomgit.com/milo-ally-stu/Yunshao.git
-cd Yunshao
+git clone https://github.com/milo-ally-open/MicroVisSpec.git
+cd MicroVisSpec
 ```
 
 ### 部署
@@ -123,7 +123,7 @@ video/                         # 演示视频
 - [服务端说明](../project/src/services/README.md)：服务启动、检查、日志与数据维护
 - [Atlas 边缘运行时](../project/src/device_sides/atlas200idka2/README.md)：边缘端构建、模型接入和视频测试
 - [课堂行为检测任务](../project/docs/Specification/classroom_behavior_detection/tasks.md)：首发模型任务与验证记录
-- [产品展示页](yunshao-exhibit.html)
+- [MicroVisSpec 产品展示页](microvisspec-exhibit.html)
 - [汇报材料索引](../ppt/README.md)
 - [协作与提交约定](../ONBOARDING.md)
 
@@ -141,3 +141,7 @@ video/                         # 演示视频
 ## 许可证
 
 本项目采用 [Apache License 2.0](../LICENSE)。
+
+## 名称与兼容性
+
+本仓库及项目正式名称为 **MicroVisSpec**。现有部署中仍使用 `yunshao` 的服务名、账户名、配置路径和环境变量是历史运行时标识；为兼容已部署设备与配置，部署命令中保留这些标识，它们不再代表项目名称。

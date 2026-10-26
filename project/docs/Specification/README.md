@@ -30,7 +30,7 @@ project/docs/Specification/
 
 当前首发产品范围为教室行为检测，详见 [课堂行为检测](classroom_behavior_detection/)。Atlas 云边代理与模型运行时见 [Atlas 边缘运行时](atlas_edge_runtime/)，Web/PWA 交付见 [web_pwa_client](web_pwa_client/)。[消防通道规格](fire_access_obstruction_detection/) 保留为后续场景历史，不属于当前验收或实现顺序。
 
-首发多服务 Compose、Nginx、PostgreSQL、Mosquitto 与 MediaMTX 整合部署见 [平台部署与整合运行](platform_deployment/)。
+首发五个 Go 服务以独立二进制和 systemd 运行，Web/PWA 以静态文件交由系统 Nginx 托管；PostgreSQL、Mosquitto 与 MediaMTX 原生运行。完整构建、配置和运维步骤见[平台部署规格](platform_deployment/)与仓库根目录 [DEPLOY.md](../../../DEPLOY.md)。
 
 各组按需维护四份文档。轻量工作可以只改 `proposal.md`；没有新增技术选择时，`design.md` 写明沿用哪份合同即可。新服务/领域组可运行 Skill 的 `init_spec_group.py`，从仓库模板建立初始结构；脚本拒绝覆盖已有目录。
 

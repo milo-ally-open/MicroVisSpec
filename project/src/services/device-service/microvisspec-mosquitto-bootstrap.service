@@ -1,0 +1,13 @@
+[Unit]
+Description=Initialize MicroVisSpec Mosquitto service identities and ACLs
+After=mosquitto.service
+Requires=mosquitto.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/microvisspec/device-service.env
+ExecStart=/bin/sh /opt/microvisspec/device-service/bootstrap-mqtt.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

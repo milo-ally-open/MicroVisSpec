@@ -1,5 +1,0 @@
-services:
-  web:
-    ports:
-      - "${WEB_ATLAS_BIND_ADDRESS:?set WEB_ATLAS_BIND_ADDRESS in .env}:${WEB_HTTP_PORT:-80}:80/tcp"
-      - "${WEB_ATLAS_BIND_ADDRESS:?set WEB_ATLAS_BIND_ADDRESS in .env}:${WEB_HTTPS_PORT:-443}:443/tcp"
