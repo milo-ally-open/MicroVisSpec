@@ -12,6 +12,8 @@
 
 media schema 独占；仅来源 RTSP URL 加密保存；摄像头归属由 device-service 核验；播放按租约管理。RTSP URL 不含 userinfo，不单独支持来源用户名/密码。Nginx 将媒体请求交给 media-service 单次鉴权；media-service 使用服务间凭据向 auth-service 校验原始会话 Cookie 与请求元数据，再用返回的可信账号和会话 ID 校验观看租约。浏览器提供的身份头不参与授权。
 
+三类用户目标：来源与 stream 作为 workspace 资源，viewer lease/session 记录真实 account/session 主体；设备级 `stream.view` 覆盖该设备摄像头。撤权后新请求立即拒绝，服务健康时 30 秒内终止既有连接。详细合同见 [共享授权规格](../multi_user_workspace_access/)。
+
 ## 决策记录
 
 已明确的方向以服务规格为准。Nginx 嵌套 `auth_request` 的上游身份头在实际部署中未传至 media-service，导致合法租约播放被拒；采用 media-service 直连 auth-service 会话校验后，身份验证和租约验证在同一个授权处理器中完成。未记录的备选方案不推定为已评审结论；影响接口、数据所有权或部署方式的变化，应记录决定、依据和影响并同步规格。
@@ -26,3 +28,4 @@ media schema 独占；仅来源 RTSP URL 加密保存；摄像头归属由 devic
 ## 状态依据
 
 设计描述目标与约束，不代表已实现；状态由[任务与证据清单](tasks.md)、仓库代码和部署记录确认。
+播放 lease 创建与续租、以及媒体资源的 Nginx 授权请求都向 auth-service 实时核对 `stream.view`。有效 lease 设为 25 秒、到期扫描每秒触发；活动 MediaMTX lease kick 并发执行以满足已确认的 30 秒撤权目标。该时限仍须用目标 MediaMTX 与浏览器端到端验收，源码参数与 Go build 不能代替实测。

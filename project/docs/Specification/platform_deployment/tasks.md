@@ -4,15 +4,15 @@
 
 ## 任务清单
 
-- [x] **T-01 五个 Go 二进制与 systemd 单元**：在各 `*-service` 中保留配置与 Go 模块，增加 Linux amd64 build.sh、五个独立 unit 和环境样例；确认 unit 依赖并不形成循环。覆盖 REQ-01 AC-01.1–01.2、REQ-06；每个服务改动前回读其 service Spec。
-- [x] **T-02 PostgreSQL 原生初始化与数据操作**：适配 `auth-service/database-bootstrap.sh` 为 PostgreSQL OS 用户执行，保持五 schema/角色及权限；文档覆盖首次创建、备份与恢复。覆盖 REQ-02。
-- [x] **T-03 Mosquitto 原生 TLS 与 ACL**：把配置路径改为系统路径，bootstrap 从受限文件读取管理员/服务身份配置，保持幂等 ACL；保留 device-service owner 目录。覆盖 REQ-03。
-- [x] **T-04 Web 静态发布与 Nginx 原生入口**：更新 Nginx 上游至 loopback 端口、移除 Docker host gateway 和容器 secret 路径；通过静态 dist + 系统 Nginx 部署。覆盖 REQ-01 AC-01.3–01.5、REQ-04。
-- [x] **T-05 MediaMTX 原生进程与受保护媒体入口**：提供 systemd unit，控制 API/RTSP/HLS/WHEP 端口仅供本机访问，并保留园区 WebRTC UDP；部署主机媒体链路仍待验收。覆盖 REQ-05。
-- [x] **T-06 密钥和运行配置**：各服务 env 样例只含非机密值和 `*_FILE` 路径；部署文档说明 `/etc/microvisspec` 文件权限和密钥生成。覆盖 REQ-06。
-- [ ] **T-07 文档与部署验证**：更新 DEPLOY.md、README、STRUCTURE、全局 SPEC 和 service README；删除 Compose/Dockerfile 部署入口；Go build 与 Web production build 已通过。Nginx 语法检查及目标 Linux 主机 smoke 尚未执行。覆盖 REQ-07 AC-07.1–07.4。
-- [x] **T-08 本机 Docker 清理与磁盘记录**：移除确认属于本项目的 22 个已退出容器和未引用项目镜像；不删除数据卷或构建缓存，记录清理前后占用。覆盖 REQ-07 AC-07.5。
-- [x] **T-09 默认分支交付**：变更已在本地提交并推送至 GitHub 默认 `main`；运行时密钥与生成的 Go 二进制未纳入 Git。
+- [x] **T-01 五个 Go 二进制与 systemd 单元**：在各 `*-service` 中保留配置与 Go 模块，增加 Linux amd64 build.sh、五个独立 unit 和环境样例；确认 unit 依赖并不形成循环。覆盖 REQ-01 / AC-01.1、AC-01.2；REQ-06 / AC-06.1、AC-06.2；每个服务改动前回读其 service Spec。
+- [x] **T-02 PostgreSQL 原生初始化与数据操作**：适配 `auth-service/database-bootstrap.sh` 为 PostgreSQL OS 用户执行，保持五 schema/角色及权限；文档覆盖首次创建、备份与恢复。覆盖 REQ-02 / AC-02.1、AC-02.2、AC-02.3。
+- [x] **T-03 Mosquitto 原生 TLS 与 ACL**：把配置路径改为系统路径，bootstrap 从受限文件读取管理员/服务身份配置，保持幂等 ACL；保留 device-service owner 目录。覆盖 REQ-03 / AC-03.1、AC-03.2、AC-03.3、AC-03.4。
+- [x] **T-04 Web 静态发布与 Nginx 原生入口**：更新 Nginx 上游至 loopback 端口、移除 Docker host gateway 和容器 secret 路径；通过静态 dist + 系统 Nginx 部署。覆盖 REQ-01 / AC-01.3、AC-01.4、AC-01.5；REQ-04 / AC-04.1、AC-04.2、AC-04.3、AC-04.4、AC-04.5。
+- [x] **T-05 MediaMTX 原生进程与受保护媒体入口**：提供 systemd unit，控制 API/RTSP/HLS/WHEP 端口仅供本机访问，并保留园区 WebRTC UDP；部署主机媒体链路仍待验收。覆盖 REQ-05 / AC-05.1、AC-05.2、AC-05.3、AC-05.4。
+- [x] **T-06 密钥和运行配置**：各服务 env 样例只含非机密值和 `*_FILE` 路径；部署文档说明 `/etc/microvisspec` 文件权限和密钥生成。覆盖 REQ-06 / AC-06.1、AC-06.2、AC-06.3。
+- [ ] **T-07 文档与部署验证**：已更新 DEPLOY.md 和 auth-service env 样例，补充 admin 一次性 bootstrap token 的权限、清除要求以及 auth 对 event-service 的就绪探针地址；Nginx 已增加 `/api/v1/admin/` 到 auth-service 的同源代理。本轮 Go/Web build 通过。目标 Linux 主机、Nginx 语法、secret owner/mode、bootstrap 和 smoke 尚未验证。覆盖 REQ-07 / AC-07.1、AC-07.2、AC-07.3、AC-07.4。
+- [x] **T-08 本机 Docker 清理与磁盘记录**：移除确认属于本项目的 22 个已退出容器和未引用项目镜像；不删除数据卷或构建缓存，记录清理前后占用。覆盖 REQ-07 / AC-07.5。
+- [x] **T-09 默认分支交付**：变更已在本地提交并推送至 GitHub 默认 `main`；运行时密钥与生成的 Go 二进制未纳入 Git；发布文件和原生部署入口按 REQ-07 / AC-07.1 追踪。
 
 ## 验收记录
 

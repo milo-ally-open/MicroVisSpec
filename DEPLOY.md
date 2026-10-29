@@ -115,6 +115,7 @@ sudo sh -c 'umask 077; openssl rand -hex 32 > /etc/microvisspec/device-internal-
 sudo sh -c 'umask 077; openssl rand -hex 32 > /etc/microvisspec/device-media-service-token'
 sudo sh -c 'umask 077; openssl rand -hex 32 > /etc/microvisspec/auth-media-service-token'
 sudo sh -c 'umask 077; openssl rand -hex 32 > /etc/microvisspec/auth-push-service-token'
+sudo sh -c 'umask 077; openssl rand -hex 32 > /etc/microvisspec/auth-admin-bootstrap-token'
 sudo sh -c 'umask 077; openssl rand -hex 32 > /etc/microvisspec/event-push-service-token'
 sudo sh -c 'umask 077; openssl rand -base64 32 > /etc/microvisspec/media-source-encryption-key'
 sudo sh -c 'umask 077; openssl rand -hex 32 > /etc/microvisspec/media-nginx-internal-token'
@@ -152,8 +153,8 @@ mkcert 仅适合试点；访问端也必须信任该 mkcert 根证书。MQTT 证
 ```sh
 sudo chown root:postgres /etc/microvisspec/auth-database-password /etc/microvisspec/device-database-password /etc/microvisspec/event-database-password /etc/microvisspec/media-database-password /etc/microvisspec/push-database-password
 sudo chmod 0640 /etc/microvisspec/*-database-password
-sudo chown root:microvisspec /etc/microvisspec/*-database-url /etc/microvisspec/*-service-token /etc/microvisspec/device-media-service-token /etc/microvisspec/auth-media-service-token /etc/microvisspec/media-source-encryption-key /etc/microvisspec/media-nginx-internal-token /etc/microvisspec/event-cursor-signing-key /etc/microvisspec/push-encryption-key /etc/microvisspec/push-vapid-public-key /etc/microvisspec/push-vapid-private-key /etc/microvisspec/mqtt-admin-password /etc/microvisspec/mqtt-device-service-password /etc/microvisspec/mqtt-event-service-password /etc/microvisspec/mediamtx-api-password /etc/microvisspec/mediamtx-reader-password
-sudo chmod 0640 /etc/microvisspec/*-database-url /etc/microvisspec/*-service-token /etc/microvisspec/device-media-service-token /etc/microvisspec/auth-media-service-token /etc/microvisspec/media-source-encryption-key /etc/microvisspec/media-nginx-internal-token /etc/microvisspec/event-cursor-signing-key /etc/microvisspec/push-encryption-key /etc/microvisspec/push-vapid-public-key /etc/microvisspec/push-vapid-private-key /etc/microvisspec/mqtt-admin-password /etc/microvisspec/mqtt-device-service-password /etc/microvisspec/mqtt-event-service-password /etc/microvisspec/mediamtx-api-password /etc/microvisspec/mediamtx-reader-password
+sudo chown root:microvisspec /etc/microvisspec/*-database-url /etc/microvisspec/*-service-token /etc/microvisspec/auth-admin-bootstrap-token /etc/microvisspec/device-media-service-token /etc/microvisspec/auth-media-service-token /etc/microvisspec/media-source-encryption-key /etc/microvisspec/media-nginx-internal-token /etc/microvisspec/event-cursor-signing-key /etc/microvisspec/push-encryption-key /etc/microvisspec/push-vapid-public-key /etc/microvisspec/push-vapid-private-key /etc/microvisspec/mqtt-admin-password /etc/microvisspec/mqtt-device-service-password /etc/microvisspec/mqtt-event-service-password /etc/microvisspec/mediamtx-api-password /etc/microvisspec/mediamtx-reader-password
+sudo chmod 0640 /etc/microvisspec/*-database-url /etc/microvisspec/*-service-token /etc/microvisspec/auth-admin-bootstrap-token /etc/microvisspec/device-media-service-token /etc/microvisspec/auth-media-service-token /etc/microvisspec/media-source-encryption-key /etc/microvisspec/media-nginx-internal-token /etc/microvisspec/event-cursor-signing-key /etc/microvisspec/push-encryption-key /etc/microvisspec/push-vapid-public-key /etc/microvisspec/push-vapid-private-key /etc/microvisspec/mqtt-admin-password /etc/microvisspec/mqtt-device-service-password /etc/microvisspec/mqtt-event-service-password /etc/microvisspec/mediamtx-api-password /etc/microvisspec/mediamtx-reader-password
 sudo chown root:microvisspec /etc/microvisspec/auth-service.env /etc/microvisspec/device-service.env /etc/microvisspec/event-service.env /etc/microvisspec/media-service.env /etc/microvisspec/push-service.env
 sudo chmod 0640 /etc/microvisspec/*-service.env
 ```
@@ -171,6 +172,8 @@ sudo chmod 0640 /etc/microvisspec/nginx-auth-header.conf /etc/microvisspec/nginx
 ```
 
 应用 env 文件只含配置值与 `*_FILE` 路径，不放密钥内容。若启用网页 SSH 初始化 Atlas，还需将按 Atlas README 构建的设备 bootstrap 包安装到 `/opt/microvisspec/atlas200idka2-bootstrap.tar.gz`。
+
+平台首次管理员通过 auth-service 的内部一次性 bootstrap 入口初始化：仅在尚不存在管理员账号时成功，服务端数据库锁保证并发调用只会有一个成功。用受限部署自动化读取 `auth-admin-bootstrap-token` 并经本机内部端口提交管理员用户名和密码；不要把 token 放入浏览器、URL、仓库或命令行参数。成功后立即从 `/etc/microvisspec/auth-service.env` 移除 `AUTH_ADMIN_BOOTSTRAP_TOKEN_FILE` 并安全删除该 token 文件。此入口不经 Nginx 公网代理；日常 PC 账号、状态、健康和审计由 Web 管理页操作。
 
 运行一次数据库初始化。确保 `/etc/microvisspec` 中的五个数据库密码文件对 postgres 用户可读：
 

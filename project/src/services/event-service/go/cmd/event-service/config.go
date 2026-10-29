@@ -25,6 +25,7 @@ type Config struct {
 	BrokerClientKeyFile  string
 	DeviceServiceURL     string
 	DeviceServiceToken   string
+	AuthServiceURL       string
 	PushServiceURL       string
 	PushServiceToken     string
 	CursorSigningKey     []byte
@@ -56,6 +57,7 @@ func LoadConfig() (Config, error) {
 		BrokerClientKeyFile:  os.Getenv("MQTT_CLIENT_KEY_FILE"),
 		DeviceServiceURL:     strings.TrimRight(os.Getenv("DEVICE_SERVICE_INTERNAL_URL"), "/"),
 		DeviceServiceToken:   read("DEVICE_SERVICE_INTERNAL_TOKEN"),
+		AuthServiceURL:       strings.TrimRight(os.Getenv("AUTH_SERVICE_INTERNAL_URL"), "/"),
 		PushServiceURL:       strings.TrimRight(os.Getenv("PUSH_SERVICE_INTERNAL_URL"), "/"),
 		PushServiceToken:     read("PUSH_SERVICE_INTERNAL_TOKEN"),
 	}
@@ -76,6 +78,9 @@ func LoadConfig() (Config, error) {
 		return c, errors.New("DEVICE_SERVICE_INTERNAL_TOKEN is required")
 	}
 	if err := validateServiceURL("DEVICE_SERVICE_INTERNAL_URL", c.DeviceServiceURL); err != nil {
+		return c, err
+	}
+	if err := validateServiceURL("AUTH_SERVICE_INTERNAL_URL", c.AuthServiceURL); err != nil {
 		return c, err
 	}
 	if c.PushServiceToken == "" {

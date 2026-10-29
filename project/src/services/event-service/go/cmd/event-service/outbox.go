@@ -32,6 +32,7 @@ type pushInboxEnvelope struct {
 
 type pushOutboxPayload struct {
 	EventID    uuid.UUID `json:"event_id"`
+	DeviceID   uuid.UUID `json:"device_id"`
 	OccurredAt time.Time `json:"occurred_at"`
 }
 
@@ -113,7 +114,7 @@ func (a *App) claimOutbox(ctx context.Context) (*Outbox, error) {
 
 func (a *App) deliverOutbox(ctx context.Context, item Outbox) error {
 	var payload pushOutboxPayload
-	if err := json.Unmarshal(item.Payload, &payload); err != nil || payload.EventID != item.ID || payload.OccurredAt.IsZero() {
+	if err := json.Unmarshal(item.Payload, &payload); err != nil || payload.EventID != item.ID || payload.DeviceID == uuid.Nil || payload.OccurredAt.IsZero() {
 		return errors.New("event.created outbox payload is invalid")
 	}
 	envelope := pushInboxEnvelope{Producer: "event-service", EventType: item.EventType, EventID: item.ID,

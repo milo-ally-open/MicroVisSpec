@@ -42,7 +42,7 @@
 
 **需求**：`project/src/device_sides/atlas200idka2/` 必须包含可构建的 C++ AscendCL 推理运行时代码，不得只保留模型入库代理而把唯一推理实现留在 `preparation/` Demo。工程采用插件式通用 AI 接口、manager 调度和硬件媒体 pipeline：运行时按 profile 装载 Atlas AI 插件，流管理器按 stream 配置绑定 model_id，告警过滤器独立消费检测结果。配置拆分为 `config/models.json`（多模型 profiles 与本机支持能力）、`config/streams_config.json`（流到 model_id/阈值绑定）和 `config/alarm_rules.json`（类别到事件类型/等级的告警规则）。每个模型 profile 定义唯一 `model_id`、算法键、模型文件格式/名称、目标 SoC、插件/后端/模型族/解码器、输入尺寸/像素格式/预处理、有序类别、置信度/NMS/最大检测数及启用状态。profile 的模型类别、芯片、尺寸、格式、插件和规则映射须从配置与模型清单读取；通用 catalog/配置解析不得固化 classroom class、类别数量或课堂 event type。配置可登记多个模型，未知支持能力、重复 ID、非法尺寸/阈值和与模型清单不一致的类别映射均须拒绝。模型包清单是哈希、版本和模型文件的事实来源，并须与所选 profile 一致。模型按 `models/{model_id}/{version}/` 入库、按 `active/{model_id}` 独立激活；安装/回滚一个模型不得覆盖其他模型。推理进程按配置选用 model_id，并按 `max_loaded_models` 限额运行；默认值为 1，只有实机内存/时延验证后才提高。模型 ID、版本、格式、类别映射、输入尺寸和哈希须对云端可观测。
 
-模型及插件统一采用 `model_` 前缀、以 `_` 分隔的小写英文领域段，并以任务类型结尾；末尾任务段只能是 `detection`、`segmentation` 或 `classification`。例如课堂行为检测的 `model_id` 为 `model_classroom_behavior_detection`，插件源文件为 `plugins/model_classroom_behavior_detection.cpp`，共享库为 `libmodel_classroom_behavior_detection.so`，实现类为 `ModelClassroomBehaviorDetection`。插件类实现 `IAIModel`，工厂导出符号保持 ABI 合同；插件 `name()` 与其 profile 的 `model_id` 相同。`algorithm_key` 是云端业务算法键，不受此命名约束，课堂场景继续使用 `classroom_behavior_detection`；`model_family`（例如 `yolo11`）描述模型/输出族，不用作模型 ID 或插件名。新模型的源文件、库、类、profile、清单和引用该模型的流/规则必须使用同一模型标识。
+模型及插件统一采用 `model_` 前缀、以 `_` 分隔的小写英文领域段，并以任务类型结尾；末尾任务段只能是 `detection`、`segmentation` 或 `classification`。例如课堂行为检测的 `model_id` 为 `model_classroom_behavior_detection`，插件源文件为 `plugins/model_classroom_behavior_detection.cpp`，共享库为 `libmodel_classroom_behavior_detection.so`，实现类为 `ModelClassroomBehaviorDetection`。插件类实现 `IAIModel`，导出 `GetAIModelPluginApiVersion`、`CreateAIModel` 和 `DestroyAIModel`；runtime 在调用工厂前拒绝缺少版本符号或版本不匹配的插件。当前 API 版本为 1，不兼容地改变接口时递增版本；runtime 与插件按同一构建工具链成对发布，版本号不承诺跨编译器的 C++ ABI 可移植性。插件 `name()` 与其 profile 的 `model_id` 相同。`algorithm_key` 是云端业务算法键，不受此命名约束，课堂场景继续使用 `classroom_behavior_detection`；`model_family`（例如 `yolo11`）描述模型/输出族，不用作模型 ID 或插件名。新模型的源文件、库、类、profile、清单和引用该模型的流/规则必须使用同一模型标识。
 
 Atlas 媒体公共接口放在 `include/media/`，实现放在 `src/media/`；每个 `.hpp` 都有同基名的 `.cpp`（如 `media_pipeline.hpp` / `media_pipeline.cpp`），不再使用 `common/media/`。
 
@@ -57,7 +57,7 @@ Atlas 媒体公共接口放在 `include/media/`，实现放在 `src/media/`；�
 - **AC-03.5** Given 两个 model_id 分别安装不同版本，When 单独激活或回滚其中一个 ID，Then 仅对应 `active/{model_id}` 变化，其他模型活动版本及运行状态不变；加载数量不得超过 `max_loaded_models`，默认限制为 1。
 - **AC-03.6** Given 新设备首次启动且未收到云端告警规则，When 运行本地 `alarm_rules.json`，Then 所有规则均为 disabled；推理仍可输出实时检测用于 OSD，但不会创建事件或证据。
 - **AC-03.7** Given 配置文件为某模型声明了类别、芯片、输入尺寸、后端、解码器和告警事件映射，When 通用配置解析与模型 catalog 校验，Then 这些值均从 profile/清单/规则读取；将 classroom 类别替换为另一组有效类别时，公共配置与 catalog 仍按新配置校验，不依赖课堂类别常量。
-- **AC-03.8** Given 新增 detection、segmentation 或 classification 模型，When 注册 profile 并构建插件，Then `model_id`、插件源文件/共享库、实现类及对应流/规则/清单遵循 `model_` + 领域名 + 任务类型的命名并保持一致；`IAIModel::name()` 等于 profile 的 `model_id`，`algorithm_key` 与 `model_family` 各自保留业务语义和模型族语义。
+- **AC-03.8** Given 新增 detection、segmentation 或 classification 模型，When 注册 profile 并构建插件，Then `model_id`、插件源文件/共享库、实现类及对应流/规则/清单遵循 `model_` + 领域名 + 任务类型的命名并保持一致；插件导出 API 版本、工厂和析构符号，runtime 在创建实例前拒绝缺少版本符号或版本不匹配的插件；`IAIModel::name()` 等于 profile 的 `model_id`，`algorithm_key` 与 `model_family` 各自保留业务语义和模型族语义。
 - **AC-03.9** Given Atlas 媒体模块参与构建，When 检查产品源码布局，Then 媒体头文件位于 `include/media/`、实现位于 `src/media/`，每对 `.hpp`/`.cpp` 的基名完全一致，且不存在 `common/media/` 实现目录。
 - **AC-03.10** Given Atlas 公共核心/配置模块参与构建，When 检查头源文件布局，Then `include/common/core.hpp` 与 `src/common/core.cpp`、`include/common/config.hpp` 与 `src/common/config.cpp` 同名配对，且不再引用 `edge_core.hpp` 或 `model_config.hpp`。
 
@@ -151,6 +151,7 @@ RTSP 模式默认不保存本地 H.264 连续文件；仅显式传入诊断输�
 | 2026-10-19 | 明确采用插件接口、manager/pipeline、逐流模型绑定和独立告警 JSON 的组织方式，适配 Atlas AscendCL。 | 用户指定参考 `device_side_ax650` 仓库；仅借鉴架构，不复用 AX 芯片 API |
 | 2026-10-19 | 将产品进程、源码目录、环境变量、IPC socket 和 systemd 单元的名称统一为 `agent`。 | 用户要求 `edge_agent` 全量替换为 `agent` |
 | 2026-10-19 | 统一模型插件、模型 ID 和任务类型的命名；课堂模型标识为 `model_classroom_behavior_detection`，算法键继续为 `classroom_behavior_detection`。 | 用户要求插件遵循 detection/segmentation/classification 命名规范 |
+| 2026-10-29 | 增加插件 API v1 版本符号及不匹配时 fail closed 的要求；明确版本号不提供跨工具链 C++ ABI 兼容性。 | Atlas 插件加载 adapter 首段重构 |
 | 2026-10-19 | 媒体接口与实现目录统一为 `include/media/` 和 `src/media/`，头源文件按相同基名配对。 | 用户要求将 Atlas `common/media/` 并入 include 且不增加 common 层 |
 | 2026-10-19 | 将 Atlas `include/common/` 头文件改为与 `src/common/` 实现同基名：`core.hpp`/`core.cpp`、`config.hpp`/`config.cpp`。 | 用户指出公共头文件遵循头源文件基名一致规范 |
 | 2026-10-20 | 要求 agent 与 classroom-runtime 显式读取受限权限的 CANN 运行环境文件，避免 systemd 无法解析 AscendCL 动态库或依赖交互式 shell 环境。 | Atlas 实机 systemd 启动以 127 失败，干净环境检查发现 AscendCL/媒体动态库缺失 |

@@ -46,6 +46,7 @@ func (SessionRevocation) TableName() string { return "push.session_revocations" 
 type Delivery struct {
 	ID             uuid.UUID  `gorm:"type:uuid;primaryKey"`
 	EventID        uuid.UUID  `gorm:"type:uuid;not null;uniqueIndex:idx_push_delivery_dedupe,priority:1;index"`
+	DeviceID       *uuid.UUID `gorm:"type:uuid;index"`
 	SubscriptionID uuid.UUID  `gorm:"type:uuid;not null;uniqueIndex:idx_push_delivery_dedupe,priority:2;index"`
 	AccountID      uuid.UUID  `gorm:"type:uuid;not null;index"`
 	Payload        []byte     `gorm:"type:bytea;not null"`

@@ -12,6 +12,8 @@
 
 device schema 由本服务独占；激活票据一次性；MQTT ACL 按设备隔离；期望配置与实报分开。
 
+三类用户目标：device/camera 等资产按 `workspace_id` 作为租户资源；当前资源 `account_id` 迁移期间兼容保留，用户主体/操作人 `account_id` 不得改写成 workspace ID。列表和每个资源操作都由 auth-service 当前 device grant 再过滤；device-service 仍是资产归属唯一来源。详细合同见 [共享授权规格](../multi_user_workspace_access/)。
+
 ## 决策记录
 
 已明确的方向以服务规格为准。未记录的备选方案不推定为已评审结论；影响接口、数据所有权或部署方式的变化，应记录决定、依据和影响并同步规格。
@@ -54,3 +56,4 @@ device schema 由本服务独占；激活票据一次性；MQTT ACL 按设备隔
 ## 状态依据
 
 设计描述目标与约束，不代表已实现；状态由[任务与证据清单](tasks.md)、仓库代码和部署记录确认。
+设备服务的内部接口 `GET /internal/v1/devices/{device_id}/ownership` 仅向携带 device 内部服务凭据的服务返回活动设备的 owner account ID；auth-service 用于邀请创建和在线授权绑定 workspace。浏览器不能直接调用该接口。授权列表中的设备读路径返回脱敏视图；设备创建、配置、激活和运维操作仅允许 PC owner。

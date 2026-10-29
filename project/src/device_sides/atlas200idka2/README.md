@@ -10,7 +10,10 @@
 
 | 产品位置 | 职责 | Demo 到产品的变化 |
 |---|---|---|
-| `include/ai_interface.hpp` | 通用 `IAIModel`、输入帧和检测结果插件 ABI | 把模型装载/推理从视频循环中解耦 |
+| `include/ai_interface.hpp` | `IAIModel`、输入帧、检测结果和插件 ABI 版本合同 | 把模型装载/推理从视频循环中解耦；当前 API 版本为 1 |
+| `include/adapters/ai_model_plugin.hpp`、`src/adapters/ai_model_plugin.cpp` | 动态库加载、ABI 版本核验、插件实例生命周期和推理转发 | manager 不再直接依赖 `dlopen`/`dlsym` |
+| `include/application/`、`src/application/` | 告警事件发布、激活租期 gate、Agent 本机控制/持久事件 outbox/MQTT/evidence uploader/HTTPS/service-lifecycle/lease-writer ports、MQTT session、`AgentCloudCycle`、命令/ACK inbox、云端命令处理、已应用规则 ACK 用例 | `AgentCloudCycle` 编排连接后的命令处理、规则应用 ACK、状态/事件发布及证据上传；systemd 生命周期和授权租期写入分别经 `AgentServiceLifecycle`、`ActivationLeaseWriter` ports 注入；命令队列消费、拒绝 ACK、applied readiness 检查与 ACK 顺序、ACK payload 组装从 Agent 分离 |
+| `include/adapters/`、`src/adapters/` | Agent/runtime Unix socket client/server、SQLite 事件 outbox、libmosquitto transport、libcurl HTTPS transport/evidence uploader、`SystemdAgentServiceLifecycle`、`FileActivationLeaseWriter`、云规则配置与 applied-state 适配器、文件租期/证据 outbox、系统事件 ID/UTC 时间和插件适配器 | 用例经端口访问 IPC、SQLite、MQTT、HTTPS、systemd、运行时文件及动态库；规则配置及 runtime 状态/就绪标记访问位于 adapter；Agent 外层调度及激活业务编排仍在进程代码中 |
 | `plugins/model_classroom_behavior_detection.cpp` | `ModelClassroomBehaviorDetection`：YOLO11 AscendCL OM 装载、NV21 输入、张量解码、NMS | 类别顺序、输入尺寸、阈值和最大检测数从 profile 读取；插件名与 model_id 一致 |
 | `include/manager/`、`src/manager/` | AI processor、推理/流/config/alarm managers | 按 stream 选 model_id，分开推理、媒体和业务规则 |
 | `include/media/*.hpp`、`src/media/*.cpp` | 同名媒体接口与实现；Atlas VDEC/VPSS/VENC、FFmpeg 输入和 OSD | 按相同基名配对，媒体实现不放在 `include/` |
@@ -37,7 +40,7 @@
 
 在 `config/models.json` 的 `models` 数组增加 profile，至少填写唯一 `model_id`、云端算法键、模型格式/文件名/SoC、plugin library、backend、family、decoder、输入宽高/像素格式/预处理、有序 `classes`、置信度阈值、NMS 阈值和最大检测数。模型及插件统一按 `model_<domain>_<task>` 命名，task 使用 `detection`、`segmentation` 或 `classification`；例如本模型为 `model_classroom_behavior_detection`，库名为 `libmodel_classroom_behavior_detection.so`。profile 引用的插件库必须与 model_id 匹配。相关值必须属于同文件 `runtime.capabilities` 声明的支持集合。当前 Atlas 产品构建声明支持 `om`、`ascendcl`、`yolo11/yolo_v11`、NV21 `static_aipp` 和 310B4；输入尺寸为 640×640。
 
-`algorithm_key` 表示云端算法语义（本模型为 `classroom_behavior_detection`），`model_family` 表示网络/输出族（本模型为 `yolo11`）；两者不代替 model_id。新增领域或任务时，使用相应命名的插件源文件、共享库和 `Model<Domain><Task>` 类；内部通用 YOLO 解码逻辑可以抽取复用，但不能用架构名作为产品插件名。新增插件须实现 `IAIModel`、导出 `CreateAIModel`/`DestroyAIModel`，并在 CMake 构建和 `runtime.capabilities` 中登记。禁止只改配置来宣称代码不支持的能力。
+`algorithm_key` 表示云端算法语义（本模型为 `classroom_behavior_detection`），`model_family` 表示网络/输出族（本模型为 `yolo11`）；两者不代替 model_id。新增领域或任务时，使用相应命名的插件源文件、共享库和 `Model<Domain><Task>` 类；内部通用 YOLO 解码逻辑可以抽取复用，但不能用架构名作为产品插件名。新增插件须实现 `IAIModel`，导出 `GetAIModelPluginApiVersion`、`CreateAIModel` 和 `DestroyAIModel`，并在 CMake 构建和 `runtime.capabilities` 中登记。当前 runtime 只接受 API 版本 1，缺少版本符号或版本不符即拒绝加载；接口含 C++ 类型，runtime 与插件应由同一工具链成对构建部署，版本号不代表跨工具链二进制兼容。禁止只改配置来宣称代码不支持的能力。
 
 ### 3. 绑定视频流和告警规则
 

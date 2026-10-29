@@ -10,6 +10,7 @@ import (
 type Stream struct {
 	ID                   uuid.UUID  `gorm:"type:uuid;primaryKey" json:"stream_id"`
 	AccountID            uuid.UUID  `gorm:"type:uuid;not null;index" json:"account_id"`
+	WorkspaceID          *uuid.UUID `gorm:"type:uuid;index" json:"-"`
 	DeviceID             uuid.UUID  `gorm:"type:uuid;not null;index" json:"device_id"`
 	CameraID             uuid.UUID  `gorm:"type:uuid;not null;uniqueIndex" json:"camera_id"`
 	EncryptedSource      []byte     `gorm:"type:bytea;not null" json:"-"`

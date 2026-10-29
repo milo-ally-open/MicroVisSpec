@@ -24,11 +24,12 @@ import (
 var errOwnershipNotFound = errors.New("camera ownership not found")
 
 type App struct {
-	db       *gorm.DB
-	config   Config
-	device   CameraOwnershipResolver
-	mediaMTX MediaPathControl
-	auth     AuthSessionValidator
+	db        *gorm.DB
+	config    Config
+	device    CameraOwnershipResolver
+	authorize DeviceCapabilityAuthorizer
+	mediaMTX  MediaPathControl
+	auth      AuthSessionValidator
 }
 
 func OpenDatabase(dsn string) (*gorm.DB, error) {
@@ -42,11 +43,17 @@ func OpenDatabase(dsn string) (*gorm.DB, error) {
 	if err := db.AutoMigrate(&Stream{}, &ViewerLease{}, &Inbox{}); err != nil {
 		return nil, err
 	}
+	// Expand/backfill phase. Workspace IDs currently map to the existing PC
+	// owner account IDs; keep the column nullable until orphan review is done.
+	if err := db.Exec("UPDATE media.streams SET workspace_id = account_id WHERE workspace_id IS NULL").Error; err != nil {
+		return nil, err
+	}
 	return db, nil
 }
 
 func NewApp(config Config, db *gorm.DB, device CameraOwnershipResolver, mediaMTX MediaPathControl) *App {
-	return &App{db: db, config: config, device: device, mediaMTX: mediaMTX, auth: NewAuthSessionClient(config)}
+	return &App{db: db, config: config, device: device, authorize: NewAuthAuthorizationClient(config),
+		mediaMTX: mediaMTX, auth: NewAuthSessionClient(config)}
 }
 
 func NewAppFromConfig(config Config, db *gorm.DB) *App {
@@ -237,7 +244,8 @@ func (a *App) putSource(c *gin.Context) {
 		writeError(c, http.StatusInternalServerError, "internal_error", "media source could not be secured")
 		return
 	}
-	stream := Stream{ID: uuid.New(), AccountID: ownerID, DeviceID: deviceID, CameraID: cameraID, EncryptedSource: encrypted,
+	workspaceID := ownerID
+	stream := Stream{ID: uuid.New(), AccountID: ownerID, WorkspaceID: &workspaceID, DeviceID: deviceID, CameraID: cameraID, EncryptedSource: encrypted,
 		ConfigVersion: 1, ConfigStatus: "pending", SourceState: "configured", MediaState: "unknown", Active: true, CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
 	err = a.db.WithContext(c.Request.Context()).Transaction(func(tx *gorm.DB) error {
 		var existing Stream
@@ -537,14 +545,17 @@ func (a *App) reconcileStream(ctx context.Context, streamID uuid.UUID) error {
 func (a *App) reconciliationLoop(ctx context.Context) {
 	a.reconcilePendingStreams(ctx)
 	a.expireViewerLeases(ctx)
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
+	reconcileTicker := time.NewTicker(5 * time.Second)
+	expiryTicker := time.NewTicker(time.Second)
+	defer reconcileTicker.Stop()
+	defer expiryTicker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-ticker.C:
+		case <-reconcileTicker.C:
 			a.reconcilePendingStreams(ctx)
+		case <-expiryTicker.C:
 			a.expireViewerLeases(ctx)
 		}
 	}

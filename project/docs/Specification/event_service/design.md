@@ -12,6 +12,8 @@
 
 event schema 与私有证据存储由本服务管理；按设备和边缘事件 ID 幂等；事件与 outbox 同事务。
 
+三类用户目标：event/evidence 按 `workspace_id` 归属；查询授权按实际操作者的设备 grant 校验，disposition actor `account_id` 保留用户身份。撤权后禁止新的事件、证据和处置访问；outbox 仍按既有事务合同管理。详细合同见 [共享授权规格](../multi_user_workspace_access/)。
+
 ## 决策记录
 
 已明确的方向以服务规格为准。未记录的备选方案不推定为已评审结论；影响接口、数据所有权或部署方式的变化，应记录决定、依据和影响并同步规格。

@@ -8,6 +8,7 @@ const paths: Record<string, string[]> = {
   analytics: ['M4 3v17h17M8 15v-4M13 15V7M18 15V4'],
   devices: ['M6 6h12v12H6zM9 9h6v6H9zM9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4'],
   settings: ['m9 3-1 3-3 1-2 3 2 2v2l-2 2 2 3 3 1 1 2h6l1-2 3-1 2-3-2-2v-2l2-2-2-3-3-1-1-3Z', 'M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0'],
+  users: ['M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M10 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM20 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75'],
   arrow: ['M5 12h14m-5-5 5 5-5 5'],
   arrowUp: ['M7 17 17 7M7 7h10v10'],
   refresh: ['M20 7v5h-5M4 17v-5h5', 'M6 6a8 8 0 0 1 13 3M5 15a8 8 0 0 0 13 3'],

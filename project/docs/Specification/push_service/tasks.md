@@ -11,6 +11,8 @@
 - [ ] **T-05 push-service 服务内集成测试** — PostgreSQL + 可控 Web Push endpoint/mock + auth/event producer stub，覆盖账号切换 endpoint 防串发、重复 inbox、乱序撤销、并发领取、404/410 清理、429/5xx 重试、过期事件与重启恢复、秘密不泄漏；覆盖 REQ-01、REQ-02、REQ-03、REQ-04 / AC-01.1、AC-01.2、AC-02.1、AC-02.2、AC-03.1、AC-03.2、AC-04.1、AC-04.2。
 - [ ] **T-06 PWA 通知接口联调与运维** — VAPID 配置、delivery 指标和 Web/PWA 订阅/点击/解绑验收；只发送已启用课堂规则事件；覆盖 REQ-04 / AC-04.1、AC-04.2。
 
+- [~] **T-07 按当前工作空间授权重算移动接收人** — subscription/delivery 继续绑定真实账号；event.created inbox 按事件设备向 auth-service 分页查询当前 active mobile `alert.receive` 成员，只为这些成员的订阅创建 delivery；发送前再次检查订阅账号、来源 session 与设备能力，撤权后取消，授权服务故障时重试。PC owner 不加入本通知收件人集合。未完成真实跨服务测试、Push 手机验收及授权撤销并发边界验证；本轮仅 Go build 编译证据。覆盖本组 REQ-01 / AC-01.1、AC-01.2、REQ-02 / AC-02.2，并满足共享授权规格定义的成员接收人重算与撤权合同；依赖 multi_user_workspace_access T-04、T-07。
+
 ## 验收证据
 
 ### 2026-10-22 本机补充验收

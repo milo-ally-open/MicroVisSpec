@@ -5,11 +5,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type Event struct {
 	ID                uuid.UUID       `gorm:"type:uuid;primaryKey" json:"event_id"`
 	AccountID         uuid.UUID       `gorm:"type:uuid;not null;index:idx_events_account_occurred,priority:1" json:"account_id"`
+	WorkspaceID       *uuid.UUID      `gorm:"type:uuid;index" json:"-"`
 	DeviceID          uuid.UUID       `gorm:"type:uuid;not null;uniqueIndex:idx_events_device_edge,priority:1;index" json:"device_id"`
 	CameraID          uuid.UUID       `gorm:"type:uuid;not null;index" json:"camera_id"`
 	EdgeEventID       uuid.UUID       `gorm:"type:uuid;not null;uniqueIndex:idx_events_device_edge,priority:2" json:"edge_event_id"`
@@ -32,6 +34,14 @@ type Event struct {
 }
 
 func (Event) TableName() string { return "event.events" }
+
+func (event *Event) BeforeCreate(*gorm.DB) error {
+	if event.WorkspaceID == nil && event.AccountID != uuid.Nil {
+		workspaceID := event.AccountID
+		event.WorkspaceID = &workspaceID
+	}
+	return nil
+}
 
 type Evidence struct {
 	ID           uuid.UUID  `gorm:"type:uuid;primaryKey"`
@@ -60,6 +70,7 @@ func (Disposition) TableName() string { return "event.dispositions" }
 
 type Outbox struct {
 	ID            uuid.UUID       `gorm:"type:uuid;primaryKey" json:"event_id"`
+	WorkspaceID   *uuid.UUID      `gorm:"type:uuid;index" json:"-"`
 	EventType     string          `gorm:"size:100;not null;index" json:"event_type"`
 	Payload       json.RawMessage `gorm:"type:jsonb;not null" json:"payload"`
 	CreatedAt     time.Time       `gorm:"not null;index" json:"created_at"`

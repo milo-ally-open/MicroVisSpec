@@ -6,6 +6,8 @@
 
 首发进程为五个 Go 服务、Nginx/Web、PostgreSQL、Mosquitto 与 MediaMTX。MCP 未实现，不部署。首发原生部署目标为 Ubuntu/Debian Linux amd64；Compose 和 Dockerfile 不属于交付运行方式。
 
+三类用户下，管理员界面不拥有主机部署权限。部署配置、密钥注入、服务重启、数据库迁移与恢复仅通过受控运维路径执行；产品管理页只读显示脱敏健康/诊断和审计。数据库租户迁移及兼容阶段见[共享授权规格](../multi_user_workspace_access/spec.md)和本规格 REQ-02，未完成备份、恢复与回滚演练前不得移除兼容字段。
+
 ## 需求与验收条件
 
 ### REQ-01：独立原生服务与静态 Web 部署

@@ -24,11 +24,14 @@ project/docs/Specification/
 ├── atlas_edge_runtime/
 ├── classroom_behavior_detection/
 ├── web_pwa_client/
+├── multi_user_workspace_access/  # 三类身份、成员授权与跨服务迁移（评审目标）
 ├── fire_access_obstruction_detection/  # 后续场景/历史规格，非首发
 └── project_spec_workflow/
 ```
 
 当前首发产品范围为教室行为检测，详见 [课堂行为检测](classroom_behavior_detection/)。Atlas 云边代理与模型运行时见 [Atlas 边缘运行时](atlas_edge_runtime/)，Web/PWA 交付见 [web_pwa_client](web_pwa_client/)。[消防通道规格](fire_access_obstruction_detection/) 保留为后续场景历史，不属于当前验收或实现顺序。
+
+三类用户与工作空间授权是新评审目标，见 [multi_user_workspace_access](multi_user_workspace_access/)。该组集中记录当前实现证据、目标合同、建议架构和迁移任务；在产品待确认项解决并完成实现/验收前，其他服务规格记录的单账号行为仍代表现有基线。
 
 首发五个 Go 服务以独立二进制和 systemd 运行，Web/PWA 以静态文件交由系统 Nginx 托管；PostgreSQL、Mosquitto 与 MediaMTX 原生运行。完整构建、配置和运维步骤见[平台部署规格](platform_deployment/)与仓库根目录 [DEPLOY.md](../../../DEPLOY.md)。
 

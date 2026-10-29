@@ -82,13 +82,42 @@ add_library(edge_core
   src/common/cloud_config.cpp
   src/common/config.cpp)
 target_include_directories(edge_core PUBLIC include "${NLOHMANN_JSON_INCLUDE_DIR}" "${ACL_INCLUDE_DIR}")
-target_link_libraries(edge_core PUBLIC OpenSSL::Crypto SQLite::SQLite3 "${ASCENDCL_LIBRARY}")
+target_link_libraries(edge_core PUBLIC OpenSSL::Crypto "${ASCENDCL_LIBRARY}")
 target_compile_options(edge_core PRIVATE -Wall -Wextra -Wpedantic)
 
-add_executable(yunshao-agent src/agent/agent.cpp src/agent/activation.cpp)
+add_library(edge_event_outbox_adapter src/adapters/sqlite_event_outbox.cpp)
+target_include_directories(edge_event_outbox_adapter PUBLIC include "${NLOHMANN_JSON_INCLUDE_DIR}")
+target_link_libraries(edge_event_outbox_adapter PUBLIC SQLite::SQLite3)
+target_compile_options(edge_event_outbox_adapter PRIVATE -Wall -Wextra -Wpedantic)
+
+add_library(edge_mqtt_transport_adapter src/adapters/mosquitto_mqtt_transport.cpp)
+target_include_directories(edge_mqtt_transport_adapter PUBLIC include)
+target_link_libraries(edge_mqtt_transport_adapter PUBLIC PkgConfig::MOSQUITTO)
+target_compile_options(edge_mqtt_transport_adapter PRIVATE -Wall -Wextra -Wpedantic)
+
+add_executable(yunshao-agent
+  src/agent/agent.cpp
+  src/agent/activation.cpp
+  src/application/agent_activation_workflow.cpp
+  src/application/agent_run_loop.cpp
+  src/application/agent_cloud_command_processor.cpp
+  src/application/agent_cloud_cycle.cpp
+  src/application/agent_applied_rule_acknowledger.cpp
+  src/application/agent_command_acknowledger.cpp
+  src/application/agent_mqtt_inbox.cpp
+  src/application/agent_mqtt_session.cpp
+  src/adapters/agent_cloud_rule_command_settings.cpp
+  src/adapters/agent_applied_cloud_rule_state.cpp
+  src/adapters/file_activation_lease_writer.cpp
+  src/adapters/file_agent_configuration_store.cpp
+  src/adapters/curl_https_transport.cpp
+  src/adapters/https_evidence_uploader.cpp
+  src/adapters/system_event_metadata.cpp
+  src/adapters/systemd_agent_service_lifecycle.cpp
+  src/adapters/unix_agent_control_server.cpp)
 find_package(CURL REQUIRED)
 target_include_directories(yunshao-agent PRIVATE include "${NLOHMANN_JSON_INCLUDE_DIR}" "${ACL_INCLUDE_DIR}")
-target_link_libraries(yunshao-agent PRIVATE edge_core PkgConfig::MOSQUITTO CURL::libcurl)
+target_link_libraries(yunshao-agent PRIVATE edge_core edge_event_outbox_adapter edge_mqtt_transport_adapter CURL::libcurl)
 target_compile_options(yunshao-agent PRIVATE -Wall -Wextra -Wpedantic)
 configure_ascend_runtime_rpath(yunshao-agent)
 
@@ -113,11 +142,20 @@ if(NOT YUNSHAO_AGENT_ONLY)
 
   add_executable(yunshao-classroom-runtime
     src/main.cpp
+    src/application/activation_lease_gate.cpp
+    src/application/alarm_event_publisher.cpp
+    src/adapters/agent_event_socket_outbox.cpp
+    src/adapters/file_activation_lease_status.cpp
+    src/adapters/file_alarm_evidence_outbox.cpp
+    src/adapters/system_event_metadata.cpp
+    src/adapters/ai_model_plugin.cpp
     src/manager/ai_processor.cpp
     src/manager/inference_manager.cpp
     src/manager/config_service.cpp
     src/manager/alarm_filter.cpp
     src/manager/video_stream_manager.cpp
+    src/adapters/atlas_evidence_frame_encoder.cpp
+    src/adapters/file_runtime_rule_state_reader.cpp
     src/media/media_pipeline.cpp
     src/media/rtsp_server.cpp
     src/media/region_osd.cpp)
@@ -142,7 +180,7 @@ if(BUILD_TESTING AND NOT YUNSHAO_AGENT_ONLY)
   add_test(NAME cloud_config_test COMMAND cloud_config_test)
   add_executable(edge_core_test tests/edge_core_test.cpp)
   target_include_directories(edge_core_test PRIVATE include "${NLOHMANN_JSON_INCLUDE_DIR}" "${ACL_INCLUDE_DIR}")
-  target_link_libraries(edge_core_test PRIVATE edge_core)
+  target_link_libraries(edge_core_test PRIVATE edge_core edge_event_outbox_adapter)
   configure_ascend_runtime_rpath(edge_core_test)
   add_test(NAME edge_core_test COMMAND edge_core_test)
 

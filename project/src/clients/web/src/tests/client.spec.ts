@@ -108,7 +108,7 @@ describe('same-origin API client', () => {
 
 describe('session state', () => {
   it('clears the in-memory user and CSRF token on expiry', async () => {
-    setSession({ account_id: 'account-test', username: 'teacher', csrf_token: 'csrf-test-token' })
+    setSession({ account_id: 'account-test', username: 'teacher', user_type: 'pc', csrf_token: 'csrf-test-token' })
     clearSession()
     expect(authState.user).toBeNull()
 

@@ -27,11 +27,12 @@ type EventMessagePlane interface {
 }
 
 type App struct {
-	config     Config
-	db         *gorm.DB
-	messages   EventMessagePlane
-	deviceHTTP *http.Client
-	pushHTTP   *http.Client
+	config        Config
+	db            *gorm.DB
+	messages      EventMessagePlane
+	deviceHTTP    *http.Client
+	pushHTTP      *http.Client
+	authorization EventAuthorizationClient
 }
 
 func openDatabase(dsn string) (*gorm.DB, error) {
@@ -45,6 +46,14 @@ func openDatabase(dsn string) (*gorm.DB, error) {
 	if err := db.AutoMigrate(&Event{}, &Evidence{}, &Disposition{}, &Outbox{}); err != nil {
 		return nil, err
 	}
+	// Expand/backfill phase: workspace IDs currently map to the event's
+	// trusted PC owner. Outbox ownership is derived from its persisted event.
+	if err := db.Exec("UPDATE event.events SET workspace_id = account_id WHERE workspace_id IS NULL").Error; err != nil {
+		return nil, err
+	}
+	if err := db.Exec("UPDATE event.outbox AS outboxes SET workspace_id = events.workspace_id FROM event.events AS events WHERE outboxes.id = events.id AND outboxes.workspace_id IS NULL").Error; err != nil {
+		return nil, err
+	}
 	return db, nil
 }
 
@@ -52,7 +61,7 @@ func NewApp(config Config, db *gorm.DB, messages EventMessagePlane, deviceHTTP *
 	if deviceHTTP == nil {
 		deviceHTTP = &http.Client{Timeout: 5 * time.Second}
 	}
-	return &App{config: config, db: db, messages: messages, deviceHTTP: deviceHTTP, pushHTTP: &http.Client{Timeout: 5 * time.Second,
+	return &App{config: config, db: db, messages: messages, deviceHTTP: deviceHTTP, authorization: NewEventAuthorizationClient(config), pushHTTP: &http.Client{Timeout: 5 * time.Second,
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}
 }
 
@@ -126,12 +135,16 @@ func (a *App) ready(c *gin.Context) {
 func (a *App) requireAccount() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id, err := uuid.Parse(c.GetHeader("X-Account-ID"))
-		if err != nil || id == uuid.Nil {
+		sessionID := strings.TrimSpace(c.GetHeader("X-Session-ID"))
+		userType := strings.TrimSpace(c.GetHeader("X-User-Type"))
+		if err != nil || id == uuid.Nil || sessionID == "" || len(sessionID) > 128 || (userType != "pc" && userType != "mobile") {
 			writeError(c, http.StatusUnauthorized, "unauthorized", "a valid account session is required")
 			c.Abort()
 			return
 		}
 		c.Set("account_id", id)
+		c.Set("session_id", sessionID)
+		c.Set("user_type", userType)
 		c.Next()
 	}
 }

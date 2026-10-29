@@ -2,11 +2,7 @@
 
 #include "common/config.hpp"
 
-#include <sqlite3.h>
-
 #include <filesystem>
-#include <mutex>
-#include <optional>
 #include <string>
 #include <vector>
 
@@ -48,33 +44,6 @@ private:
                                const std::string& link_name,
                                const std::filesystem::path& target);
     Json status_one(const std::string& model_id) const;
-};
-
-class EventOutbox {
-public:
-    explicit EventOutbox(const std::filesystem::path& database_path,
-                         std::string device_id,
-                         EdgeAppConfig config);
-    ~EventOutbox();
-    EventOutbox(const EventOutbox&) = delete;
-    EventOutbox& operator=(const EventOutbox&) = delete;
-
-    bool enqueue(const Json& event, std::string* error);
-    std::vector<Json> due_events(std::size_t limit = 32);
-    void note_publish_attempt(const std::string& event_id, const std::string& error = "");
-    bool apply_ack(const Json& ack, std::string* error);
-    Json counts();
-    void replace_config(EdgeAppConfig config);
-    std::string event_state(const std::string& event_id);
-
-private:
-    ::sqlite3* db_ = nullptr;
-    std::string device_id_;
-    EdgeAppConfig config_;
-    std::mutex mutex_;
-
-    void initialize();
-    void validate_event(const Json& event) const;
 };
 
 }  // namespace yunshao

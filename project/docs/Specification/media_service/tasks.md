@@ -13,6 +13,8 @@
 - [ ] **T-07 Atlas/园区媒体容量验收** — 单路教室处理后 RTSP 接入、协议与浏览器验证、12 路源与 24 个连接负载实测；记录 CPU、内存、带宽和失败状态；覆盖 REQ-02 / AC-02.2；依赖边缘视频输出。
 - [ ] **T-08 历史 RTSP 来源兼容清理** — 启动时将旧密文解密为 RTSP URL-only、清除旧独立认证属性并重加密；迁移幂等，密钥错误/解密失败时服务不可就绪且不覆盖原记录；覆盖 REQ-01 / AC-01.3、AC-01.4；依赖 T-01。
 
+- [~] **T-09 workspace 播放授权与成员撤权** — 建立/续租播放 lease 及每次 Nginx 媒体授权请求均通过 auth-service 检查 session 对设备的 `stream.view` grant；viewer/session 继续记录真实用户主体。lease 为 25 秒、到期扫描每秒触发，最多 24 条活动租约并发 kick。`workspace_id` 迁移、owner 来源配置 UI/API、成员撤销事件触发即时 kick、真实 MediaMTX/WHEP/HLS 的 30 秒上界仍未验收；当前只有 Go build 证据。覆盖本组 REQ-02 / AC-02.1、REQ-04 / AC-04.1、AC-04.2，并满足共享授权规格定义的跨工作空间访问与撤权合同；依赖 multi_user_workspace_access T-04–T-06。
+
 ## 验收证据
 
 | REQ/AC | 检查方法 | 当前证据 | 状态 |

@@ -1,0 +1,129 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2050" height="1430" viewBox="0 0 2050 1430" role="img" aria-labelledby="title desc">
+<title id="title">工作空间授权核心类图</title>
+<desc id="desc">目标逻辑类与主要关联；跨服务字段以合同引用，非跨 schema 外键。</desc>
+<defs>
+<marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,0 L10,4 L0,8 z" fill="#42617b"/></marker>
+<marker id="eventArrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,0 L10,4 L0,8 z" fill="#bd6b26"/></marker>
+<style>text{font-family:Arial,"Microsoft YaHei",sans-serif;fill:#203246}.title{font-size:30px;font-weight:700}.sub{font-size:17px;fill:#53677b}.h{font-size:20px;font-weight:700}.body{font-size:17px}.small{font-size:14px;fill:#53677b}.box{fill:#fff;stroke:#7790a8;stroke-width:2}.blue{fill:#eaf3fb;stroke:#5590c1;stroke-width:2}.green{fill:#eaf7f0;stroke:#4b9b73;stroke-width:2}.purple{fill:#f2edfb;stroke:#8872b3;stroke-width:2}.pale{fill:#fbfcfe;stroke:#c4d0dc;stroke-width:1.5}.note{fill:#fff8d9;stroke:#d2b75d;stroke-width:1.5}.divider{stroke:#c5d0da;stroke-width:1.2}.assoc{fill:none;stroke:#63788d;stroke-width:1.7}.composition{fill:#42617b;stroke:#42617b;stroke-width:1.4}.ref{fill:none;stroke:#bd6b26;stroke-width:1.8;stroke-dasharray:6 5;marker-end:url(#eventArrow)}</style>
+</defs>
+<rect width="100%" height="100%" fill="white"/>
+<text x="42" y="48" class="title" text-anchor="start">工作空间授权核心类图</text>
+<text x="42" y="76" class="sub" text-anchor="start">目标逻辑模型；workspace_id 表示资源租户，account_id 表示操作用户；跨服务关系不建立 schema 外键。</text>
+<rect x="45" y="105" width="1960" height="445" rx="16" class="purple"/>
+<text x="72" y="140" class="h" text-anchor="start">身份与授权（auth-service）</text>
+<rect x="45" y="570" width="1960" height="370" rx="16" class="blue"/>
+<text x="72" y="605" class="h" text-anchor="start">设备与媒体（device-service / media-service）</text>
+<rect x="45" y="960" width="1960" height="420" rx="16" class="green"/>
+<text x="72" y="995" class="h" text-anchor="start">事件、证据与通知（event-service / push-service）</text>
+<polyline points="420,270 650,270" class="assoc"/><text x="535" y="246" class="small" text-anchor="middle">owner account 1 — workspace 0..1</text>
+<polyline points="1030,270 1330,270" class="assoc"/><text x="1180" y="246" class="small" text-anchor="middle">workspace 1 — invitations 0..*</text>
+<polyline points="255,350 255,390" class="assoc"/><text x="365" y="378" class="small" text-anchor="middle">account 1 — membership 0..1</text>
+<polyline points="820,350 820,372 560,372 560,390" class="assoc"/><text x="700" y="365" class="small" text-anchor="middle">workspace 1 — members 0..*</text>
+<polyline points="590,462 790,462" class="assoc"/><text x="690" y="440" class="small" text-anchor="middle">member 1 — grants 0..*</text>
+<polyline points="965,540 965,610 250,610 250,655" class="ref"/><text x="585" y="600" class="small" text-anchor="middle">grant targets device_id</text>
+<polyline points="410,750 560,750" class="assoc"/><text x="485" y="728" class="small" text-anchor="middle">device 1 — cameras 0..*</text>
+<polyline points="860,750 1030,750" class="assoc"/><text x="945" y="728" class="small" text-anchor="middle">camera 1 — stream 0..1</text>
+<polyline points="1400,750 1550,750" class="assoc"/><text x="1475" y="728" class="small" text-anchor="middle">stream 1 — leases 0..*</text>
+<polyline points="440,1090 560,1090" class="assoc"/><text x="500" y="1068" class="small" text-anchor="middle">event 1 — evidence 0..1</text>
+<polyline points="430,1090 430,1015 1240,1015 1240,1030" class="assoc"/><text x="840" y="1005" class="small" text-anchor="middle">event 1 — dispositions 0..*</text>
+<polygon points="820,350 828,358 820,366 812,358" class="composition"/>
+<polygon points="590,462 598,470 590,478 582,470" class="composition"/>
+<polygon points="410,750 418,758 410,766 402,758" class="composition"/>
+<polygon points="442,1090 450,1098 442,1106 434,1098" class="composition"/>
+<rect x="90" y="180" width="330" height="170" rx="8" class="box"/>
+<line x1="90" y1="222" x2="420" y2="222" class="divider"/>
+<text x="255.0" y="209" class="h" text-anchor="middle">Account</text>
+<text x="104" y="248" class="small" text-anchor="start">+ id; user_type; status</text>
+<text x="104" y="271" class="small" text-anchor="start">+ username; password_hash</text>
+<line x1="90" y1="287" x2="420" y2="287" class="divider"/>
+<text x="104" y="311" class="small" text-anchor="start">+ authenticate()</text>
+<rect x="650" y="180" width="380" height="170" rx="8" class="box"/>
+<line x1="650" y1="222" x2="1030" y2="222" class="divider"/>
+<text x="840.0" y="209" class="h" text-anchor="middle">Workspace</text>
+<text x="664" y="248" class="small" text-anchor="start">+ id; owner_account_id</text>
+<text x="664" y="271" class="small" text-anchor="start">+ status: active/restricted</text>
+<line x1="650" y1="287" x2="1030" y2="287" class="divider"/>
+<text x="664" y="311" class="small" text-anchor="start">+ authorize()</text>
+<rect x="1330" y="180" width="390" height="170" rx="8" class="box"/>
+<line x1="1330" y1="222" x2="1720" y2="222" class="divider"/>
+<text x="1525.0" y="209" class="h" text-anchor="middle">Invitation</text>
+<text x="1344" y="248" class="small" text-anchor="start">+ token_hash; expires_at</text>
+<text x="1344" y="271" class="small" text-anchor="start">+ used_at; revoked_at</text>
+<line x1="1330" y1="287" x2="1720" y2="287" class="divider"/>
+<text x="1344" y="311" class="small" text-anchor="start">+ redeem()</text>
+<rect x="170" y="390" width="420" height="150" rx="8" class="box"/>
+<line x1="170" y1="432" x2="590" y2="432" class="divider"/>
+<text x="380.0" y="419" class="h" text-anchor="middle">WorkspaceMember</text>
+<text x="184" y="458" class="small" text-anchor="start">+ workspace_id; account_id</text>
+<text x="184" y="481" class="small" text-anchor="start">+ status; joined_at; revoked_at</text>
+<line x1="170" y1="497" x2="590" y2="497" class="divider"/>
+<text x="184" y="521" class="small" text-anchor="start">+ revoke()</text>
+<rect x="790" y="390" width="350" height="150" rx="8" class="box"/>
+<line x1="790" y1="432" x2="1140" y2="432" class="divider"/>
+<text x="965.0" y="419" class="h" text-anchor="middle">DeviceGrant</text>
+<text x="804" y="458" class="small" text-anchor="start">+ member_id; device_id</text>
+<text x="804" y="481" class="small" text-anchor="start">+ capability; revoked_at</text>
+<line x1="790" y1="497" x2="1140" y2="497" class="divider"/>
+<text x="804" y="521" class="small" text-anchor="start">+ allows(capability)</text>
+<rect x="90" y="655" width="320" height="180" rx="8" class="box"/>
+<line x1="90" y1="697" x2="410" y2="697" class="divider"/>
+<text x="250.0" y="684" class="h" text-anchor="middle">Device</text>
+<text x="104" y="723" class="small" text-anchor="start">+ workspace_id; status</text>
+<text x="104" y="746" class="small" text-anchor="start">+ device_key_id</text>
+<line x1="90" y1="762" x2="410" y2="762" class="divider"/>
+<text x="104" y="786" class="small" text-anchor="start">+ listCameras()</text>
+<rect x="560" y="655" width="300" height="180" rx="8" class="box"/>
+<line x1="560" y1="697" x2="860" y2="697" class="divider"/>
+<text x="710.0" y="684" class="h" text-anchor="middle">Camera</text>
+<text x="574" y="723" class="small" text-anchor="start">+ id; device_id</text>
+<text x="574" y="746" class="small" text-anchor="start">+ name; enabled</text>
+<line x1="560" y1="762" x2="860" y2="762" class="divider"/>
+<text x="574" y="786" class="small" text-anchor="start">+ configureSource()</text>
+<rect x="1030" y="655" width="370" height="180" rx="8" class="box"/>
+<line x1="1030" y1="697" x2="1400" y2="697" class="divider"/>
+<text x="1215.0" y="684" class="h" text-anchor="middle">MediaStream</text>
+<text x="1044" y="723" class="small" text-anchor="start">+ workspace_id; camera_id</text>
+<text x="1044" y="746" class="small" text-anchor="start">+ encrypted_rtsp; status</text>
+<line x1="1030" y1="762" x2="1400" y2="762" class="divider"/>
+<text x="1044" y="786" class="small" text-anchor="start">+ createLease()</text>
+<rect x="1550" y="655" width="390" height="180" rx="8" class="box"/>
+<line x1="1550" y1="697" x2="1940" y2="697" class="divider"/>
+<text x="1745.0" y="684" class="h" text-anchor="middle">ViewerLease</text>
+<text x="1564" y="723" class="small" text-anchor="start">+ account_id; session_id</text>
+<text x="1564" y="746" class="small" text-anchor="start">+ stream_id; expires_at</text>
+<line x1="1550" y1="762" x2="1940" y2="762" class="divider"/>
+<text x="1564" y="786" class="small" text-anchor="start">+ renew(); revoke()</text>
+<rect x="90" y="1030" width="340" height="185" rx="8" class="box"/>
+<line x1="90" y1="1072" x2="430" y2="1072" class="divider"/>
+<text x="260.0" y="1059" class="h" text-anchor="middle">Event</text>
+<text x="104" y="1098" class="small" text-anchor="start">+ workspace_id; device_id</text>
+<text x="104" y="1121" class="small" text-anchor="start">+ event_id; status; occurred_at</text>
+<line x1="90" y1="1137" x2="430" y2="1137" class="divider"/>
+<text x="104" y="1161" class="small" text-anchor="start">+ transition()</text>
+<rect x="560" y="1030" width="320" height="165" rx="8" class="box"/>
+<line x1="560" y1="1072" x2="880" y2="1072" class="divider"/>
+<text x="720.0" y="1059" class="h" text-anchor="middle">Evidence</text>
+<text x="574" y="1098" class="small" text-anchor="start">+ event_id; relative_path</text>
+<text x="574" y="1121" class="small" text-anchor="start">+ expires_at; deleted_at</text>
+<line x1="560" y1="1137" x2="880" y2="1137" class="divider"/>
+<text x="574" y="1161" class="small" text-anchor="start">+ authorizeRead()</text>
+<rect x="1050" y="1030" width="370" height="185" rx="8" class="box"/>
+<line x1="1050" y1="1072" x2="1420" y2="1072" class="divider"/>
+<text x="1235.0" y="1059" class="h" text-anchor="middle">Disposition</text>
+<text x="1064" y="1098" class="small" text-anchor="start">+ event_id; actor_account_id</text>
+<text x="1064" y="1121" class="small" text-anchor="start">+ from/to; result; acted_at</text>
+<line x1="1050" y1="1137" x2="1420" y2="1137" class="divider"/>
+<text x="1064" y="1161" class="small" text-anchor="start">+ record()</text>
+<rect x="1550" y="1030" width="390" height="185" rx="8" class="box"/>
+<line x1="1550" y1="1072" x2="1940" y2="1072" class="divider"/>
+<text x="1745.0" y="1059" class="h" text-anchor="middle">PushSubscription</text>
+<text x="1564" y="1098" class="small" text-anchor="start">+ account_id; endpoint_hash</text>
+<text x="1564" y="1121" class="small" text-anchor="start">+ source_session_id; disabled_at</text>
+<line x1="1550" y1="1137" x2="1940" y2="1137" class="divider"/>
+<text x="1564" y="1161" class="small" text-anchor="start">+ disable()</text>
+<rect x="500" y="1235" width="610" height="110" rx="10" class="note"/>
+<text x="522" y="1268" class="h" text-anchor="start">字段与服务边界</text>
+<text x="522" y="1298" class="small" text-anchor="start">workspace_id 归属设备/流/事件等资源；</text>
+<text x="522" y="1324" class="small" text-anchor="start">account_id 仍表示登录者、处置人、观看者或订阅人。</text>
+<text x="1145" y="1300" class="small" text-anchor="start">每个服务只写自有 schema；跨服务由 API / 消息合同核验。</text>
+</svg>

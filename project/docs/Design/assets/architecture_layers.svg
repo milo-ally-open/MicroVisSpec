@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1900" height="1120" viewBox="0 0 1900 1120" role="img" aria-labelledby="title desc">
+<title id="title">系统分层与依赖边界</title>
+<desc id="desc">从运行基础设施向用户入口展示分层；左侧是运行调用路径，右侧是代码依赖约束。</desc>
+<defs>
+<marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,0 L10,4 L0,8 z" fill="#42617b"/></marker>
+<marker id="greenArrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,0 L10,4 L0,8 z" fill="#25845b"/></marker>
+<marker id="orangeArrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,0 L10,4 L0,8 z" fill="#bd6b26"/></marker>
+<style>text{font-family:Arial,"Microsoft YaHei",sans-serif;fill:#203246}.title{font-size:30px;font-weight:700}.sub{font-size:17px;fill:#53677b}.h{font-size:20px;font-weight:700}.body{font-size:17px}.small{font-size:14px;fill:#53677b}.tiny{font-size:13px;fill:#53677b}.box{fill:#fff;stroke:#7790a8;stroke-width:2}.blue{fill:#eaf3fb;stroke:#5590c1;stroke-width:2}.green{fill:#eaf7f0;stroke:#4b9b73;stroke-width:2}.orange{fill:#fff3e7;stroke:#d3904c;stroke-width:2}.purple{fill:#f2edfb;stroke:#8872b3;stroke-width:2}.line{fill:none;stroke:#42617b;stroke-width:2;marker-end:url(#arrow)}.return{fill:none;stroke:#25845b;stroke-width:2;stroke-dasharray:8 6;marker-end:url(#greenArrow)}.event{fill:none;stroke:#bd6b26;stroke-width:2;stroke-dasharray:3 6;marker-end:url(#orangeArrow)}.lifeline{stroke:#a5b4c2;stroke-width:1.5;stroke-dasharray:6 7}.divider{stroke:#c5d0da;stroke-width:1.2}.note{fill:#fff8d9;stroke:#d2b75d;stroke-width:1.5}.system{fill:#fbfcfe;stroke:#486882;stroke-width:3;stroke-dasharray:12 7}.actor{stroke:#203246;stroke-width:3;fill:none;stroke-linecap:round}.association{fill:none;stroke:#63788d;stroke-width:1.6}.composition{fill:#42617b;stroke:#42617b}</style>
+</defs>
+<rect x="0" y="0" width="100%" height="100%" fill="#ffffff"/>
+<text x="48" y="48" class="title" text-anchor="start">系统分层与依赖边界</text>
+<text x="48" y="76" class="sub" text-anchor="start">运行自下而上建设；请求自上而下进入业务服务。现状目录与目标代码边界分别标注。</text>
+<rect x="52" y="108" width="1110" height="86" rx="10" class="blue"/>
+<text x="78" y="139" class="h" text-anchor="start">L6 入口与客户端</text>
+<text x="350" y="139" class="body" text-anchor="start">Vue 页面 / PWA、Atlas Agent 与浏览器；同一客户端按服务端角色呈现能力。</text>
+<text x="78" y="167" class="small" text-anchor="start">当前已有分散实现</text>
+<rect x="52" y="218" width="1110" height="86" rx="10" class="blue"/>
+<text x="78" y="249" class="h" text-anchor="start">L5 接入边界</text>
+<text x="350" y="249" class="body" text-anchor="start">Nginx HTTPS / auth 子请求；Mosquitto MQTT/TLS；媒体 HTTP/WebRTC/HLS 入口。</text>
+<text x="78" y="277" class="small" text-anchor="start">现状 + 目标边界</text>
+<rect x="52" y="328" width="1110" height="86" rx="10" class="purple"/>
+<text x="78" y="359" class="h" text-anchor="start">L4 入站适配器</text>
+<text x="350" y="359" class="body" text-anchor="start">Gin handlers、MQTT consumers、outbox workers、定时任务；解析协议并调用用例。</text>
+<text x="78" y="387" class="small" text-anchor="start">现状 + 目标边界</text>
+<rect x="52" y="438" width="1110" height="86" rx="10" class="purple"/>
+<text x="78" y="469" class="h" text-anchor="start">L3 应用用例</text>
+<text x="350" y="469" class="body" text-anchor="start">注册、设备配置、授权检查、事件处置、创建播放租约、撤销成员等；定义输出端口。</text>
+<text x="78" y="497" class="small" text-anchor="start">现状 + 目标边界</text>
+<rect x="52" y="548" width="1110" height="86" rx="10" class="green"/>
+<text x="78" y="579" class="h" text-anchor="start">L2 领域模型与策略</text>
+<text x="350" y="579" class="body" text-anchor="start">Account / Workspace / Device / Event / Lease；规则、状态机、能力策略；不依赖框架。</text>
+<text x="78" y="607" class="small" text-anchor="start">现状 + 目标边界</text>
+<rect x="52" y="658" width="1110" height="86" rx="10" class="orange"/>
+<text x="78" y="689" class="h" text-anchor="start">L1 出站适配器</text>
+<text x="350" y="689" class="body" text-anchor="start">PostgreSQL/GORM repositories、内部 HTTP、MQTT client、MediaMTX、Push、私有文件卷。</text>
+<text x="78" y="717" class="small" text-anchor="start">现状 + 目标边界</text>
+<rect x="52" y="768" width="1110" height="86" rx="10" class="box"/>
+<text x="78" y="799" class="h" text-anchor="start">L0 基础设施与设备</text>
+<text x="350" y="799" class="body" text-anchor="start">PostgreSQL 各自 schema、Mosquitto、MediaMTX、文件系统、Web Push 服务、Atlas/CANN/摄像头。</text>
+<text x="78" y="827" class="small" text-anchor="start">当前已有分散实现</text>
+<path d="M605,194 L605,214" class="line"/>
+<path d="M605,304 L605,324" class="line"/>
+<path d="M605,414 L605,434" class="line"/>
+<path d="M605,524 L605,544" class="line"/>
+<path d="M605,634 L605,654" class="line"/>
+<path d="M605,744 L605,764" class="line"/>
+
+
+
+
+<rect x="1230" y="108" width="620" height="760" rx="14" class="box"/>
+<text x="1260" y="150" class="h" text-anchor="start">Go 服务的目标源码边界</text><text x="1260" y="177" class="small" text-anchor="start">运行调用向下；源码依赖指向 application/domain。</text>
+<text x="1260" y="202" class="h" text-anchor="start">composition root</text>
+<text x="1260" y="229" class="body" text-anchor="start">cmd/&lt;service&gt; 只负责配置、依赖装配和启动</text>
+<line x1="1260" y1="247" x2="1815" y2="247" class="divider"/>
+<text x="1260" y="284" class="h" text-anchor="start">inbound</text>
+<text x="1260" y="311" class="body" text-anchor="start">internal/transport/http、mqtt、worker → application</text>
+<line x1="1260" y1="329" x2="1815" y2="329" class="divider"/>
+<text x="1260" y="366" class="h" text-anchor="start">application</text>
+<text x="1260" y="393" class="body" text-anchor="start">internal/application 定义用例与 ports</text>
+<line x1="1260" y1="411" x2="1815" y2="411" class="divider"/>
+<text x="1260" y="448" class="h" text-anchor="start">domain</text>
+<text x="1260" y="475" class="body" text-anchor="start">internal/domain 只依赖标准库和本域代码</text>
+<line x1="1260" y1="493" x2="1815" y2="493" class="divider"/>
+<text x="1260" y="530" class="h" text-anchor="start">outbound</text>
+<text x="1260" y="557" class="body" text-anchor="start">internal/adapters/outbound 实现 application ports</text>
+<line x1="1260" y1="575" x2="1815" y2="575" class="divider"/>
+<text x="1260" y="612" class="h" text-anchor="start">service boundary</text>
+<text x="1260" y="639" class="body" text-anchor="start">cmd 不导入其他服务；不跨 schema 联表</text>
+<line x1="1260" y1="657" x2="1815" y2="657" class="divider"/>
+<text x="1260" y="694" class="h" text-anchor="start">contracts</text>
+<text x="1260" y="721" class="body" text-anchor="start">服务协作只走版本化 HTTP/MQTT/outbox 合同</text>
+<rect x="52" y="892" width="1798" height="82" rx="10" class="note"/>
+<text x="78" y="925" class="h" text-anchor="start">依赖方向：入站适配器 → application → domain；application 定义端口，出站适配器依赖端口并访问基础设施。</text>
+<text x="78" y="954" class="body" text-anchor="start">domain 不导入 Gin/GORM/MQTT/MediaMTX SDK；服务间不共享可变领域模型。目标边界需分服务、分切片迁移，不要求一次全量重写。</text>
+<text x="52" y="1028" class="body" text-anchor="start">Web：pages/layouts → feature use cases/state → typed API clients；共享组件只承载展示。</text>
+<text x="52" y="1060" class="body" text-anchor="start">Atlas：main.cpp composition root → agent/runtime application → hardware/protocol adapters；模型插件实现稳定接口，平台专用代码不直接耦合所有插件。</text>
+</svg>

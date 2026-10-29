@@ -29,10 +29,11 @@ type pushSender interface {
 }
 
 type App struct {
-	config Config
-	db     *gorm.DB
-	box    *secretBox
-	sender pushSender
+	config        Config
+	db            *gorm.DB
+	box           *secretBox
+	sender        pushSender
+	authorization PushAuthorizationClient
 }
 
 func openDatabase(dsn string) (*gorm.DB, error) {
@@ -54,7 +55,7 @@ func NewApp(config Config, db *gorm.DB, sender pushSender) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &App{config: config, db: db, box: box, sender: sender}, nil
+	return &App{config: config, db: db, box: box, sender: sender, authorization: NewPushAuthorizationClient(config)}, nil
 }
 
 func (a *App) Handler() http.Handler {

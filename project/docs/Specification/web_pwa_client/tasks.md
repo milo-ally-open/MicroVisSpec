@@ -16,14 +16,15 @@
 - [ ] **T-10 设备详情 RTSP 来源表单精简** — 加载 media-service status 中已保存的 RTSP URL；仅保留 URL 输入、校验和保存状态，移除来源用户名/密码字段；验证凭据/非法 URL 拒绝、跨账号错误展示和来源正常应用；覆盖 REQ-02 / AC-02.5；依赖 media-service T-01/T-02 与 device-service T-07。
 - [ ] **T-11 Web/PWA 品牌统一** — 使用仓库项目 Logo 替换品牌区占位标记，并在桌面/手机工作台及登录/注册页显示完整座右铭；覆盖 REQ-06 / AC-06.5。
 - [ ] **T-12 Web/PWA 展品视觉统一** — 以 `readme/microvisspec-exhibit.html` 为视觉参照，统一暖纸色、墨色导航、森林绿强调色和标题层级；检查业务页、认证页、离线提示及更新提示，保持页面行为不变；覆盖 REQ-06 / AC-06.6。
-- [ ] **T-13 Web/PWA 局域网入口配置** — 由主机 Nginx 托管静态站点并代理 loopback Go 服务；HTTPS 证书 SAN、PUBLIC_ORIGIN、MediaMTX 来源/WebRTC candidates 与主机防火墙说明保持一致；覆盖 REQ-07 / AC-07.1–07.3。
-- [ ] **T-15 网页激活与设备期限续期** — 设备详情提供无限期/自定义分钟、小时、天选择；提交无秘密值的激活请求并轮询 `pending`、`syncing`、完成状态；移除用户可见票据和命令行，MQTT 凭据仅由 Atlas agent 经 HTTPS 领取并由 agent 确认；覆盖 REQ-02 / AC-02.6–02.8；依赖 device-service T-08 与 Atlas agent 轮询流程。
-- [ ] **T-16 网页 SSH 设备首次接入** — 设备详情提供 SSH 用户名/密码表单、设备指纹确认和安全阶段进度；仅通过设备服务启动登记 IP 的固定端口 SSH 任务，清空密码且不持久化；覆盖 REQ-08 / AC-08.1–08.4；依赖 device-service T-09。
+- [ ] **T-13 Web/PWA 局域网入口配置** — 由主机 Nginx 托管静态站点并代理 loopback Go 服务；HTTPS 证书 SAN、PUBLIC_ORIGIN、MediaMTX 来源/WebRTC candidates 与主机防火墙说明保持一致；覆盖 REQ-07 / AC-07.1、AC-07.2、AC-07.3。
+- [ ] **T-15 网页激活与设备期限续期** — 设备详情提供无限期/自定义分钟、小时、天选择；提交无秘密值的激活请求并轮询 `pending`、`syncing`、完成状态；移除用户可见票据和命令行，MQTT 凭据仅由 Atlas agent 经 HTTPS 领取并由 agent 确认；覆盖 REQ-02 / AC-02.6、AC-02.7、AC-02.8；依赖 device-service T-08 与 Atlas agent 轮询流程。
+- [ ] **T-16 网页 SSH 设备首次接入** — 设备详情提供 SSH 用户名/密码表单、设备指纹确认和安全阶段进度；仅通过设备服务启动登记 IP 的固定端口 SSH 任务，清空密码且不持久化；覆盖 REQ-08 / AC-08.1、AC-08.2、AC-08.3、AC-08.4、AC-08.5；依赖 device-service T-09。
+- [~] **T-17 三角色工作空间界面切片** — PC 工作台新增按设备授予/替换移动成员 capability、撤销成员、创建/撤销 24 小时单次邀请及复制邀请链接；新增邀请兑换页；mobile 角色路由到移动入口，可查看服务端授权设备/事件并在 `stream.view` 下打开单路播放器；事件详情按 `event.handle` 隐藏处置表单。admin 页面已有 PC 账号创建/停用恢复、mobile 停用恢复、服务健康和审计查看。当前只有 TypeScript 类型检查和生产构建证据，未做真实浏览器/手机、Push 点击或后端联调验收；角色账号切换、健康探针部署校验和完整 PWA 路由回归仍待处理。覆盖共享授权 REQ-03、REQ-08 / AC-03.1–03.6、AC-08.1–08.8；依赖 multi_user_workspace_access T-04、T-06、T-07。
 
 ## 验收记录
 
-- [ ] **T-12 Web/PWA 展品视觉统一** — 样式实现已完成；`npm run build`（含 Vue 与 service worker 类型检查）通过，桌面登录页目测符合暖纸色、墨色按钮与衬线标题层级。业务页、注册页、离线/更新提示及窄屏尚未逐页目测，待补验收后关闭；路由、API、数据与交互逻辑未改。
-- [ ] **T-13 Web/PWA 局域網入口配置** — 历史 Docker 部署验收（2026-10-22）：Web 与认证服务已启动；`curl.exe` 从本机 Wi‑Fi 地址 `172.50.53.131` 取得 HTTPS 首页 `200 OK`，HTTP `18081` 返回 `308` 并跳转到 `19080`；TLS 使用当时的开发 CA 验证。这只记录旧环境，不验收目前的原生部署。Atlas 激活、媒体播放及目标 Linux 主机网络仍待验证。
+- 展品视觉验收记录：样式实现已完成；`npm run build`（含 Vue 与 service worker 类型检查）通过，桌面登录页目测符合暖纸色、墨色按钮与衬线标题层级。业务页、注册页、离线/更新提示及窄屏尚未逐页目测，待补验收后关闭；路由、API、数据与交互逻辑未改。
+- 局域网部署验收记录：历史 Docker 部署验收（2026-10-22）；Web 与认证服务曾启动，本机 Wi‑Fi HTTPS 返回 200、HTTP 跳转 308。该记录不验收当前原生部署；Atlas 激活、媒体播放及目标 Linux 主机网络待验证。
 
 - [x] **T-09 工作台视觉与窄屏检查** — 统一共享样式、导航/图标、概览和登录注册；验证密码显示切换、真实日期及统计范围标题；覆盖 REQ-06 / AC-06.1、AC-06.2、AC-06.3、AC-06.4。现有单测 10/10、类型检查及生产构建通过；Edge 在 1440/1024/390/360px 下完成 30 项页面检查，无横向溢出与未捕获脚本错误；密码切换、上海日期/问候、统计范围标题、360px 设备登记表单及事件筛选共 5 项交互检查通过，登录流程 4 项回归通过。已部署到本机 localhost；脱敏记录见 [视觉检查证据](evidence/frontend_visual_20261020.json)。窄屏检查使用桌面 Edge 视口模拟，真实移动设备、Atlas、实时视频与 Push/PWA 全链路不属于本次视觉验收范围。
 
@@ -32,7 +33,7 @@
 | REQ/AC | 检查方法 | 当前证据 | 状态 |
 |---|---|---|---|
 | REQ-06/AC-06.6 | 生产构建；桌面/窄屏浏览业务页、认证页、离线提示与更新提示；检查无远程字体及行为回归 | 生产构建与 Vue/service worker 类型检查通过；本机 Vite 登录页已目测暖纸底、墨色主按钮、森林绿品牌强调和衬线标题。业务页、注册页、窄屏、离线/更新提示仍待目测；样式 diff 未改页面结构、路由、API 或处理逻辑 | 部分通过 |
-| REQ-07/AC-07.1–07.3 | Linux Nginx 配置、HTTPS/Origin/证书 SAN、团队网络访问和 Atlas/媒体联调 | 历史 Compose 静态校验及本机 HTTPS `200 OK`、HTTP 跳转 `308` 通过；不代表原生部署通过。目标 Linux Nginx、Atlas/媒体端到端及网络 ACL 尚未验证 | 部分通过 |
+| REQ-07/AC-07.1、AC-07.2、AC-07.3 | Linux Nginx 配置、HTTPS/Origin/证书 SAN、团队网络访问和 Atlas/媒体联调 | 历史 Compose 静态校验及本机 HTTPS `200 OK`、HTTP 跳转 `308` 通过；不代表原生部署通过。目标 Linux Nginx、Atlas/媒体端到端及网络 ACL 尚未验证 | 部分通过 |
 | REQ-01/AC-01.1–01.3 | 组件/API 认证测试与浏览器账号流程 | 9 个 Vitest 用例通过，覆盖 CSRF、401 状态清理、安全回跳和错误映射；生产 TypeScript 检查通过；完整浏览器账号流程待联调 | 部分通过 |
 | REQ-02/AC-02.1–02.4 | 设备状态/规则 API 测试、媒体真实浏览器联调 | 三类规则默认关闭/阈值校验用例通过；生产构建成功；设备/媒体 API 与浏览器播放待后端栈联调 | 部分通过 |
 | REQ-02/AC-02.5 | 设备详情 URL 回显/提交、URL 校验、账号隔离集成和浏览器验证 | 待本次实现 | 待执行 |
@@ -43,5 +44,6 @@
 ## 环境与执行入口
 
 - 最近执行：隔离副本 `npm ci`、`npm run test`（9/9）、`npm run build`（含 Vue 与 service worker type-check）均通过；Vite 开发进程占用工作区原生 Rolldown 文件，故验证副本未覆盖工作区依赖目录。
+- 本轮角色化 UI 切片已执行 `npm ci --ignore-scripts`、`npm run build`：Vue/service worker 类型检查与生产构建通过；未运行 Vitest，未做真实浏览器或手机验收。
 - 当前 `package.json` 已定义 `test`；2026-10-20 在 Docker Web 构建环境执行 `npm test`，10/10 通过，含登录失败文案回归；生产构建包含 Vue/service worker TypeScript 检查。本次真实浏览器登录相关 4 项检查通过；详细本机记录为仓库外 `E:/视频制作/yunshao-local-runtime/login-smoke-report.json`。
 - 真实 Push 仍需 HTTPS、VAPID 和支持的浏览器；mock/API 测试不替代浏览器推送验收。

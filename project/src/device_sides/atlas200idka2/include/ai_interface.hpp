@@ -8,6 +8,10 @@
 
 namespace yunshao {
 
+// Bump only when the plugin ABI below changes incompatibly. The runtime and
+// plugin are installed as a matched pair and the loader rejects other versions.
+inline constexpr int kAIModelPluginApiVersion = 1;
+
 struct InferenceFrame {
     const void* nv21_device = nullptr;
     std::size_t bytes = 0;
@@ -47,8 +51,10 @@ public:
 
 using CreateAIModelFn = IAIModel* (*)();
 using DestroyAIModelFn = void (*)(IAIModel*);
+using GetAIModelPluginApiVersionFn = int (*)() noexcept;
 
 }  // namespace yunshao
 
+extern "C" int GetAIModelPluginApiVersion() noexcept;
 extern "C" yunshao::IAIModel* CreateAIModel();
 extern "C" void DestroyAIModel(yunshao::IAIModel* model);

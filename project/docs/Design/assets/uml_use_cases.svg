@@ -1,0 +1,121 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1940" height="1540" viewBox="0 0 1940 1540" role="img" aria-labelledby="title desc">
+<title id="title">三类用户 Web/PWA 用例图</title>
+<desc id="desc">参与者位于系统边界外；管理员、PC 工作空间 owner 和移动成员的日常操作均通过界面完成。</desc>
+<defs>
+<marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,0 L10,4 L0,8 z" fill="#42617b"/></marker>
+<marker id="greenArrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,0 L10,4 L0,8 z" fill="#25845b"/></marker>
+<marker id="orangeArrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,0 L10,4 L0,8 z" fill="#bd6b26"/></marker>
+<style>text{font-family:Arial,"Microsoft YaHei",sans-serif;fill:#203246}.title{font-size:30px;font-weight:700}.sub{font-size:17px;fill:#53677b}.h{font-size:20px;font-weight:700}.body{font-size:17px}.small{font-size:14px;fill:#53677b}.tiny{font-size:13px;fill:#53677b}.box{fill:#fff;stroke:#7790a8;stroke-width:2}.blue{fill:#eaf3fb;stroke:#5590c1;stroke-width:2}.green{fill:#eaf7f0;stroke:#4b9b73;stroke-width:2}.orange{fill:#fff3e7;stroke:#d3904c;stroke-width:2}.purple{fill:#f2edfb;stroke:#8872b3;stroke-width:2}.line{fill:none;stroke:#42617b;stroke-width:2;marker-end:url(#arrow)}.return{fill:none;stroke:#25845b;stroke-width:2;stroke-dasharray:8 6;marker-end:url(#greenArrow)}.event{fill:none;stroke:#bd6b26;stroke-width:2;stroke-dasharray:3 6;marker-end:url(#orangeArrow)}.lifeline{stroke:#a5b4c2;stroke-width:1.5;stroke-dasharray:6 7}.divider{stroke:#c5d0da;stroke-width:1.2}.note{fill:#fff8d9;stroke:#d2b75d;stroke-width:1.5}.system{fill:#fbfcfe;stroke:#486882;stroke-width:3;stroke-dasharray:12 7}.actor{stroke:#203246;stroke-width:3;fill:none;stroke-linecap:round}.association{fill:none;stroke:#63788d;stroke-width:1.6}.composition{fill:#42617b;stroke:#42617b}</style>
+</defs>
+<rect x="0" y="0" width="100%" height="100%" fill="#ffffff"/>
+<text x="42" y="48" class="title" text-anchor="start">三类用户 Web/PWA 用例图</text>
+<text x="42" y="76" class="sub" text-anchor="start">系统边界内覆盖角色日常业务；首个管理员引导和主机部署/重启走受控运维流程。</text>
+<rect x="300" y="92" width="1370" height="1390" rx="14" class="system"/>
+<text x="330" y="128" class="h" text-anchor="start">MicroVisSpec Web App / PWA</text>
+<rect x="340" y="155" width="600" height="400" rx="18" fill="#f7f9fc" stroke="#c4d0dc" stroke-width="1.5"/>
+<text x="360" y="185" class="h" text-anchor="start">管理员控制台</text>
+<rect x="340" y="585" width="600" height="850" rx="18" fill="#f7f9fc" stroke="#c4d0dc" stroke-width="1.5"/>
+<text x="360" y="615" class="h" text-anchor="start">PC 工作空间</text>
+<rect x="970" y="155" width="660" height="1280" rx="18" fill="#f7f9fc" stroke="#c4d0dc" stroke-width="1.5"/>
+<text x="990" y="185" class="h" text-anchor="start">移动成员 PWA</text>
+<polyline points="150,312 245,312 245,245 470,245" class="association"/>
+<polyline points="150,312 245,312 245,365 470,365" class="association"/>
+<polyline points="150,312 245,312 245,485 470,485" class="association"/>
+<polyline points="150,867 260,867 260,660 470,660" class="association"/>
+<polyline points="150,867 260,867 260,790 470,790" class="association"/>
+<polyline points="150,867 260,867 260,920 470,920" class="association"/>
+<polyline points="150,867 260,867 260,1050 470,1050" class="association"/>
+<polyline points="150,867 260,867 260,1180 470,1180" class="association"/>
+<polyline points="150,867 260,867 260,1310 470,1310" class="association"/>
+<polyline points="150,1342 220,1342 220,790 470,790" class="association"/>
+<polyline points="1788,882 1710,882 1710,245 1550,245" class="association"/>
+<polyline points="1788,882 1710,882 1710,385 1550,385" class="association"/>
+<polyline points="1788,882 1710,882 1710,525 1550,525" class="association"/>
+<polyline points="1788,882 1710,882 1710,665 1550,665" class="association"/>
+<polyline points="1788,882 1710,882 1710,805 1550,805" class="association"/>
+<polyline points="1788,882 1710,882 1710,945 1550,945" class="association"/>
+<polyline points="1788,882 1710,882 1710,1085 1550,1085" class="association"/>
+<polyline points="1788,882 1710,882 1710,1225 1550,1225" class="association"/>
+<polyline points="1788,882 1710,882 1710,1365 1550,1365" class="association"/>
+<ellipse cx="650" cy="245" rx="180.0" ry="43" class="box"/>
+<text x="650" y="242" class="body" text-anchor="middle">管理 PC / mobile 账号</text>
+<text x="650" y="265" class="small" text-anchor="middle">创建、停用、恢复</text>
+<ellipse cx="650" cy="365" rx="180.0" ry="43" class="box"/>
+<text x="650" y="362" class="body" text-anchor="middle">查看平台健康与诊断</text>
+<text x="650" y="385" class="small" text-anchor="middle">脱敏状态和更新时间</text>
+<ellipse cx="650" cy="485" rx="180.0" ry="43" class="box"/>
+<text x="650" y="482" class="body" text-anchor="middle">查询安全审计</text>
+<text x="650" y="505" class="small" text-anchor="middle">角色、成员和权限变更</text>
+<ellipse cx="650" cy="660" rx="185.0" ry="43" class="box"/>
+<text x="650" y="657" class="body" text-anchor="middle">管理工作空间和设备</text>
+<text x="650" y="680" class="small" text-anchor="middle">登记、编辑、停用</text>
+<ellipse cx="650" cy="790" rx="185.0" ry="43" class="box"/>
+<text x="650" y="787" class="body" text-anchor="middle">接入 Atlas 与摄像头</text>
+<text x="650" y="810" class="small" text-anchor="middle">激活向导、RTSP 状态</text>
+<ellipse cx="650" cy="920" rx="185.0" ry="43" class="box"/>
+<text x="650" y="917" class="body" text-anchor="middle">配置算法与告警规则</text>
+<text x="650" y="940" class="small" text-anchor="middle">查看设备应用状态</text>
+<ellipse cx="650" cy="1050" rx="185.0" ry="43" class="box"/>
+<text x="650" y="1047" class="body" text-anchor="middle">查看实时监控</text>
+<text x="650" y="1070" class="small" text-anchor="middle">桌面多路 WebRTC / HLS</text>
+<ellipse cx="650" cy="1180" rx="185.0" ry="43" class="box"/>
+<text x="650" y="1177" class="body" text-anchor="middle">查询、处置事件与统计</text>
+<text x="650" y="1200" class="small" text-anchor="middle">证据、状态流转、趋势</text>
+<ellipse cx="650" cy="1310" rx="185.0" ry="43" class="box"/>
+<text x="650" y="1307" class="body" text-anchor="middle">邀请成员并配置授权</text>
+<text x="650" y="1330" class="small" text-anchor="middle">逐设备授予/撤销能力</text>
+<ellipse cx="1160" cy="245" rx="170.0" ry="43" class="box"/>
+<text x="1160" y="242" class="body" text-anchor="middle">兑换邀请并登录</text>
+<text x="1160" y="265" class="small" text-anchor="middle">加入一个工作空间</text>
+<ellipse cx="1160" cy="385" rx="170.0" ry="43" class="box"/>
+<text x="1160" y="382" class="body" text-anchor="middle">查看本人授权范围</text>
+<text x="1160" y="405" class="small" text-anchor="middle">显示设备和能力</text>
+<ellipse cx="1160" cy="525" rx="170.0" ry="43" class="box"/>
+<text x="1160" y="522" class="body" text-anchor="middle">查看设备、事件与证据</text>
+<text x="1160" y="545" class="small" text-anchor="middle">仅返回授权且未过期内容</text>
+<ellipse cx="1160" cy="665" rx="170.0" ry="43" class="box"/>
+<text x="1160" y="662" class="body" text-anchor="middle">观看单路授权摄像头</text>
+<text x="1160" y="685" class="small" text-anchor="middle">stream.view；最多 1 路租约</text>
+<ellipse cx="1160" cy="805" rx="170.0" ry="43" class="box"/>
+<text x="1160" y="802" class="body" text-anchor="middle">处置获授权事件</text>
+<text x="1160" y="825" class="small" text-anchor="middle">需要 event.handle</text>
+<ellipse cx="1160" cy="945" rx="170.0" ry="43" class="box"/>
+<text x="1160" y="942" class="body" text-anchor="middle">管理本人 Push 订阅</text>
+<text x="1160" y="965" class="small" text-anchor="middle">告警按 alert.receive</text>
+<ellipse cx="1450" cy="1085" rx="170.0" ry="43" class="box"/>
+<text x="1450" y="1082" class="body" text-anchor="middle">打开通知并重验权限</text>
+<text x="1450" y="1105" class="small" text-anchor="middle">深链不是访问凭证</text>
+<ellipse cx="1450" cy="1225" rx="170.0" ry="43" class="box"/>
+<text x="1450" y="1222" class="body" text-anchor="middle">查询设备状态</text>
+<text x="1450" y="1245" class="small" text-anchor="middle">不提供设备配置</text>
+<ellipse cx="1450" cy="1365" rx="170.0" ry="43" class="box"/>
+<text x="1450" y="1362" class="body" text-anchor="middle">查看账号与成员状态</text>
+<text x="1450" y="1385" class="small" text-anchor="middle">不能扩大自身授权</text>
+<circle cx="120" cy="255" r="18" class="actor"/>
+<line x1="120" y1="273" x2="120" y2="329" class="actor"/>
+<line x1="90" y1="297" x2="150" y2="297" class="actor"/>
+<line x1="120" y1="329" x2="93" y2="367" class="actor"/>
+<line x1="120" y1="329" x2="147" y2="367" class="actor"/>
+<text x="120" y="396" class="body" text-anchor="middle">管理员</text>
+<circle cx="120" cy="810" r="18" class="actor"/>
+<line x1="120" y1="828" x2="120" y2="884" class="actor"/>
+<line x1="90" y1="852" x2="150" y2="852" class="actor"/>
+<line x1="120" y1="884" x2="93" y2="922" class="actor"/>
+<line x1="120" y1="884" x2="147" y2="922" class="actor"/>
+<text x="120" y="951" class="body" text-anchor="middle">PC 工作空间 owner</text>
+<circle cx="120" cy="1280" r="18" class="actor"/>
+<line x1="120" y1="1298" x2="120" y2="1354" class="actor"/>
+<line x1="90" y1="1322" x2="150" y2="1322" class="actor"/>
+<line x1="120" y1="1354" x2="93" y2="1392" class="actor"/>
+<line x1="120" y1="1354" x2="147" y2="1392" class="actor"/>
+<text x="120" y="1421" class="body" text-anchor="middle">Atlas Agent</text>
+<circle cx="1815" cy="825" r="18" class="actor"/>
+<line x1="1815" y1="843" x2="1815" y2="899" class="actor"/>
+<line x1="1785" y1="867" x2="1845" y2="867" class="actor"/>
+<line x1="1815" y1="899" x2="1788" y2="937" class="actor"/>
+<line x1="1815" y1="899" x2="1842" y2="937" class="actor"/>
+<text x="1815" y="966" class="body" text-anchor="middle">移动成员</text>
+
+<rect x="330" y="1494" width="1340" height="32" rx="8" class="note"/>
+<text x="350" y="1517" class="small" text-anchor="start">边界注记：首次 admin bootstrap、主机配置/服务重启由受控运维执行；设备授权、摄像头视频查看、成员日常管理均有界面。</text>
+</svg>

@@ -42,6 +42,8 @@ API client 使用同源请求、`credentials: include`、CSRF 头和 snake_case 
 
 PWA worker 只缓存应用壳、manifest 和版本化静态资源；明确排除 `/api/`、证据、播放器/媒体、Push endpoint 和个人响应。Push 点击只解析受限站内事件路径并 focus/open，目标页面自行请求 API 鉴权。
 
+三类用户目标：以 `/auth/me` 返回的服务端 user_type 分流 `/admin`、`/app`、`/m`；PC owner 在 UI 邀请和授权设备，mobile 成员查看授权范围与单路视频。前端不推断账号类型或授权结论，所有查询和播放由后端重新鉴权。详细合同见 [共享授权规格](../multi_user_workspace_access/)。
+
 ## 接口和数据
 
 - 复用 [全局 API 合同](../../Analysis/SPEC.md) 及 auth/device/event/media/push 服务规格；web 不引入第二份 API 字段定义。

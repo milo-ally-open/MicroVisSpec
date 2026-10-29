@@ -2,19 +2,12 @@
 
 #include "media/media_pipeline.hpp"
 #include "media/region_osd.hpp"
-#include "common/cloud_config.hpp"
 
 #include <acl/media/hi_mpi_vpss.h>
-#include <acl/acl.h>
-#include <opencv2/imgproc.hpp>
-#include <opencv2/imgcodecs.hpp>
-
 #include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
-#include <ctime>
-#include <cstring>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
@@ -27,19 +20,6 @@ namespace {
 
 struct LetterboxInfo { float scale; int left; int top; };
 
-bool activation_lease_expired() {
-    const char* configured = std::getenv("YUNSHAO_ACTIVATION_LEASE_FILE");
-    const std::filesystem::path path = configured && *configured ? configured : "/var/lib/yunshao/activation-lease.json";
-    if (!std::filesystem::exists(path)) return false;  // Legacy deployments without a lease remain unchanged.
-    try {
-        const auto lease = yunshao::read_json_file(path);
-        if (!lease.contains("expires_at_unix") || lease["expires_at_unix"].is_null()) return false;
-        return lease.at("expires_at_unix").get<std::int64_t>() <= std::time(nullptr);
-    } catch (...) {
-        return true;  // A corrupt lease fails closed and pauses local video processing.
-    }
-}
-
 LetterboxInfo letterbox_for(int width, int height, int target_width, int target_height) {
     const float scale = std::min(static_cast<float>(target_width) / width,
                                  static_cast<float>(target_height) / height);
@@ -50,45 +30,17 @@ LetterboxInfo letterbox_for(int width, int height, int target_width, int target_
             static_cast<int>(std::round((target_height - resized_height) / 2.0F - 0.1F))};
 }
 
-std::vector<unsigned char> capture_evidence(const hi_video_frame& frame,
-                                          const std::vector<Detection>& detections) {
-    const int width = static_cast<int>(frame.width);
-    const int height = static_cast<int>(frame.height);
-    const auto pitch = frame.width_stride[0];
-    const auto chroma_pitch = frame.width_stride[1] ? frame.width_stride[1] : pitch;
-    const auto aligned_height = frame.height_stride[0] ? frame.height_stride[0] : frame.height;
-    std::vector<unsigned char> luma(static_cast<std::size_t>(pitch) * height);
-    std::vector<unsigned char> chroma(static_cast<std::size_t>(chroma_pitch) * height / 2);
-    const auto* uv = frame.virt_addr[1] ? static_cast<unsigned char*>(frame.virt_addr[1]) :
-        static_cast<unsigned char*>(frame.virt_addr[0]) + static_cast<std::size_t>(pitch) * aligned_height;
-    if (aclrtMemcpy(luma.data(), luma.size(), frame.virt_addr[0], luma.size(), ACL_MEMCPY_DEVICE_TO_HOST) != ACL_SUCCESS ||
-        aclrtMemcpy(chroma.data(), chroma.size(), uv, chroma.size(), ACL_MEMCPY_DEVICE_TO_HOST) != ACL_SUCCESS)
-        throw std::runtime_error("cannot copy evidence frame from VPSS");
-    cv::Mat nv21(height * 3 / 2, width, CV_8UC1);
-    for (int y = 0; y < height; ++y) std::memcpy(nv21.ptr(y), luma.data() + y * pitch, width);
-    for (int y = 0; y < height / 2; ++y) std::memcpy(nv21.ptr(height + y), chroma.data() + y * chroma_pitch, width);
-    cv::Mat image;
-    cv::cvtColor(nv21, image, cv::COLOR_YUV2BGR_NV21);
-    for (const auto& detection : detections) {
-        const cv::Rect box = cv::Rect(static_cast<int>(detection.x), static_cast<int>(detection.y),
-            static_cast<int>(detection.width), static_cast<int>(detection.height)) & cv::Rect(0, 0, width, height);
-        if (box.empty()) continue;
-        cv::rectangle(image, box, cv::Scalar(32, 210, 64), 2);
-        cv::putText(image, detection.label, cv::Point(box.x, std::max(18, box.y - 4)),
-                    cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(32, 210, 64), 1);
-    }
-    std::vector<unsigned char> jpeg;
-    if (!cv::imencode(".jpg", image, jpeg, {cv::IMWRITE_JPEG_QUALITY, 85}))
-        throw std::runtime_error("cannot encode evidence JPEG");
-    return jpeg;
-}
-
 }  // namespace
 
 VideoStreamManager::VideoStreamManager(const EdgeAppConfig& config, InferenceManager& inference,
-                                       AlarmCallback on_alarm, std::filesystem::path config_directory)
+                                       AlarmCallback on_alarm, std::filesystem::path config_directory,
+                                       application::ports::EvidenceFrameEncoder& evidence_frame_encoder,
+                                       application::ports::ActivationLeaseStatus& lease_status,
+                                       application::ports::RuntimeRuleStateReader& rule_state_reader)
     : config_(config), inference_(inference), alarms_(config.alarm_rules, config.alarm_config_version),
-      on_alarm_(std::move(on_alarm)), config_directory_(std::move(config_directory)) {}
+      on_alarm_(std::move(on_alarm)), config_directory_(std::move(config_directory)),
+      evidence_frame_encoder_(evidence_frame_encoder),
+      lease_status_(lease_status), rule_state_reader_(rule_state_reader) {}
 
 void VideoStreamManager::run(const StreamProfile& stream, const std::string& input_uri,
                              const std::filesystem::path& output_h264,
@@ -117,7 +69,7 @@ void VideoStreamManager::run(const StreamProfile& stream, const std::string& inp
 
     int reconnect_delay_ms = stream.reconnect_initial_delay_ms;
     while (true) {
-        if (activation_lease_expired()) {
+        if (lease_status_.expired()) {
             std::cout << "device activation expired; local video runtime is paused" << std::endl;
             return;
         }
@@ -132,7 +84,7 @@ void VideoStreamManager::run(const StreamProfile& stream, const std::string& inp
             std::size_t frames = 0;
             hi_video_frame_info inference_frame{};
             while (true) {
-                if (activation_lease_expired()) {
+                if (lease_status_.expired()) {
                     std::cout << "device activation expired; local video runtime is paused" << std::endl;
                     return;
                 }
@@ -173,28 +125,34 @@ void VideoStreamManager::run(const StreamProfile& stream, const std::string& inp
                     const auto now = std::chrono::steady_clock::now();
                     if (!config_directory_.empty() && now >= next_refresh) {
                         try {
-                            const auto snapshot = EdgeAppConfig::load(config_directory_);
-                            const auto desired = yunshao::read_json_file(config_directory_ / "alarm_rules.json").value("cloud_command", Json::object());
-                            if (desired != command || snapshot.alarm_config_version != current_config.alarm_config_version) {
-                                alarms_ = AlarmFilter(snapshot.alarm_rules, snapshot.alarm_config_version);
-                                current_config = snapshot;
-                                command = desired;
+                            const auto snapshot = rule_state_reader_.read();
+                            if (snapshot.cloud_command != command || snapshot.config_version != current_config.alarm_config_version) {
+                                alarms_ = AlarmFilter(snapshot.rules, snapshot.config_version);
+                                current_config.alarm_rules = snapshot.rules;
+                                current_config.alarm_config_version = snapshot.config_version;
+                                command = snapshot.cloud_command;
                             }
-                            rules_ready = command.empty();
-                            if (!command.empty()) {
-                                try {
-                                    const auto ready = yunshao::read_json_file(config_directory_ / "cloud-ready.json");
-                                    rules_ready = ready.value("command_id", "") == command.value("command_id", "") &&
-                                        ready.value("updated_at_unix", std::int64_t{0}) < std::time(nullptr);
-                                } catch (...) { rules_ready = false; }
-                            }
+                            rules_ready = snapshot.ready;
                         } catch (const std::exception&) { std::cerr << "alarm_configuration_reload_failed\n"; }
                         next_refresh = now + std::chrono::seconds(1);
                     }
                     const auto alarms = rules_ready ? alarms_.observe(stream.model_id, detections, std::chrono::steady_clock::now()) : std::vector<AlarmTrigger>{};
                     if (on_alarm_ && !alarms.empty()) {
                         std::vector<unsigned char> jpeg;
-                        try { jpeg = capture_evidence(output_frame.v_frame, detections); }
+                        const hi_video_frame& evidence_frame = output_frame.v_frame;
+                        const auto width = static_cast<int>(evidence_frame.width);
+                        const auto height = static_cast<int>(evidence_frame.height);
+                        const auto luma_pitch = static_cast<std::size_t>(evidence_frame.width_stride[0]);
+                        const auto chroma_pitch = static_cast<std::size_t>(
+                            evidence_frame.width_stride[1] ? evidence_frame.width_stride[1] : evidence_frame.width_stride[0]);
+                        const auto aligned_height = static_cast<std::size_t>(
+                            evidence_frame.height_stride[0] ? evidence_frame.height_stride[0] : evidence_frame.height);
+                        try {
+                            jpeg = evidence_frame_encoder_.encode_jpeg(
+                                application::ports::EvidenceFrameView{
+                                    evidence_frame.virt_addr[0], evidence_frame.virt_addr[1], width, height,
+                                    luma_pitch, chroma_pitch, aligned_height}, detections);
+                        }
                         catch (const std::exception&) { std::cerr << "alarm_evidence_capture_failed\n"; }
                         for (const auto& alarm : alarms) on_alarm_(alarm, jpeg);
                     }

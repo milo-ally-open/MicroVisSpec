@@ -245,3 +245,4 @@ private:
 
 extern "C" yunshao::IAIModel* CreateAIModel() { return new yunshao::ModelClassroomBehaviorDetection(); }
 extern "C" void DestroyAIModel(yunshao::IAIModel* model) { delete model; }
+extern "C" int GetAIModelPluginApiVersion() noexcept { return yunshao::kAIModelPluginApiVersion; }

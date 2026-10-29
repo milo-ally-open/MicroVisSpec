@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1980" height="1720" viewBox="0 0 1980 1720" role="img" aria-labelledby="title desc">
+<title id="title">邀请授权与视频撤权时序图</title>
+<desc id="desc">展示 PC owner 通过 UI 授权移动成员，成员在 UI 兑换并查看授权摄像头，撤权后拒绝续租并关闭活动播放。</desc>
+<defs>
+<marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,0 L10,4 L0,8 z" fill="#42617b"/></marker>
+<marker id="greenArrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,0 L10,4 L0,8 z" fill="#25845b"/></marker>
+<marker id="orangeArrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,0 L10,4 L0,8 z" fill="#bd6b26"/></marker>
+<style>text{font-family:Arial,"Microsoft YaHei",sans-serif;fill:#203246}.title{font-size:30px;font-weight:700}.sub{font-size:17px;fill:#53677b}.h{font-size:20px;font-weight:700}.body{font-size:17px}.small{font-size:14px;fill:#53677b}.tiny{font-size:13px;fill:#53677b}.box{fill:#fff;stroke:#7790a8;stroke-width:2}.blue{fill:#eaf3fb;stroke:#5590c1;stroke-width:2}.green{fill:#eaf7f0;stroke:#4b9b73;stroke-width:2}.orange{fill:#fff3e7;stroke:#d3904c;stroke-width:2}.purple{fill:#f2edfb;stroke:#8872b3;stroke-width:2}.line{fill:none;stroke:#42617b;stroke-width:2;marker-end:url(#arrow)}.return{fill:none;stroke:#25845b;stroke-width:2;stroke-dasharray:8 6;marker-end:url(#greenArrow)}.event{fill:none;stroke:#bd6b26;stroke-width:2;stroke-dasharray:3 6;marker-end:url(#orangeArrow)}.lifeline{stroke:#a5b4c2;stroke-width:1.5;stroke-dasharray:6 7}.activation{fill:#dbeafe;stroke:#42617b;stroke-width:1.2}.divider{stroke:#c5d0da;stroke-width:1.2}.note{fill:#fff8d9;stroke:#d2b75d;stroke-width:1.5}.system{fill:#fbfcfe;stroke:#486882;stroke-width:3;stroke-dasharray:12 7}.actor{stroke:#203246;stroke-width:3;fill:none;stroke-linecap:round}.association{fill:none;stroke:#63788d;stroke-width:1.6}.composition{fill:#42617b;stroke:#42617b}</style>
+</defs>
+<rect x="0" y="0" width="100%" height="100%" fill="#ffffff"/>
+<text x="42" y="48" class="title" text-anchor="start">邀请授权与视频撤权时序图</text>
+<text x="42" y="76" class="sub" text-anchor="start">用户请求经 Nginx 同源 HTTPS 入口；为突出授权流程，图中省略入口转发细节。实线为请求，绿色虚线为响应，橙色点线为异步撤权事件。</text>
+<rect x="4" y="105" width="172" height="62" rx="8" class="blue"/>
+<text x="90" y="143" class="h" text-anchor="middle">PC Owner</text>
+<line x1="90" y1="167" x2="90" y2="1690" class="lifeline"/>
+<rect x="254" y="105" width="172" height="62" rx="8" class="blue"/>
+<text x="340" y="143" class="h" text-anchor="middle">Web/PWA</text>
+<line x1="340" y1="167" x2="340" y2="1690" class="lifeline"/>
+<rect x="514" y="105" width="172" height="62" rx="8" class="blue"/>
+<text x="600" y="143" class="h" text-anchor="middle">auth-service</text>
+<line x1="600" y1="167" x2="600" y2="1690" class="lifeline"/>
+<rect x="764" y="105" width="172" height="62" rx="8" class="blue"/>
+<text x="850" y="143" class="h" text-anchor="middle">Mobile</text>
+<line x1="850" y1="167" x2="850" y2="1690" class="lifeline"/>
+<rect x="1024" y="105" width="172" height="62" rx="8" class="blue"/>
+<text x="1110" y="143" class="h" text-anchor="middle">media-service</text>
+<line x1="1110" y1="167" x2="1110" y2="1690" class="lifeline"/>
+<rect x="1304" y="105" width="172" height="62" rx="8" class="blue"/>
+<text x="1390" y="143" class="h" text-anchor="middle">MediaMTX</text>
+<line x1="1390" y1="167" x2="1390" y2="1690" class="lifeline"/>
+<!-- UML execution specifications, rendered behind the messages. -->
+<rect x="334" y="260" width="12" height="190" class="activation"/>
+<rect x="334" y="555" width="12" height="175" class="activation"/>
+<rect x="334" y="845" width="12" height="370" class="activation"/>
+<rect x="334" y="1325" width="12" height="130" class="activation"/>
+<rect x="844" y="555" width="12" height="180" class="activation"/>
+<rect x="844" y="845" width="12" height="375" class="activation"/>
+<rect x="844" y="1575" width="12" height="110" class="activation"/>
+<rect x="594" y="310" width="12" height="90" class="activation"/>
+<rect x="594" y="600" width="12" height="100" class="activation"/>
+<rect x="594" y="940" width="12" height="80" class="activation"/>
+<rect x="594" y="1370" width="12" height="85" class="activation"/>
+<rect x="594" y="1595" width="12" height="80" class="activation"/>
+<rect x="1104" y="890" width="12" height="280" class="activation"/>
+<rect x="1104" y="1470" width="12" height="80" class="activation"/>
+<rect x="1104" y="1595" width="12" height="90" class="activation"/>
+<rect x="1384" y="1040" width="12" height="80" class="activation"/>
+<rect x="1384" y="1470" width="12" height="80" class="activation"/>
+<rect x="45" y="195" width="1890" height="46" rx="8" class="purple"/>
+<text x="70" y="225" class="h" text-anchor="start">1. PC 在界面创建邀请并选择设备能力</text>
+<path d="M90,275 L340,275" class="line"/><text x="215.0" y="265" class="small" text-anchor="middle">提交成员邮箱/设备/能力</text>
+<path d="M340,325 L600,325" class="line"/><text x="470.0" y="315" class="small" text-anchor="middle">POST invitation + device grants</text>
+<text x="625" y="358" class="small" text-anchor="start">auth-service 原子保存邀请、grant 草案和审计</text>
+<path d="M600,390 L340,390" class="return"/><text x="470.0" y="380" class="small" text-anchor="middle">一次性邀请链接与有效期</text>
+<path d="M340,435 L90,435" class="return"/><text x="215.0" y="425" class="small" text-anchor="middle">显示邀请状态；可复制一次性链接</text>
+<rect x="45" y="480" width="1890" height="46" rx="8" class="purple"/>
+<text x="70" y="510" class="h" text-anchor="start">2. 移动成员兑换邀请并恢复服务端身份</text>
+<path d="M850,565 L340,565" class="line"/><text x="595.0" y="555" class="small" text-anchor="middle">打开 /m 邀请链接</text>
+<path d="M340,615 L600,615" class="line"/><text x="470.0" y="605" class="small" text-anchor="middle">POST redeem（token + 登录会话）</text>
+<text x="625" y="647" class="small" text-anchor="start">校验 token_hash、期限、状态及账号类型；同事务消费邀请并创建成员</text>
+<path d="M600,680 L340,680" class="return"/><text x="470.0" y="670" class="small" text-anchor="middle">成员关系与已授权设备清单</text>
+<path d="M340,725 L850,725" class="return"/><text x="595.0" y="715" class="small" text-anchor="middle">展示工作空间、设备和能力范围</text>
+<rect x="45" y="770" width="1890" height="46" rx="8" class="blue"/>
+<text x="70" y="800" class="h" text-anchor="start">3. 成员选择授权摄像头，打开单路实时视频</text>
+<path d="M850,855 L340,855" class="line"/><text x="595.0" y="845" class="small" text-anchor="middle">选择设备/摄像头并点开播放</text>
+<path d="M340,905 L1110,905" class="line"/><text x="725.0" y="895" class="small" text-anchor="middle">POST playback lease（camera_id）</text>
+<path d="M1110,955 L600,955" class="line"/><text x="855.0" y="945" class="small" text-anchor="middle">在线检查 stream.view + workspace/device</text>
+<path d="M600,1005 L1110,1005" class="return"/><text x="855.0" y="995" class="small" text-anchor="middle">允许 / 拒绝（当前授权结果）</text>
+<path d="M1110,1055 L1390,1055" class="line"/><text x="1250.0" y="1045" class="small" text-anchor="middle">创建/校验受保护的播放租约</text>
+<path d="M1390,1105 L1110,1105" class="return"/><text x="1250.0" y="1095" class="small" text-anchor="middle">路径状态与连接信息</text>
+<path d="M1110,1155 L340,1155" class="return"/><text x="725.0" y="1145" class="small" text-anchor="middle">短时播放描述符；不返回 RTSP</text>
+<path d="M340,1205 L850,1205" class="return"/><text x="595.0" y="1195" class="small" text-anchor="middle">启动 WebRTC；失败时 HTTPS HLS 回退</text>
+<rect x="45" y="1250" width="1890" height="46" rx="8" class="orange"/>
+<text x="70" y="1280" class="h" text-anchor="start">4. PC 撤权；新请求立即拒绝，活动流异步收敛</text>
+<path d="M90,1335 L340,1335" class="line"/><text x="215.0" y="1325" class="small" text-anchor="middle">点击撤销成员/设备能力</text>
+<path d="M340,1385 L600,1385" class="line"/><text x="470.0" y="1375" class="small" text-anchor="middle">提交成员撤销并写 outbox</text>
+<path d="M600,1435 L1110,1435" class="event"/><text x="855.0" y="1425" class="small" text-anchor="middle">member.revoked（可靠重试）</text>
+<path d="M1110,1485 L1390,1485" class="line"/><text x="1250.0" y="1475" class="small" text-anchor="middle">释放 viewer lease / 断开活动会话</text>
+<path d="M1390,1535 L1110,1535" class="return"/><text x="1250.0" y="1525" class="small" text-anchor="middle">已关闭；失败则保留待重试</text>
+<path d="M850,1585 L1110,1585" class="line"/><text x="980.0" y="1575" class="small" text-anchor="middle">续租旧播放会话</text>
+<path d="M1110,1615 L600,1615" class="line"/><text x="855.0" y="1605" class="small" text-anchor="middle">复核当前成员与 stream.view</text>
+<path d="M600,1645 L1110,1645" class="return"/><text x="855.0" y="1635" class="small" text-anchor="middle">deny</text>
+<path d="M1110,1675 L850,1675" class="return"/><text x="980.0" y="1665" class="small" text-anchor="middle">403；清除播放器状态并提示已撤权</text>
+</svg>

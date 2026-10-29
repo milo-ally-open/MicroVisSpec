@@ -10,7 +10,7 @@
 
 云哨连接摄像头和运行视觉算法的边缘设备，在平台侧汇聚设备状态、处理后的视频、通用异常事件及处置记录，并在 Web/PWA 中完成查看、告警响应和基础统计。教室行为检测用于首发验证，平台数据模型不能依赖某一种算法或场景。[PRD §1、§4](../Analysis/PRD.md)
 
-首发以完整业务闭环验收：注册登录 → 登记设备 → 查看状态和画面 → 接收事件与截图 → PWA 通知 → 处置反馈 → 查看基础统计。首发采用个人账号数据边界，不包含成员邀请和共享。首发移动端为 PWA，监控大屏只在桌面 Web 展示；原生应用与 MCP 工具在后续阶段定义。[PRD §4、§6](../Analysis/PRD.md)
+现有 MVP 以完整业务闭环验收：注册登录 → 登记设备 → 查看状态和画面 → 接收事件与截图 → PWA 通知 → 处置反馈 → 查看基础统计。该基线采用个人账号数据边界，不包含成员邀请和共享。下一阶段拟增加平台管理员、PC 工作空间 owner 和移动成员；其目标边界与迁移方式见[三类用户与工作空间授权规格](../Specification/multi_user_workspace_access/)。在该组完成评审和实现验收前，不把目标入口描述为当前能力。现有移动端为同一 Web/PWA 的响应式入口，原生应用与 MCP 工具仍属后续阶段。[PRD §4、§6](../Analysis/PRD.md)
 
 | 设计约束 | 架构落点 |
 | --- | --- |
@@ -133,7 +133,9 @@ flowchart TB
         EdgeConfig[config：models、streams、alarm_rules JSON]
         EdgeAgent[src/agent：C++ 云边代理与 SQLite outbox]
         EdgeCommon[include/common + src/common：core.hpp/core.cpp、config.hpp/config.cpp]
-        EdgeManagers[src/manager：配置、流、推理、告警管理器]
+        EdgeManagers[src/manager：配置、流、推理、告警管理器；VideoStreamManager 经 port 查询租期状态]
+        EdgeApplication[include/application + src/application：告警事件 use case、租期 gate、Agent 控制/outbox/MQTT/evidence/service lifecycle/配置与租期 writer ports、MQTT session、cloud cycle 与 inbox]
+        EdgeAdapters[include/adapters + src/adapters：插件、Agent/runtime Unix socket、SQLite outbox、MQTT、HTTPS evidence/transport、systemd 生命周期、agent.env 与激活覆盖文件/租期读写和证据文件 adapters]
         EdgePlugins[plugins/model_classroom_behavior_detection.cpp：ModelClassroomBehaviorDetection / libmodel_classroom_behavior_detection.so]
         EdgeMedia[include/media 与 src/media：Atlas DVPP/FFmpeg pipeline 接口与同名实现]
         EdgeApp[src/main.cpp：classroom-runtime 组装入口]
@@ -141,8 +143,13 @@ flowchart TB
         EdgeTests[tests：配置、模型、规则与集成测试]
         EdgeAgent --> EdgeManagers
         EdgeAgent --> EdgeCommon
+        EdgeAgent --> EdgeAdapters
+        EdgeAdapters --> EdgeApplication
         EdgeApp --> EdgeManagers
-        EdgeManagers --> EdgePlugins
+        EdgeApp --> EdgeApplication
+        EdgeApp --> EdgeAdapters
+        EdgeManagers --> EdgeAdapters
+        EdgeAdapters --> EdgePlugins
         EdgeManagers --> EdgeMedia
         EdgeManagers --> EdgeConfig
         EdgeSystemd --> EdgeAgent
@@ -197,18 +204,25 @@ flowchart TB
 
 ## 4. Web 与 PWA 客户端
 
-现有前端位于 [project/src/clients/web](../../src/clients/web/README.md)，使用 Vue 3、TypeScript、Vue Router、Vite 与 vite-plugin-pwa。现有 pages 和 router 仍为占位；下表是后续页面与路由的设计，不代表已经实现。
+现有前端位于 [project/src/clients/web](../../src/clients/web/README.md)，使用 Vue 3、TypeScript、Vue Router、Vite 与 vite-plugin-pwa。router 已挂载真实设备、监控、事件、统计和设置页面，但只支持单账号；下面先列代码现状，再列下一阶段角色路由目标。
 
-| 路由 | 页面与服务 | 桌面 Web | 手机 PWA |
-| --- | --- | --- | --- |
-| /login、/register | 注册登录；auth-service。 | 支持 | 支持 |
-| /account | 账号资料与旧密码改密；auth-service。 | 支持 | 支持 |
-| /devices、/devices/:deviceId | 我的设备、状态、摄像头、算法及参数；device-service，播放入口由 media-service 提供。 | 支持 | 支持 |
-| /events、/events/:eventId | 告警列表、详情、截图和处置；event-service。通知点击直达详情。 | 支持 | 支持 |
-| /monitor | 最多 12 路活动源流的实时监控大屏；media-service + device-service。 | 支持 | 不作为手机端页面；深链进入时提示在桌面查看。 |
-| /analytics | 基础设备及事件统计；前端组合两个业务服务的账号级统计接口。 | 大屏布局 | 手机端简化布局 |
-| /notifications | PWA 通知授权和订阅管理；push-service。 | 支持 | 支持 |
-| /mcp | MCP 配置入口。 | 后续 | 后续 |
+| 当前路由 | 页面与服务 | 当前能力 |
+| --- | --- | --- |
+| /login、/register | 注册登录；auth-service。 | 已实现 |
+| /（AppShell 子路由） | 统一当前账号工作台导航；Vue router。 | 已实现；没有角色分流 |
+| /devices、/devices/:deviceId | 设备登记/编辑/停用；首次 SSH 指纹确认、引导 job、激活/续期；摄像头登记和 RTSP 来源管理。 | 已实现；仍按当前账号隔离 |
+| /monitor | 最多渲染 12 个播放器；media-service + device-service + CameraPlayer。 | 桌面多路；窄屏仅变为单列栅格，挂载的播放器仍各自申请租约；没有 mobile member grant 过滤 |
+| /events、/events/:eventId | 事件查询、截图和处置；event-service。 | 已实现；通知深链指向事件详情 |
+| /analytics | 基础设备与事件统计。 | 已实现 |
+| /settings | 改密与当前浏览器 Push 订阅；auth-service + push-service。 | 已实现 |
+
+下列角色路由是下一阶段目标，不是当前路由：
+
+| 目标入口 | 目标页面与服务 | 目标范围 |
+| --- | --- | --- |
+| /admin | 管理账号、健康、脱敏诊断和审计。 | 首个 admin 初始化、主机配置和服务重启仍走受控运维流程。 |
+| /app | PC owner 工作台。 | 保留现有设备/视频/事件流程；新增成员邀请及逐设备能力授权/撤权。 |
+| /m | 移动成员 PWA。 | 邀请兑换、查看本人授权范围、事件/截图/Push、按 stream.view 看单路视频；设备列表和播放由服务端授权过滤。 |
 
 页面组件放在 src/pages，路由集中在 src/router；src/api 按 auth、device、event、media、push 拆分有类型的客户端，公共请求层处理会话失效、错误码和请求 ID。界面层不拼接 RTSP 地址、不保存服务器凭据。桌面监控页负责分屏、播放状态、设备位置和状态展示；播放失败先做可解释的错误提示，再尝试 HLS。事件详情保留处理历史并支持待处置 → 处理中 → 已解除/误报，服务端验证状态流转。[PRD §3](../Analysis/PRD.md)
 
@@ -220,11 +234,12 @@ PWA 与 Web 共用页面和路由。生产环境使用 HTTPS、manifest、可从
 
 ### 5.1 设备登记、激活与状态
 
-1. 登录用户在“我的设备”录入 IP、名称、位置，并按需登记摄像头与算法绑定。device-service 创建归属于该账号的待激活设备 ID；录入的 IP 只作为设备资料和候选媒体地址。
-2. 平台生成一次性激活凭据，现场人员把它配置到边缘代理。边缘代理主动通过 HTTPS 向 device-service 完成激活并领取独立的 MQTT 身份；凭据只显示一次，过期或遗失需重新签发。此流程不要求平台先通过 SSH 连入设备。
-3. 边缘代理以 MQTT/TLS 发送心跳、运行状态、摄像头与算法实报配置。device-service 根据最后心跳时间计算在线状态，并把“设备在线”“算法运行”和“视频可播放”分别展示，不用一个布尔值混淆三种状态。心跳周期及离线阈值是可配置运维参数。
-4. 对设备支持的算法参数，device-service 保存期望配置版本，通过 MQTT 下发命令；边缘代理返回应用结果与实报版本。超时或失败显示未生效，不把“命令已发出”等同于“算法已更新”。参数可编辑的范围由设备上报的能力和算法参数约束决定；首发优先实现查看和已有能力支持的配置。
-5. 首发课堂规则配置按类别独立启用；新设备默认全部关闭。启用时必须设置置信度阈值、持续时间、冷却时间及事件等级；只有收到设备对相应版本的 applied ACK 后，该版本规则才能触发业务事件。
+1. 当前 Web 的“边缘设备”页允许登录用户录入 IP、名称、位置；详情页可登记摄像头、配置 RTSP 来源和算法绑定。device-service 创建归属于当前账号的设备记录；录入 IP 也作为受限接入向导的目标地址。
+2. 首次接入在 `DeviceDetailPage` 完成：用户先让 device-service 检查已登记 IP 并确认 SSH host-key 指纹，再输入现场管理员提供的 SSH 用户名/密码及使用期限并提交。device-service 限制目标 IP 在配置的私网 CIDR 中、校验已确认的指纹、生成有审计记录的异步 provisioning job；凭据不落库/不写日志，页面轮询任务并在提交后清空密码字段。任务完成后 Agent 通过 HTTPS 激活并领取独立 MQTT 身份。用户不需要手工调用 API 或进入开发板命令行。
+3. 已接入设备可在同一详情页激活、续期和查看状态；一次性激活凭据由服务端管理，Agent 主动通过 HTTPS 领取凭据并完成 MQTT 身份同步。SSH 仅是首次受限引导/必要人工维护通道，不承担正常业务消息。
+4. 边缘代理以 MQTT/TLS 发送心跳、运行状态、摄像头与算法实报配置。device-service 根据最后心跳时间计算在线状态，并把“设备在线”“算法运行”和“视频可播放”分别展示，不用一个布尔值混淆三种状态。心跳周期及离线阈值是可配置运维参数。
+5. 对设备支持的算法参数，device-service 保存期望配置版本，通过 MQTT 下发命令；边缘代理返回应用结果与实报版本。超时或失败显示未生效，不把“命令已发出”等同于“算法已更新”。参数可编辑的范围由设备上报的能力和算法参数约束决定；首发优先实现查看和已有能力支持的配置。
+6. 首发课堂规则配置按类别独立启用；新设备默认全部关闭。启用时必须设置置信度阈值、持续时间、冷却时间及事件等级；只有收到设备对相应版本的 applied ACK 后，该版本规则才能触发业务事件。
 
 MQTT 使用独立设备身份和最小发布/订阅权限。QoS 1 只保证至少一次交付，服务端消费和设备命令均需幂等；设备离线时边缘代理须有有界本地队列与重试机制。Mosquitto 持久化和持久会话要显式配置并监控积压，不能把 broker 的 PUBACK 当作业务事件已落库。[MQTT 3.1.1](https://docs.oasis-open.org/mqtt/mqtt/v3.1.1/mqtt-v3.1.1.html)、[Mosquitto 配置](https://mosquitto.org/man/mosquitto-conf-5.html)
 
@@ -253,6 +268,8 @@ sequenceDiagram
 ```
 
 media-service 保存摄像头与媒体路径映射、源 RTSP 地址和凭据，并协调 MediaMTX 的路径配置；可对按需观看的源启用按需拉流。前端只拿到受保护的播放路径，不拿到设备的 RTSP 凭据。Nginx 对 WebRTC 信令和每个 HLS 请求校验登录态及摄像头归属；MediaMTX 的 HTTP 读入口只允许经受控代理访问，并以内部身份限制直接读取，控制 API 只在内部网络开放。一个可访问的流地址并不代表账号有播放权限。[MediaMTX 鉴权](https://mediamtx.org/docs/features/authentication)、[控制 API](https://mediamtx.org/docs/features/control-api)、[配置参考](https://mediamtx.org/docs/references/configuration-file/)
+
+当前 `MonitorPage` 按登录账号加载最多 12 路活动摄像头；每个 `CameraPlayer` 挂载时向 media-service 申请观看租约。窄屏 CSS 只把栅格改为单列，页面仍会渲染这些播放器，因此不能把当前窄屏布局称作“单路视频播放”。三角色目标必须由服务端按设备授权过滤摄像头与播放请求；移动页只展示 `stream.view` 覆盖设备下的摄像头，一次只挂载/播放用户选中的一路，切换摄像头先释放旧租约。单列布局本身不能替代授权检查或连接数控制。
 
 Atlas 200I DK A2 首发边缘设备每台默认运行 1 路摄像头推理并输出 1 路带算法标注的 RTSP 预览流。模型由 CANN ATC 转换为面向 Ascend 310B4 的 OM，边缘应用通过 AscendCL 推理，并按开发套件软件栈使用 VENC 编码。推理输入可保留摄像头原始分辨率，输出预览分辨率可独立设置。华为官方开发文档提供 Atlas 200I DK A2 的 VENC 接口；下表是待首发实机联调验收的 MVP 配置，不代表已测得的设备并发能力。[Atlas 200I DK A2 VENC 应用开发指南](https://www.hiascend.com/document/detail/zh/Atlas200IDKA2DeveloperKit/23.0.RC2/Application%20Development%20Guide/aadgc/aclcppdevg_000033.html)、[CANN ATC 模型转换指南](https://www.hiascend.com/doc_center/source/zh/canncommercial/70RC1/inferapplicationdev/atctool/CANN%207.0.RC1%20ATC%E5%B7%A5%E5%85%B7%E4%BD%BF%E7%94%A8%E6%8C%87%E5%8D%97%2001.pdf)
 
@@ -336,7 +353,7 @@ event-service 维护待处置 → 处理中 → 已解除/误报的状态流转�
 
 1. **账号与浏览器**：auth-service 以用户名和密码管理账号；密码采用 Argon2id 等适当强哈希。登录会话使用 Secure、HttpOnly、SameSite Cookie，经 HTTPS 传输。若使用 Cookie 作为写操作凭据，须做 CSRF 防护。Nginx 做会话入口校验，各服务仍按 account_id 过滤对象；未知或越权资源不泄露其他账号信息。Gin 只信任明确配置的反向代理。[Gin 可信代理](https://gin-gonic.com/en/docs/server-config/trusted-proxies/)
 2. **内部服务**：内部调用使用独立服务凭据、限流和超时；Nginx 清除来自公网的身份转发头后注入已验证身份。数据库账号只访问本服务 schema；密钥、VAPID 私钥、MQTT 凭据和 RTSP 密码由部署机密提供，不进入仓库或普通日志。
-3. **设备与 MQTT**：一次性激活凭据仅用于初次绑定；每台设备有独立、可撤销的 MQTT 身份和主题 ACL。设备上报中的 account_id 不能作为可信归属，归属由 device-service 的登记记录确定。SSH 只用于人工运维，不承载常规业务消息。
+3. **设备与 MQTT**：一次性激活凭据仅用于初次绑定；每台设备有独立、可撤销的 MQTT 身份和主题 ACL。设备上报中的 account_id 不能作为可信归属，归属由 device-service 的登记记录确定。SSH 可由网页向导用于受限首次 provisioning，也可用于必要人工维护；使用私网 CIDR allowlist、用户确认的 pinned host-key fingerprint 和临时凭据，不承载常规业务消息。凭据不落库、不写日志，正常设备业务走 HTTPS/MQTT。
 4. **媒体与证据**：RTSP 源地址和凭据不发往浏览器；播放入口检查摄像头归属，MediaMTX 管理口和原始 RTSP 流保持内部可达。截图文件卷无公开静态映射；下载和预览均经 event-service 授权。日志应隐藏会话、订阅 endpoint、媒体凭据与证据路径。
 5. **Push 与后续 MCP**：Web Push 订阅只能绑定当前登录账号，通知点击重新鉴权；mcp-service 启用时须沿用账号级授权并留下调用审计，不能因为 Agent 接入而绕过业务服务。
 
@@ -386,3 +403,158 @@ event-service 维护待处置 → 处理中 → 已解除/误报的状态流转�
 | 2026-10-04 | 基于 PRD、调研决策和已确认的六服务方向，建立首发 Web/PWA、边缘代理、媒体、事件、通知、数据所有权、部署与故障处理设计；MCP 标记为后续。 |
 | 2026-10-15 | 将首发边缘平台更新为华为 Atlas 200I DK A2（Ascend 310B4）；视频编码、多路吞吐及观看容量保留为实机验收目标。 |
 | 2026-10-18 | 首发场景切换为教室行为检测，采用 YOLO11n/640 规格；告警规则默认关闭，增加设备配置版本与事件准入校验；消防通道移出首发。 |
+
+## 11. 三类用户扩展目标（尚未实现）
+
+本节表达下一阶段的目标边界；完整需求和验收以[三类用户与工作空间授权规格](../Specification/multi_user_workspace_access/)为准。现有服务仍按个人账号过滤数据，不能据本节推断管理员控制台、workspace 或移动成员权限已经存在。
+
+### 11.1 目标结构
+
+```mermaid
+flowchart LR
+    Admin[管理员 /admin] --> N[Nginx HTTPS]
+    PC[PC owner /app] --> N
+    Mobile[移动成员 PWA /m] --> N
+    N --> Auth[auth-service<br/>账号、会话、workspace、邀请与授权]
+    N --> Device[device-service<br/>workspace 设备与配置]
+    N --> Event[event-service<br/>workspace 事件与证据]
+    N --> Media[media-service<br/>来源、租约与播放授权]
+    N --> Push[push-service<br/>按当前成员授权投递]
+    Device --> Auth
+    Event --> Auth
+    Media --> Auth
+    Push --> Auth
+    Media --> MTX[MediaMTX]
+```
+
+目标沿用现有五个 Go 服务和同一媒体控制面。auth-service 管理账号类型/状态、workspace、成员、邀请、设备能力授权与管理审计；device/event/media/push 保持各自 schema 与数据写入边界，通过受服务认证的 authz 合同读取当前授权。服务不直接跨 schema 联表，授权依赖故障时拒绝敏感操作。
+
+### 11.2 目标权限边界
+
+| 身份 | 目标能力 | 明确限制 |
+|---|---|---|
+| `admin` | 账号状态、服务健康、运维元数据和审计 | 不默认读取客户视频、RTSP、事件截图或 workspace 业务详情。 |
+| `pc` | 自己 workspace 的设备、媒体来源、AI 规则、监控、事件、统计与成员 | 不能访问别的 workspace；不允许经客户端改 owner 或角色。 |
+| `mobile` | 按设备 grant 查看设备/事件/截图、处置事件、单路授权播放和收取 Push | 邀请加入单一 workspace；不能配置设备、RTSP、AI、成员或管理员功能。 |
+
+工作空间归属只覆盖资源租户字段。会话账号、事件处置人、媒体观看者和 Push 订阅账号仍是实际用户主体；不能把所有 `account_id` 统一重命名或回填成 workspace 字段。
+
+### 11.3 身份与媒体数据流
+
+浏览器会话仍由 Nginx auth 子请求校验。auth-service 返回的类型和 workspace 上下文经 Nginx 清理客户端同名头后传递；业务服务再以本地资源 workspace、设备能力和当前会话调用 authz 检查。前端角色路由仅决定导航，不授予权限。
+
+PC 与移动端继续调用 media-service 获取授权租约；RTSP 密钥留在媒体服务，MediaMTX 继续只处理经授权的流。WebRTC/HLS、12 路活动源和 24 个观看连接目标沿用当前基线。成员撤销后，新请求立即拒绝，media-service 消费撤权事件释放租约并断开活动连接；目标时限以领域规格待确认项为准。
+
+事件归 workspace 并依设备授权过滤。Push 接收人应在投递时按当前 workspace/device grants 计算，避免使用创建事件时已经过期的成员快照。截图维持上传后 24 小时保留并始终经 event-service 授权读取。
+
+### 11.4 迁移原则
+
+先扩展列并兼容旧字段，再回填、核对、启用新授权，保留旧列直到回滚窗口结束。首版 workspace ID 建议复用 PC owner account UUID，以便服务在自己的 schema 内将旧租户 `account_id` 映射到 workspace；若实施前决定使用独立 UUID，必须提供跨 schema 的受控映射/核对工具。会话、actor、viewer lease 和 Push 订阅的账号主体字段不迁移。完整备份、孤儿核对、跨账号回归与恢复门禁见规格组 REQ-09。
+
+## 12. 当前源码层次与目标代码边界
+
+本节根据当前仓库目录核对现状，再定义未来重构约束。目标分层尚未在代码中完成；可执行验收见跨服务规格 REQ-10。下表中的目录名是现状证据，目标目录是建议，不应混为已实现结构。
+
+### 12.1 现状目录与边界判断
+
+| 子系统 | 当前可见结构 | 当前边界判断 |
+|---|---|---|
+| Go 后端 | 五个独立 Go module；各服务入口位于 go/cmd/service-name，业务实现主要集中在 package main。 | 运行时按服务拆分、schema 与数据库角色隔离；服务内部尚未普遍拆出 domain/application/adapters。 |
+| Web/PWA | src/router、pages、layouts、api、state、components、lib；当前 router 提供登录/注册及统一账号工作台，DeviceDetailPage 含设备 SSH 指纹确认、provisioning job 轮询、激活/续期、摄像头/RTSP 管理，MonitorPage 将最多 12 个 CameraPlayer 渲染为栅格；窄屏 CSS 改为单列，各播放器仍会各自申请租约。 | 已有设备和视频 UI，但不是多角色 UI；尚无管理员路由、成员邀请/设备 grant、mobile 授权过滤与“仅一条活动租约”的单路成员视频入口。仍需按业务 feature 收敛状态/用例与类型化 API 依赖。 |
+| Atlas runtime | `include/src` 有 `application`、`adapters`、common、agent、manager、media、plugins、tests、config；application 当前承载告警发布 use case、租期 gate、Agent 本机控制/持久 outbox/MQTT/evidence uploader/HTTPS transport/service-lifecycle/配置与租期 writer ports、`AgentMqttSession`、`AgentCloudCycle`、`AgentRunLoop`、`AgentActivationWorkflow`、`EvidenceFrameEncoder` port、命令/ACK inbox、云端命令处理与已应用规则 ACK 用例，adapters 隔离云规则配置与 applied-state、模型插件动态库、Agent/runtime Unix socket client/server、SQLite outbox、libmosquitto transport、libcurl HTTPS transport、systemd Agent 生命周期/截图上传、`agent.env` 与激活覆盖文件/租期文件读写、证据文件与事件元数据。 | 配置存储 adapter 已加入源码与 Agent CMake target；WSL GCC C++17 语法检查/对象编译及 Atlas ARM64 CMake configure、`yunshao-agent` build 均通过。本轮 `yunshao-agent` 与 `yunshao-classroom-runtime` 两个 ARM64 targets 均完成构建，分别包含 activation/run-loop 与 evidence-frame adapter。板端 clock-skew warning；未运行 CTest/运行时回归。`AgentRunLoop` 已承接 Agent 外层调度，`AgentActivationWorkflow` 已承接授权校验及配置/租期编排，`EvidenceFrameEncoder`/`AtlasEvidenceFrameEncoder` 已隔离 NV21 证据帧编码；激活 CLI/HTTPS/JSON、其余 AscendCL 和媒体 pipeline 仍未全面分层；其他 systemd 操作、租期及配置文件写入已通过 ports 注入 adapters，云端连接后的命令处理、应用规则 ACK、状态/事件发布和证据上传已由 `AgentCloudCycle` 编排，不能据目录推断完整分层已验收。 |
+| 部署与数据 | systemd 单元、Nginx、PostgreSQL 各 schema/角色、Mosquitto、MediaMTX。 | 运行进程边界明确；服务对自有 schema 写入，外部设施由部署合同管理。 |
+
+### 12.2 自基础设施向用户入口的分层
+
+下表按“自下而上”梳理运行能力；实际请求从用户入口向下进入，用例再经端口访问出站适配器。前后端分别保持独立构建和部署。
+
+| 层 | 责任与代表组件 | 允许依赖 |
+|---|---|---|
+| L0 基础设施与设备 | PostgreSQL 各服务 schema、Mosquitto、MediaMTX、私有文件卷、浏览器 Push 服务、Atlas/CANN、摄像头与 RTSP 源。 | 不依赖本项目上层代码。 |
+| L1 出站适配器 | GORM repository、内部服务 HTTP client、MQTT client、MediaMTX control client、Push provider、文件存储适配器。 | 可依赖本服务 application port 与必要的 domain 类型；不得写其他服务数据。 |
+| L2 领域模型与策略 | 账号/成员、设备、事件、处置、播放租约等实体；能力策略、规则和状态机。 | 本域代码与标准库；不得依赖 Gin、ORM、消息 broker 或平台 SDK。 |
+| L3 应用用例 | 注册、授权、设备配置、事件处置、建立/续租播放、邀请和撤权等可执行业务流程；定义所需出站接口。 | domain 与本层定义的端口；不直接绑定数据库或网络实现。 |
+| L4 入站适配器 | Gin HTTP handlers、MQTT consumers、outbox workers、定时任务。 | 将传输 DTO 转换为调用并处理应用用例结果；不承载核心授权/状态转换。 |
+| L5 接入边界 | Nginx HTTPS/auth 子请求、Mosquitto 设备 ACL、受控媒体信令与 HLS 入口。 | 路由到对应入站适配器；不替代服务内授权判断。 |
+| L6 表现与调用端 | 管理员/PC/mobile Vue 页面、PWA Service Worker、Atlas Agent/runtime client。 | 只调用受支持的 API、MQTT 或媒体合同；客户端状态不构成权限事实。 |
+
+![自下而上的运行分层与代码依赖边界](assets/architecture_layers.svg)
+
+### 12.3 Go 服务内的目标代码布局与依赖规则
+
+每个服务继续是独立 Go module 和部署二进制。逐步迁移后的目录建议如下：
+
+    go/
+    ├── cmd/service-name/main.go                 # 组合根：配置、依赖装配、启动
+    └── internal/
+        ├── domain/                           # 实体、值对象、策略、状态机
+        ├── application/                      # 用例；定义 repository/client ports
+        ├── transport/
+        │   ├── http/                         # Gin handlers、DTO、路由
+        │   ├── mqtt/                         # 设备消息入站/出站适配
+        │   └── worker/                       # outbox、定时任务
+        └── adapters/outbound/
+            ├── postgres/                     # 本服务 schema 的仓储
+            ├── serviceclient/                # 受认证的内部 API client
+            ├── broker/                       # MQTT 实现
+            ├── media/                        # MediaMTX 控制适配
+            ├── push/                          # Web Push provider
+            └── filesystem/                   # 私有证据文件
+
+代码依赖约束：
+
+- HTTP/MQTT/worker 适配器只把传输输入映射为 application command/query；Gin context 不进入 domain。
+- application 编排用例并定义出站 port；domain 定义规则和状态转换。domain 不导入 Gin、GORM、MQTT、MediaMTX SDK、环境读取或部署包。
+- 出站 adapter 实现本服务 port；事务与表访问留在自有 repository，不让 handler/用例执行原生跨服务 SQL。
+- cmd 是唯一组合根，可以创建具体 adapters 并注入 ports。除生成的版本化客户端合同/纯传输类型外，一个服务不能导入另一个服务源码包。
+- 服务间以版本化 HTTP、MQTT 或 outbox/inbox 交互；禁止跨 schema 联表、共享可变 domain model 和循环依赖。workspace/device 权限必须由服务端当前策略校验；不能把 Nginx 头、缓存或 Vue 路由当授权结果。
+- 目录搬迁不得改变 API、数据库写入所有权、Atlas MQTT 协议、RTSP/MediaMTX 角色、WebRTC/HLS 行为或 Push/证据保留语义。
+
+### 12.4 Web 与 Atlas 的代码边界
+
+Web 目标结构沿用现有 Vue 工程目录，按 feature 加固依赖方向：pages/router/layouts 负责入口和呈现；feature 用例/store 组织各功能状态与流程；typed API clients 是唯一业务 HTTP 边界；components 放通用展示；lib 放跨 feature 的纯工具。保留并回归现有设备详情 SSH 指纹确认/引导任务/续期、RTSP 来源配置，以及桌面多路播放器；新增 admin/PC/mobile 角色路由、成员邀请与设备能力授权、移动成员授权范围和服务端过滤的单路视频。移动播放器仅为当前选中摄像头建立一条活动租约，切换时先释放旧租约。角色/设备授权状态可由页面呈现，但允许/拒绝必须来自服务端。Push 权限弹窗由浏览器在用户手势下显示，页面需引导并报告拒绝/不可用状态。Service Worker 只管理静态应用壳、Push 展示与通知点击，不缓存 API、截图和视频。
+
+Atlas 目标结构从 main.cpp 组合入口向下分层：runtime application 编排激活、配置应用、检测结果和事件持久化；domain/policy 保持设备状态、规则版本和事件格式；AscendCL/VENC/RTSP、MQTT、SQLite 等放入平台适配器；算法实现以稳定的插件接口注册。该安排围绕现有 common/agent/manager/media/plugins 渐进拆分，不另起一套边缘协议或模型运行栈。
+
+### 12.5 渐进重构顺序与验收门槛
+
+1. 先以现有 API、消息、数据库所有权和端到端链路建立基线；每个领域规格记录当前行为和回归证据。
+2. 按服务选择一个垂直切片，抽出 application 用例与端口，保持 transport 和持久化合同不变；先完成一个服务，再将相同规则应用到其他服务。
+3. 成员授权先由 auth-service 形成唯一写入和决策边界；设备、事件、媒体和 Push 按本域 adapter 接入，不跨 schema 联表。
+4. Web 按设备/事件/邀请等 feature 收敛页面与 API client；角色页面只调用服务端合同。Atlas 保留 Agent/MQTT/媒体协议，最后按硬件 adapter/plugin seam 分阶段整理。
+5. 依赖检查阻止 domain → framework、service → service 源码依赖和循环引用；每个重构切片分别通过既有服务/协议合同及适用集成验收后再合并。
+6. 不做一次性全量重写；任何数据迁移继续按先扩展/兼容、回填核对、切换读写、保留回滚窗口的顺序执行。
+
+## 13. 三类角色目标 UML
+
+以下均为目标行为视图。用例图表示角色在 Web/PWA 中完成的日常操作；类图表示逻辑实体及不同 account_id 语义；时序图说明设备授权、视频查看和撤权的服务协作；状态图表示邀请与成员生命周期。它们不证明路由、API、角色表或撤权实现已经存在。
+
+### 13.1 用例图：管理员、PC owner、移动成员与 Atlas
+
+![三类用户与边缘设备的 Web/PWA 用例图](assets/uml_use_cases.svg)
+
+**界面闭环说明**：PC 页面选择成员、设备与能力并提交授权；mobile PWA 兑换邀请、查看自己的设备范围，在有 stream.view 时查看授权设备下的单路摄像头视频，也可按 event.handle 处理事件。管理员通过控制台完成日常账号、健康、脱敏诊断和审计。首个 admin 初始化及主机部署/服务重启留在受控运维流程；首版设备级视频授权覆盖其全部摄像头。
+
+### 13.2 类图：身份、工作空间、设备、事件与媒体
+
+![工作空间和设备授权的目标领域类图](assets/uml_domain_class.svg)
+
+类图区分资源租户 workspace_id 与操作主体 account_id：会话、事件处置人、媒体观看者和 Push 订阅继续保存真实账号。跨服务 ID 是合同引用；每个服务只维护本服务 schema，不通过物理外键或联表跨域读取。
+
+### 13.3 时序图：邀请兑换、单路播放与撤权
+
+![邀请、设备授权、视频查看和撤权时序图](assets/uml_access_sequence.svg)
+
+授权由 PC owner 在 UI 发起并由 auth-service 保存；mobile 兑换成功后调用现有 media-service 获取短时租约。RTSP 凭据留在媒体服务。撤权提交后新的授权检查立即拒绝；media-service 通过 outbox/重试关闭已有 MediaMTX 会话，并显示收敛状态。
+
+### 13.4 状态图：邀请与成员生命周期
+
+![邀请和成员授权状态图](assets/uml_access_state.svg)
+
+邀请为一次性并有有效期；兑换后建立成员关系。成员可处于有效、受限或撤销状态，权限更新不改变成员身份。恢复状态前重新检查 workspace、账号和 grant；撤销后不自动恢复旧权限。
+
+## 14. 文档变更记录
+
+| 日期 | 变更 |
+|---|---|
+| 2026-10-29 | 基于源码目录核对补充当前实现与目标分层边界；新增架构分层、用例/类/时序/状态 SVG，并明确角色日常操作的界面闭环。 |

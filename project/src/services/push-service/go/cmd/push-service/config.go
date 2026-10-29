@@ -22,6 +22,7 @@ type Config struct {
 	VAPIDPrivateKey   string
 	VAPIDSubject      string
 	EncryptionKey     []byte
+	AuthServiceURL    string
 	AuthServiceToken  string
 	EventServiceToken string
 	MaxEventAge       time.Duration
@@ -47,6 +48,7 @@ func LoadConfig() (Config, error) {
 		VAPIDPublicKey:    read("PUSH_VAPID_PUBLIC_KEY"),
 		VAPIDPrivateKey:   read("PUSH_VAPID_PRIVATE_KEY"),
 		VAPIDSubject:      os.Getenv("PUSH_VAPID_SUBJECT"),
+		AuthServiceURL:    strings.TrimRight(os.Getenv("AUTH_SERVICE_INTERNAL_URL"), "/"),
 		AuthServiceToken:  read("PUSH_AUTH_SERVICE_TOKEN"),
 		EventServiceToken: read("PUSH_EVENT_SERVICE_TOKEN"),
 		MaxEventAge:       envDuration("PUSH_MAX_EVENT_AGE", 24*time.Hour),
@@ -73,6 +75,10 @@ func LoadConfig() (Config, error) {
 	c.VAPIDSubject = subject
 	if c.AuthServiceToken == "" || c.EventServiceToken == "" {
 		return c, errors.New("PUSH_AUTH_SERVICE_TOKEN and PUSH_EVENT_SERVICE_TOKEN are required")
+	}
+	parsedAuthURL, err := url.ParseRequestURI(c.AuthServiceURL)
+	if err != nil || (parsedAuthURL.Scheme != "http" && parsedAuthURL.Scheme != "https") || parsedAuthURL.Host == "" || parsedAuthURL.User != nil {
+		return c, errors.New("AUTH_SERVICE_INTERNAL_URL must be an absolute HTTP(S) URL without user information")
 	}
 	keyRaw := read("PUSH_ENCRYPTION_KEY")
 	if configErr != nil {

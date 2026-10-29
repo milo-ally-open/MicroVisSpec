@@ -27,6 +27,31 @@ type CameraOwnershipSnapshot struct {
 	Algorithms     []AlgorithmOwnershipSnapshot `json:"algorithms"`
 }
 
+type DeviceOwnershipSnapshot struct {
+	DeviceID  uuid.UUID `json:"device_id"`
+	AccountID uuid.UUID `json:"account_id"`
+	Active    bool      `json:"active"`
+}
+
+func (a *App) resolveDeviceOwnership(c *gin.Context) {
+	deviceID, err := uuid.Parse(c.Param("device_id"))
+	if err != nil || deviceID == uuid.Nil {
+		writeError(c, http.StatusNotFound, "device_not_found", "device was not found")
+		return
+	}
+	var device Device
+	if err := a.db.WithContext(c.Request.Context()).Where("id = ? AND active = ? AND (activation_expires_at IS NULL OR activation_expires_at > ?)",
+		deviceID, true, time.Now().UTC()).Take(&device).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			writeError(c, http.StatusNotFound, "device_not_found", "device was not found")
+			return
+		}
+		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "device ownership could not be verified")
+		return
+	}
+	c.JSON(http.StatusOK, DeviceOwnershipSnapshot{DeviceID: device.ID, AccountID: device.AccountID, Active: device.Active})
+}
+
 func (a *App) resolveCameraOwnership(c *gin.Context) {
 	deviceID, err := uuid.Parse(c.Param("device_id"))
 	if err != nil || deviceID == uuid.Nil {

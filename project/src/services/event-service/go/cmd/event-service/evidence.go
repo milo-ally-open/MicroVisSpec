@@ -263,12 +263,24 @@ func (a *App) readEvidence(c *gin.Context) {
 		return
 	}
 	var event Event
-	if err := a.db.WithContext(c.Request.Context()).Table(Event{}.TableName()).Where("id = ? AND account_id = ?", eventID, accountID(c)).Take(&event).Error; err != nil {
+	eventQuery := a.db.WithContext(c.Request.Context()).Table(Event{}.TableName()).Where("id = ?", eventID)
+	if c.GetString("user_type") == "pc" {
+		eventQuery = eventQuery.Where("workspace_id = ?", accountID(c))
+	}
+	if err := eventQuery.Take(&event).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			writeError(c, http.StatusNotFound, "not_found", "event was not found")
 			return
 		}
 		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "event could not be loaded")
+		return
+	}
+	if err := a.requireEventCapability(c, event.DeviceID, "event.read"); err != nil {
+		if errors.Is(err, errEventCapabilityDenied) {
+			writeError(c, http.StatusNotFound, "not_found", "event was not found")
+		} else {
+			writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "event authorization could not be checked")
+		}
 		return
 	}
 	var evidence Evidence

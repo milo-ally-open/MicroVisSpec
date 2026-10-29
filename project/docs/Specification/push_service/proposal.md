@@ -15,6 +15,8 @@ PWA 订阅、VAPID、事件 inbox、可靠投递、失效清理和点击路由�
 
 事件事实、会话主数据、原生推送和用户已读回执。
 
+当前订阅与投递按单账号基线。三类用户目标下，Push subscription/delivery 仍属于实际移动账号主体，不归属于 workspace；事件接收人须按发送时的有效成员关系和设备 grant 重新计算，撤权后停止后续投递。共享合同见[三类用户与工作空间授权规格](../multi_user_workspace_access/)。
+
 ## 文档关系
 
 2026-10-22 本机联调补充：用户授权独立表单和逻辑后端，在 `src/tools/push-debug/` 使用专用模拟设备接入现有事件链路；不增加生产通知绕过接口，不改变账号归属。工具的 REQ/AC、状态及安全边界见 [CONTRACT](../../../src/tools/push-debug/CONTRACT.md)。手机和 CodeArts 实机证据按用户决定后补。

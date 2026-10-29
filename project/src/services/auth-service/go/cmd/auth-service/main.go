@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -23,23 +24,33 @@ import (
 	"golang.org/x/crypto/argon2"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"gorm.io/gorm/logger"
 )
 
 const sessionLifetime = 7 * 24 * time.Hour
+const invitationLifetime = 24 * time.Hour
+
+var allowedDeviceCapabilities = map[string]struct{}{
+	"device.read": {}, "event.read": {}, "event.handle": {}, "stream.view": {}, "alert.receive": {},
+}
 
 type Config struct {
-	DatabaseURL        string
-	ListenAddress      string
-	PublicOrigin       string
-	CookieName         string
-	CookieSecure       bool
-	InternalToken      string
-	MediaServiceURL    string
-	MediaServiceToken  string
-	PushServiceURL     string
-	PushServiceToken   string
-	RateLimitPerMinute int
+	DatabaseURL         string
+	ListenAddress       string
+	PublicOrigin        string
+	CookieName          string
+	CookieSecure        bool
+	InternalToken       string
+	DeviceServiceURL    string
+	EventServiceURL     string
+	DeviceServiceToken  string
+	MediaServiceURL     string
+	MediaServiceToken   string
+	PushServiceURL      string
+	PushServiceToken    string
+	AdminBootstrapToken string
+	RateLimitPerMinute  int
 }
 
 func LoadConfig() (Config, error) {
@@ -56,17 +67,21 @@ func LoadConfig() (Config, error) {
 		return value
 	}
 	c := Config{
-		DatabaseURL:        read("DATABASE_URL"),
-		ListenAddress:      env("AUTH_LISTEN_ADDRESS", ":8080"),
-		PublicOrigin:       strings.TrimRight(os.Getenv("PUBLIC_ORIGIN"), "/"),
-		CookieName:         env("AUTH_COOKIE_NAME", "yunshao_session"),
-		CookieSecure:       envBool("AUTH_COOKIE_SECURE", true),
-		InternalToken:      read("AUTH_INTERNAL_SERVICE_TOKEN"),
-		MediaServiceURL:    strings.TrimRight(os.Getenv("AUTH_MEDIA_SERVICE_URL"), "/"),
-		MediaServiceToken:  read("AUTH_MEDIA_SERVICE_TOKEN"),
-		PushServiceURL:     strings.TrimRight(os.Getenv("AUTH_PUSH_SERVICE_URL"), "/"),
-		PushServiceToken:   read("AUTH_PUSH_SERVICE_TOKEN"),
-		RateLimitPerMinute: envInt("AUTH_RATE_LIMIT_PER_MINUTE", 20),
+		DatabaseURL:         read("DATABASE_URL"),
+		ListenAddress:       env("AUTH_LISTEN_ADDRESS", ":8080"),
+		PublicOrigin:        strings.TrimRight(os.Getenv("PUBLIC_ORIGIN"), "/"),
+		CookieName:          env("AUTH_COOKIE_NAME", "yunshao_session"),
+		CookieSecure:        envBool("AUTH_COOKIE_SECURE", true),
+		InternalToken:       read("AUTH_INTERNAL_SERVICE_TOKEN"),
+		DeviceServiceURL:    strings.TrimRight(os.Getenv("AUTH_DEVICE_SERVICE_URL"), "/"),
+		EventServiceURL:     strings.TrimRight(os.Getenv("AUTH_EVENT_SERVICE_URL"), "/"),
+		DeviceServiceToken:  read("AUTH_DEVICE_SERVICE_TOKEN"),
+		MediaServiceURL:     strings.TrimRight(os.Getenv("AUTH_MEDIA_SERVICE_URL"), "/"),
+		MediaServiceToken:   read("AUTH_MEDIA_SERVICE_TOKEN"),
+		PushServiceURL:      strings.TrimRight(os.Getenv("AUTH_PUSH_SERVICE_URL"), "/"),
+		PushServiceToken:    read("AUTH_PUSH_SERVICE_TOKEN"),
+		AdminBootstrapToken: read("AUTH_ADMIN_BOOTSTRAP_TOKEN"),
+		RateLimitPerMinute:  envInt("AUTH_RATE_LIMIT_PER_MINUTE", 20),
 	}
 	if configErr != nil {
 		return c, configErr
@@ -80,8 +95,14 @@ func LoadConfig() (Config, error) {
 	if c.InternalToken == "" {
 		return c, errors.New("AUTH_INTERNAL_SERVICE_TOKEN is required")
 	}
-	if c.MediaServiceToken == "" || c.PushServiceToken == "" {
-		return c, errors.New("AUTH_MEDIA_SERVICE_TOKEN and AUTH_PUSH_SERVICE_TOKEN are required")
+	if c.DeviceServiceToken == "" || c.MediaServiceToken == "" || c.PushServiceToken == "" {
+		return c, errors.New("AUTH_DEVICE_SERVICE_TOKEN, AUTH_MEDIA_SERVICE_TOKEN, and AUTH_PUSH_SERVICE_TOKEN are required")
+	}
+	if err := validateServiceURL("AUTH_DEVICE_SERVICE_URL", c.DeviceServiceURL); err != nil {
+		return c, err
+	}
+	if err := validateServiceURL("AUTH_EVENT_SERVICE_URL", c.EventServiceURL); err != nil {
+		return c, err
 	}
 	if err := validateServiceURL("AUTH_MEDIA_SERVICE_URL", c.MediaServiceURL); err != nil {
 		return c, err
@@ -132,11 +153,76 @@ type Account struct {
 	Username       string    `gorm:"size:32;not null" json:"username"`
 	NormalizedUser string    `gorm:"column:normalized_username;size:32;not null;uniqueIndex" json:"-"`
 	PasswordHash   string    `gorm:"size:255;not null" json:"-"`
+	UserType       string    `gorm:"column:user_type;size:16;not null;default:pc" json:"user_type"`
+	Status         string    `gorm:"size:16;not null;default:active" json:"status"`
 	CreatedAt      time.Time `gorm:"not null" json:"created_at"`
 	UpdatedAt      time.Time `gorm:"not null" json:"updated_at"`
 }
 
 func (Account) TableName() string { return "auth.accounts" }
+
+type Workspace struct {
+	ID             uuid.UUID `gorm:"type:uuid;primaryKey" json:"workspace_id"`
+	OwnerAccountID uuid.UUID `gorm:"type:uuid;not null;uniqueIndex" json:"owner_account_id"`
+	Name           string    `gorm:"size:100;not null" json:"name"`
+	Status         string    `gorm:"size:16;not null;default:active" json:"status"`
+	CreatedAt      time.Time `gorm:"not null" json:"created_at"`
+	UpdatedAt      time.Time `gorm:"not null" json:"updated_at"`
+}
+
+func (Workspace) TableName() string { return "auth.workspaces" }
+
+type WorkspaceMember struct {
+	ID          uuid.UUID  `gorm:"type:uuid;primaryKey" json:"member_id"`
+	WorkspaceID uuid.UUID  `gorm:"type:uuid;not null;index" json:"workspace_id"`
+	AccountID   uuid.UUID  `gorm:"type:uuid;not null;uniqueIndex" json:"account_id"`
+	Status      string     `gorm:"size:16;not null;default:active" json:"status"`
+	InvitedBy   uuid.UUID  `gorm:"type:uuid;not null" json:"invited_by"`
+	JoinedAt    time.Time  `gorm:"not null" json:"joined_at"`
+	RevokedAt   *time.Time `gorm:"index" json:"revoked_at,omitempty"`
+	CreatedAt   time.Time  `gorm:"not null" json:"created_at"`
+	UpdatedAt   time.Time  `gorm:"not null" json:"updated_at"`
+}
+
+func (WorkspaceMember) TableName() string { return "auth.workspace_members" }
+
+type WorkspaceInvitation struct {
+	ID                 uuid.UUID  `gorm:"type:uuid;primaryKey" json:"invitation_id"`
+	WorkspaceID        uuid.UUID  `gorm:"type:uuid;not null;index" json:"workspace_id"`
+	CreatedBy          uuid.UUID  `gorm:"type:uuid;not null" json:"created_by"`
+	TokenHash          string     `gorm:"size:64;not null;uniqueIndex" json:"-"`
+	AuthorizationDraft []byte     `gorm:"type:jsonb;not null" json:"-"`
+	ExpiresAt          time.Time  `gorm:"not null;index" json:"expires_at"`
+	UsedAt             *time.Time `gorm:"index" json:"used_at,omitempty"`
+	RevokedAt          *time.Time `gorm:"index" json:"revoked_at,omitempty"`
+	CreatedAt          time.Time  `gorm:"not null" json:"created_at"`
+}
+
+func (WorkspaceInvitation) TableName() string { return "auth.workspace_invitations" }
+
+type MemberDeviceGrant struct {
+	ID         uuid.UUID `gorm:"type:uuid;primaryKey" json:"grant_id"`
+	MemberID   uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:idx_member_device_capability,priority:1" json:"member_id"`
+	DeviceID   uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:idx_member_device_capability,priority:2" json:"device_id"`
+	Capability string    `gorm:"size:32;not null;uniqueIndex:idx_member_device_capability,priority:3" json:"capability"`
+	CreatedAt  time.Time `gorm:"not null" json:"created_at"`
+}
+
+func (MemberDeviceGrant) TableName() string { return "auth.workspace_member_device_grants" }
+
+type AuditLog struct {
+	ID          uuid.UUID `gorm:"type:uuid;primaryKey" json:"audit_id"`
+	ActorID     uuid.UUID `gorm:"type:uuid;not null;index" json:"actor_account_id"`
+	WorkspaceID uuid.UUID `gorm:"type:uuid;not null;index" json:"workspace_id"`
+	Action      string    `gorm:"size:64;not null;index" json:"action"`
+	ResourceID  string    `gorm:"size:64;not null;default:''" json:"resource_id"`
+	Result      string    `gorm:"size:16;not null" json:"result"`
+	Reason      string    `gorm:"size:240;not null;default:''" json:"reason,omitempty"`
+	RequestID   string    `gorm:"size:64;not null;index" json:"request_id"`
+	CreatedAt   time.Time `gorm:"not null;index" json:"created_at"`
+}
+
+func (AuditLog) TableName() string { return "auth.audit_logs" }
 
 type Session struct {
 	ID             uuid.UUID  `gorm:"type:uuid;primaryKey"`
@@ -174,10 +260,20 @@ func openDatabase(dsn string) (*gorm.DB, error) {
 	if err := db.Exec("CREATE SCHEMA IF NOT EXISTS auth").Error; err != nil {
 		return nil, err
 	}
-	if err := db.AutoMigrate(&Account{}, &Session{}, &Outbox{}); err != nil {
+	if err := db.AutoMigrate(&Account{}, &Workspace{}, &WorkspaceMember{}, &WorkspaceInvitation{}, &MemberDeviceGrant{}, &AuditLog{}, &Session{}, &Outbox{}); err != nil {
+		return nil, err
+	}
+	if err := backfillOwnerWorkspaces(db); err != nil {
 		return nil, err
 	}
 	return db, nil
+}
+
+func backfillOwnerWorkspaces(db *gorm.DB) error {
+	return db.Exec(`INSERT INTO auth.workspaces (id, owner_account_id, name, status, created_at, updated_at)
+		SELECT id, id, username, 'active', created_at, updated_at
+		FROM auth.accounts WHERE user_type = 'pc'
+		ON CONFLICT (owner_account_id) DO NOTHING`).Error
 }
 
 type App struct {
@@ -199,8 +295,26 @@ func NewHandler(config Config, db *gorm.DB) http.Handler {
 	api.GET("/me", app.me)
 	api.POST("/logout", app.sameOrigin, app.logout)
 	api.PUT("/password", app.sameOrigin, app.changePassword)
+	api.GET("/workspace", app.getWorkspace)
+	api.GET("/workspace/members", app.listWorkspaceMembers)
+	api.PUT("/workspace/members/:member_id/grants", app.sameOrigin, app.replaceMemberGrants)
+	api.DELETE("/workspace/members/:member_id", app.sameOrigin, app.revokeWorkspaceMember)
+	api.GET("/workspace/invitations", app.listWorkspaceInvitations)
+	api.POST("/workspace/invitations", app.sameOrigin, app.createInvitation)
+	api.DELETE("/workspace/invitations/:invitation_id", app.sameOrigin, app.revokeWorkspaceInvitation)
+	r.POST("/api/v1/invitations/redeem", app.sameOrigin, app.limitByIP("invitation-redeem"), app.redeemInvitation)
+	r.POST("/internal/v1/admin/bootstrap", app.bootstrapAdmin)
+	admin := r.Group("/api/v1/admin", app.requireAdmin())
+	admin.GET("/accounts", app.listAdminAccounts)
+	admin.GET("/health", app.adminHealth)
+	admin.POST("/accounts", app.sameOrigin, app.requireAdminCSRF(), app.createAdminManagedPC)
+	admin.PATCH("/accounts/:account_id/status", app.sameOrigin, app.requireAdminCSRF(), app.setAdminAccountStatus)
+	admin.GET("/audit", app.listAdminAudit)
 
 	r.GET("/internal/v1/sessions/validate", app.requireSessionValidationToken(), app.validateSession)
+	r.POST("/internal/v1/authorization/check", app.requireAuthorizationService(), app.checkAuthorization)
+	r.POST("/internal/v1/authorization/devices", app.requireAuthorizationService(), app.listAuthorizedDevices)
+	r.POST("/internal/v1/authorization/recipients", app.requireAuthorizationService(), app.listAlertRecipients)
 	return r
 }
 
@@ -274,6 +388,22 @@ func (a *App) requireSessionValidationToken() gin.HandlerFunc {
 	}
 }
 
+func (a *App) requireAuthorizationService() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		provided := c.GetHeader("X-Internal-Service-Token")
+		valid := provided != "" && ((a.config.InternalToken != "" && constantTimeEqual(provided, a.config.InternalToken)) ||
+			(a.config.DeviceServiceToken != "" && constantTimeEqual(provided, a.config.DeviceServiceToken)) ||
+			(a.config.MediaServiceToken != "" && constantTimeEqual(provided, a.config.MediaServiceToken)) ||
+			(a.config.PushServiceToken != "" && constantTimeEqual(provided, a.config.PushServiceToken)))
+		if !valid {
+			writeError(c, http.StatusUnauthorized, "unauthorized", "service authentication required")
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
 type credentials struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
@@ -296,8 +426,16 @@ func (a *App) register(c *gin.Context) {
 		writeError(c, http.StatusInternalServerError, "internal_error", "request could not be completed")
 		return
 	}
-	account := Account{ID: uuid.New(), Username: username, NormalizedUser: normalized, PasswordHash: encoded, CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
-	if err := a.db.Table(Account{}.TableName()).Create(&account).Error; err != nil {
+	account := Account{ID: uuid.New(), Username: username, NormalizedUser: normalized, PasswordHash: encoded,
+		UserType: "pc", Status: "active", CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
+	workspace := Workspace{ID: account.ID, OwnerAccountID: account.ID, Name: account.Username,
+		Status: "active", CreatedAt: account.CreatedAt, UpdatedAt: account.UpdatedAt}
+	if err := a.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Table(Account{}.TableName()).Create(&account).Error; err != nil {
+			return err
+		}
+		return tx.Table(Workspace{}.TableName()).Create(&workspace).Error
+	}); err != nil {
 		if isUniqueViolation(err) {
 			writeError(c, http.StatusConflict, "username_unavailable", "username is already in use")
 			return
@@ -305,7 +443,299 @@ func (a *App) register(c *gin.Context) {
 		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "account could not be created")
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"account_id": account.ID, "username": account.Username})
+	c.JSON(http.StatusCreated, gin.H{"account_id": account.ID, "username": account.Username, "user_type": account.UserType})
+}
+
+type invitationGrantDraft struct {
+	DeviceID     string   `json:"device_id"`
+	Capabilities []string `json:"capabilities"`
+}
+
+type createInvitationRequest struct {
+	DeviceGrants []invitationGrantDraft `json:"device_grants"`
+}
+
+func (a *App) createInvitation(c *gin.Context) {
+	_, session, account, ok := a.loadSession(c, false)
+	if !ok {
+		writeError(c, http.StatusUnauthorized, "unauthorized", "a valid session is required")
+		return
+	}
+	if !a.validCSRF(c, session) {
+		writeError(c, http.StatusForbidden, "csrf_rejected", "valid CSRF token required")
+		return
+	}
+	if account.UserType != "pc" {
+		writeError(c, http.StatusForbidden, "forbidden", "only a PC workspace owner can create invitations")
+		return
+	}
+	var body createInvitationRequest
+	if err := decodeJSON(c, &body); err != nil || len(body.DeviceGrants) == 0 {
+		writeError(c, http.StatusUnprocessableEntity, "invalid_request", "at least one device grant is required")
+		return
+	}
+	grants, err := normalizeGrantDrafts(body.DeviceGrants)
+	if err != nil {
+		writeError(c, http.StatusUnprocessableEntity, "invalid_grants", "device grants are invalid")
+		return
+	}
+	var workspace Workspace
+	if err := a.db.Table(Workspace{}.TableName()).Where("owner_account_id = ? AND status = ?", account.ID, "active").First(&workspace).Error; err != nil {
+		writeError(c, http.StatusForbidden, "workspace_unavailable", "workspace is not available")
+		return
+	}
+	owned, err := a.verifyDeviceOwnership(c.Request.Context(), account.ID, grants)
+	if err != nil {
+		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "device ownership could not be verified")
+		return
+	}
+	if !owned {
+		writeError(c, http.StatusUnprocessableEntity, "invalid_grants", "every granted device must be active and owned by this workspace")
+		return
+	}
+	plainToken, err := randomToken(32)
+	if err != nil {
+		writeError(c, http.StatusInternalServerError, "internal_error", "request could not be completed")
+		return
+	}
+	now := time.Now().UTC()
+	draftBytes, err := jsonBytes(grants)
+	if err != nil {
+		writeError(c, http.StatusInternalServerError, "internal_error", "request could not be completed")
+		return
+	}
+	invitation := WorkspaceInvitation{ID: uuid.New(), WorkspaceID: workspace.ID, CreatedBy: account.ID,
+		TokenHash: hashToken(plainToken), AuthorizationDraft: draftBytes, ExpiresAt: now.Add(invitationLifetime), CreatedAt: now}
+	audit := AuditLog{ID: uuid.New(), ActorID: account.ID, WorkspaceID: workspace.ID, Action: "invitation.created",
+		ResourceID: invitation.ID.String(), Result: "success", RequestID: c.GetString("request_id"), CreatedAt: now}
+	if err := a.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Table(WorkspaceInvitation{}.TableName()).Create(&invitation).Error; err != nil {
+			return err
+		}
+		return tx.Table(AuditLog{}.TableName()).Create(&audit).Error
+	}); err != nil {
+		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "invitation could not be created")
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"invitation_id": invitation.ID, "invite_token": plainToken,
+		"expires_at": invitation.ExpiresAt, "uses_remaining": 1})
+}
+
+type redeemInvitationRequest struct {
+	Token    string `json:"token"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+func (a *App) redeemInvitation(c *gin.Context) {
+	var body redeemInvitationRequest
+	if err := decodeJSON(c, &body); err != nil || len(body.Token) < 32 || len(body.Token) > 256 {
+		writeError(c, http.StatusUnprocessableEntity, "invalid_request", "invitation token and account credentials are required")
+		return
+	}
+	username := strings.TrimSpace(body.Username)
+	normalized := strings.ToLower(username)
+	if !validUsername(normalized) || len(body.Password) < 12 {
+		writeError(c, http.StatusUnprocessableEntity, "invalid_credentials", "username or password does not meet requirements")
+		return
+	}
+	now := time.Now().UTC()
+	var createdAccount Account
+	var member WorkspaceMember
+	var invitation WorkspaceInvitation
+	var drafts []invitationGrantDraft
+	err := a.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Table(WorkspaceInvitation{}.TableName()).Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("token_hash = ?", hashToken(body.Token)).First(&invitation).Error; err != nil {
+			return errors.New("invitation is invalid or unavailable")
+		}
+		if invitation.UsedAt != nil || invitation.RevokedAt != nil || !now.Before(invitation.ExpiresAt) {
+			return errors.New("invitation is invalid or unavailable")
+		}
+		var workspace Workspace
+		if err := tx.Table(Workspace{}.TableName()+" AS workspaces").
+			Joins("JOIN auth.accounts AS owners ON owners.id = workspaces.owner_account_id").
+			Where("workspaces.id = ? AND workspaces.status = ? AND owners.status = ?", invitation.WorkspaceID, "active", "active").First(&workspace).Error; err != nil {
+			return errors.New("invitation is invalid or unavailable")
+		}
+		if err := json.Unmarshal(invitation.AuthorizationDraft, &drafts); err != nil {
+			return errors.New("invitation authorization is invalid")
+		}
+		if len(drafts) == 0 {
+			return errors.New("invitation authorization is invalid")
+		}
+		var existing Account
+		lookupErr := tx.Table(Account{}.TableName()).Where("normalized_username = ?", normalized).First(&existing).Error
+		switch {
+		case errors.Is(lookupErr, gorm.ErrRecordNotFound):
+			encoded, hashErr := hashPassword(body.Password)
+			if hashErr != nil {
+				return hashErr
+			}
+			createdAccount = Account{ID: uuid.New(), Username: username, NormalizedUser: normalized,
+				PasswordHash: encoded, UserType: "mobile", Status: "active", CreatedAt: now, UpdatedAt: now}
+			if err := tx.Table(Account{}.TableName()).Create(&createdAccount).Error; err != nil {
+				return err
+			}
+		case lookupErr != nil:
+			return lookupErr
+		default:
+			if existing.UserType != "mobile" || existing.Status != "active" || !verifyPassword(existing.PasswordHash, body.Password) {
+				return errors.New("invitation is invalid or unavailable")
+			}
+			createdAccount = existing
+		}
+		memberErr := tx.Table(WorkspaceMember{}.TableName()).Where("account_id = ?", createdAccount.ID).First(&member).Error
+		if memberErr == nil {
+			if member.Status == "active" {
+				return errors.New("mobile account already has an active membership")
+			}
+			member.WorkspaceID, member.Status, member.InvitedBy = invitation.WorkspaceID, "active", invitation.CreatedBy
+			member.JoinedAt, member.RevokedAt, member.UpdatedAt = now, nil, now
+			if err := tx.Table(WorkspaceMember{}.TableName()).Save(&member).Error; err != nil {
+				return err
+			}
+		} else if errors.Is(memberErr, gorm.ErrRecordNotFound) {
+			member = WorkspaceMember{ID: uuid.New(), WorkspaceID: invitation.WorkspaceID, AccountID: createdAccount.ID,
+				Status: "active", InvitedBy: invitation.CreatedBy, JoinedAt: now, CreatedAt: now, UpdatedAt: now}
+			if err := tx.Table(WorkspaceMember{}.TableName()).Create(&member).Error; err != nil {
+				return err
+			}
+		} else {
+			return memberErr
+		}
+		if err := tx.Table(MemberDeviceGrant{}.TableName()).Where("member_id = ?", member.ID).Delete(&MemberDeviceGrant{}).Error; err != nil {
+			return err
+		}
+		for _, draft := range drafts {
+			deviceID, parseErr := uuid.Parse(draft.DeviceID)
+			if parseErr != nil {
+				return errors.New("invitation authorization is invalid")
+			}
+			for _, capability := range draft.Capabilities {
+				grant := MemberDeviceGrant{ID: uuid.New(), MemberID: member.ID, DeviceID: deviceID, Capability: capability, CreatedAt: now}
+				if err := tx.Table(MemberDeviceGrant{}.TableName()).Create(&grant).Error; err != nil {
+					return err
+				}
+			}
+		}
+		invitation.UsedAt = &now
+		consumeResult := tx.Table(WorkspaceInvitation{}.TableName()).Where("id = ? AND used_at IS NULL AND revoked_at IS NULL", invitation.ID).
+			Update("used_at", now)
+		if consumeResult.Error != nil {
+			return consumeResult.Error
+		}
+		if consumeResult.RowsAffected != 1 {
+			return errors.New("invitation is invalid or unavailable")
+		}
+		audit := AuditLog{ID: uuid.New(), ActorID: createdAccount.ID, WorkspaceID: invitation.WorkspaceID,
+			Action: "invitation.redeemed", ResourceID: invitation.ID.String(), Result: "success",
+			RequestID: c.GetString("request_id"), CreatedAt: now}
+		return tx.Table(AuditLog{}.TableName()).Create(&audit).Error
+	})
+	if err != nil {
+		if strings.Contains(err.Error(), "mobile account already has an active membership") {
+			writeError(c, http.StatusConflict, "membership_exists", "mobile account already has an active membership")
+			return
+		}
+		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique constraint") {
+			writeError(c, http.StatusConflict, "username_unavailable", "username is already in use")
+			return
+		}
+		if strings.Contains(err.Error(), "invitation is invalid") || strings.Contains(err.Error(), "invitation authorization is invalid") {
+			writeError(c, http.StatusUnprocessableEntity, "invitation_invalid", "invitation is expired, revoked, used, or invalid")
+			return
+		}
+		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "invitation could not be redeemed")
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"account_id": createdAccount.ID, "username": createdAccount.Username,
+		"user_type": createdAccount.UserType, "workspace_id": invitation.WorkspaceID, "member_id": member.ID})
+}
+
+func normalizeGrantDrafts(input []invitationGrantDraft) ([]invitationGrantDraft, error) {
+	seen := make(map[string]struct{})
+	result := make([]invitationGrantDraft, 0, len(input))
+	for _, item := range input {
+		deviceID, err := uuid.Parse(strings.TrimSpace(item.DeviceID))
+		if err != nil || len(item.Capabilities) == 0 {
+			return nil, errors.New("invalid device grant")
+		}
+		grant := invitationGrantDraft{DeviceID: deviceID.String(), Capabilities: make([]string, 0, len(item.Capabilities))}
+		for _, capability := range item.Capabilities {
+			capability = strings.TrimSpace(capability)
+			if _, ok := allowedDeviceCapabilities[capability]; !ok {
+				return nil, errors.New("unsupported device capability")
+			}
+			key := grant.DeviceID + ":" + capability
+			if _, ok := seen[key]; ok {
+				return nil, errors.New("duplicate device capability")
+			}
+			seen[key] = struct{}{}
+			grant.Capabilities = append(grant.Capabilities, capability)
+		}
+		result = append(result, grant)
+	}
+	return result, nil
+}
+
+type deviceOwnerSnapshot struct {
+	DeviceID  uuid.UUID `json:"device_id"`
+	AccountID uuid.UUID `json:"account_id"`
+	Active    bool      `json:"active"`
+}
+
+func (a *App) verifyDeviceOwnership(ctx context.Context, ownerID uuid.UUID, grants []invitationGrantDraft) (bool, error) {
+	seen := make(map[uuid.UUID]struct{}, len(grants))
+	for _, grant := range grants {
+		deviceID, err := uuid.Parse(grant.DeviceID)
+		if err != nil {
+			return false, nil
+		}
+		if _, exists := seen[deviceID]; exists {
+			continue
+		}
+		seen[deviceID] = struct{}{}
+		snapshot, found, err := a.getDeviceOwnership(ctx, deviceID)
+		if err != nil {
+			return false, err
+		}
+		if !found {
+			return false, nil
+		}
+		if snapshot.DeviceID != deviceID || snapshot.AccountID != ownerID || !snapshot.Active {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func (a *App) getDeviceOwnership(ctx context.Context, deviceID uuid.UUID) (deviceOwnerSnapshot, bool, error) {
+	var snapshot deviceOwnerSnapshot
+	reqCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet,
+		a.config.DeviceServiceURL+"/internal/v1/devices/"+deviceID.String()+"/ownership", nil)
+	if err != nil {
+		return snapshot, false, err
+	}
+	req.Header.Set("X-Internal-Service-Token", a.config.DeviceServiceToken)
+	client := &http.Client{Timeout: 3 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	resp, err := client.Do(req)
+	if err != nil {
+		return snapshot, false, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		return snapshot, false, nil
+	}
+	if resp.StatusCode != http.StatusOK {
+		return snapshot, false, fmt.Errorf("device ownership service returned status %d", resp.StatusCode)
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 16*1024)).Decode(&snapshot); err != nil {
+		return snapshot, false, err
+	}
+	return snapshot, true, nil
 }
 
 func (a *App) login(c *gin.Context) {
@@ -316,7 +746,7 @@ func (a *App) login(c *gin.Context) {
 	}
 	var account Account
 	err := a.db.Table(Account{}.TableName()).Where("normalized_username = ?", strings.ToLower(strings.TrimSpace(body.Username))).First(&account).Error
-	if err != nil || !verifyPassword(account.PasswordHash, body.Password) {
+	if err != nil || !verifyPassword(account.PasswordHash, body.Password) || account.Status != "active" {
 		slog.Warn("auth_login_failed", "request_id", c.GetString("request_id"), "client_ip", c.ClientIP())
 		writeError(c, http.StatusUnauthorized, "invalid_credentials", "username or password is incorrect")
 		return
@@ -339,7 +769,8 @@ func (a *App) login(c *gin.Context) {
 	}
 	a.setCookie(c, token, session.ExpiresAt)
 	slog.Info("auth_login_succeeded", "request_id", c.GetString("request_id"), "account_id", account.ID)
-	c.JSON(http.StatusOK, gin.H{"account_id": account.ID, "username": account.Username, "csrf_token": csrf})
+	c.JSON(http.StatusOK, gin.H{"account_id": account.ID, "username": account.Username,
+		"user_type": account.UserType, "csrf_token": csrf})
 }
 
 func (a *App) me(c *gin.Context) {
@@ -357,7 +788,8 @@ func (a *App) me(c *gin.Context) {
 		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "session could not be refreshed")
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"account_id": account.ID, "username": account.Username, "csrf_token": csrf})
+	c.JSON(http.StatusOK, gin.H{"account_id": account.ID, "username": account.Username,
+		"user_type": account.UserType, "csrf_token": csrf})
 }
 
 func (a *App) logout(c *gin.Context) {
@@ -460,6 +892,7 @@ func (a *App) validateSession(c *gin.Context) {
 	}
 	c.Header("X-Account-ID", account.ID.String())
 	c.Header("X-Session-ID", session.ID.String())
+	c.Header("X-User-Type", account.UserType)
 	c.Status(http.StatusNoContent)
 }
 
@@ -481,7 +914,7 @@ func (a *App) loadSession(c *gin.Context, touch bool) (string, Session, Account,
 		session.LastActivityAt, session.ExpiresAt = now, now.Add(sessionLifetime)
 	}
 	var account Account
-	if err := a.db.Table(Account{}.TableName()).Where("id = ?", session.AccountID).First(&account).Error; err != nil {
+	if err := a.db.Table(Account{}.TableName()).Where("id = ? AND status = ?", session.AccountID, "active").First(&account).Error; err != nil {
 		return "", Session{}, Account{}, false
 	}
 	return cookie, session, account, true

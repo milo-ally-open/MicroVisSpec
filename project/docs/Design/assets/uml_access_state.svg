@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1760" height="1080" viewBox="0 0 1760 1080" role="img" aria-labelledby="title desc">
+<title id="title">邀请与成员授权状态图</title>
+<desc id="desc">邀请和成员状态及撤权后续清理；箭头表示状态转换，橙色点线表示异步清理。</desc>
+<defs>
+<marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,0 L10,4 L0,8 z" fill="#42617b"/></marker>
+<marker id="eventArrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,0 L10,4 L0,8 z" fill="#bd6b26"/></marker>
+<style>text{font-family:Arial,"Microsoft YaHei",sans-serif;fill:#203246}.title{font-size:30px;font-weight:700}.sub{font-size:17px;fill:#53677b}.h{font-size:20px;font-weight:700}.body{font-size:17px}.small{font-size:14px;fill:#53677b}.box{fill:#fff;stroke:#7790a8;stroke-width:2}.blue{fill:#eaf3fb;stroke:#5590c1;stroke-width:2}.green{fill:#eaf7f0;stroke:#4b9b73;stroke-width:2}.orange{fill:#fff3e7;stroke:#d3904c;stroke-width:2}.purple{fill:#f2edfb;stroke:#8872b3;stroke-width:2}.pale{fill:#fbfcfe;stroke:#c4d0dc;stroke-width:1.5}.note{fill:#fff8d9;stroke:#d2b75d;stroke-width:1.5}.divider{stroke:#c5d0da;stroke-width:1.2}.assoc{fill:none;stroke:#63788d;stroke-width:1.7}.ref{fill:none;stroke:#bd6b26;stroke-width:1.8;stroke-dasharray:6 5;marker-end:url(#eventArrow)}</style>
+</defs>
+<rect width="100%" height="100%" fill="white"/>
+<text x="42" y="48" class="title" text-anchor="start">邀请与成员授权状态图</text>
+<text x="42" y="76" class="sub" text-anchor="start">新请求在撤权提交后立即拒绝；媒体租约和 Push 接收关系由 outbox 清理或重算。</text>
+<rect x="50" y="120" width="790" height="820" rx="14" class="pale"/>
+<text x="80" y="160" class="h" text-anchor="start">邀请生命周期</text>
+<rect x="880" y="120" width="830" height="820" rx="14" class="pale"/>
+<text x="910" y="160" class="h" text-anchor="start">成员生命周期</text>
+<circle cx="115" cy="265" r="12" fill="#203246"/>
+<circle cx="115" cy="265" r="20" fill="none" stroke="#203246" stroke-width="2"/>
+<rect x="220.0" y="223.0" width="240" height="84" rx="18" class="blue"/>
+<text x="340" y="262" class="h" text-anchor="middle">待兑换</text>
+<text x="340" y="287" class="small" text-anchor="middle">保存 token hash</text>
+<rect x="545.0" y="223.0" width="210" height="84" rx="18" class="green"/>
+<text x="650" y="262" class="h" text-anchor="middle">已兑换</text>
+<text x="650" y="287" class="small" text-anchor="middle">一次性消费</text>
+<rect x="230.0" y="468.0" width="220" height="84" rx="18" class="orange"/>
+<text x="340" y="507" class="h" text-anchor="middle">已过期</text>
+<text x="340" y="532" class="small" text-anchor="middle">超过有效期</text>
+<rect x="540.0" y="468.0" width="220" height="84" rx="18" class="orange"/>
+<text x="650" y="507" class="h" text-anchor="middle">已撤销</text>
+<text x="650" y="532" class="small" text-anchor="middle">owner 撤销邀请</text>
+<path d="M135,265 L220,265" class="assoc" marker-end="url(#arrow)"/>
+<path d="M460,265 L545,265" class="assoc" marker-end="url(#arrow)"/>
+<text x="500" y="242" class="small" text-anchor="middle">兑换成功</text>
+<path d="M340,307 L340,468" class="assoc" marker-end="url(#arrow)"/>
+<text x="405" y="402" class="small" text-anchor="middle">到期</text>
+<polyline points="460,265 505,265 505,510 540,510" class="assoc" marker-end="url(#arrow)"/>
+<text x="505" y="390" class="small" text-anchor="middle">owner 撤销</text>
+<polyline points="755,265 795,265 795,770 780,770" class="assoc" marker-end="url(#arrow)"/>
+<text x="790" y="610" class="small" text-anchor="middle">创建成员</text>
+<circle cx="760" cy="770" r="12" fill="#203246"/>
+<circle cx="760" cy="770" r="20" fill="none" stroke="#203246" stroke-width="2"/>
+<circle cx="940" cy="270" r="12" fill="#203246"/>
+<circle cx="940" cy="270" r="20" fill="none" stroke="#203246" stroke-width="2"/>
+<rect x="1040.0" y="226.0" width="240" height="88" rx="18" class="green"/>
+<text x="1160" y="267" class="h" text-anchor="middle">有效</text>
+<text x="1160" y="292" class="small" text-anchor="middle">active member</text>
+<rect x="1390.0" y="226.0" width="240" height="88" rx="18" class="blue"/>
+<text x="1510" y="267" class="h" text-anchor="middle">授权已更新</text>
+<text x="1510" y="292" class="small" text-anchor="middle">grant set changed</text>
+<rect x="1040.0" y="476.0" width="240" height="88" rx="18" class="orange"/>
+<text x="1160" y="517" class="h" text-anchor="middle">受限</text>
+<text x="1160" y="542" class="small" text-anchor="middle">account/workspace disabled</text>
+<rect x="1390.0" y="476.0" width="240" height="88" rx="18" class="orange"/>
+<text x="1510" y="517" class="h" text-anchor="middle">已撤销</text>
+<text x="1510" y="542" class="small" text-anchor="middle">membership revoked</text>
+<rect x="1095.0" y="740.0" width="330" height="100" rx="18" class="purple"/>
+<text x="1260" y="787" class="h" text-anchor="middle">已清理 / 待重试</text>
+<text x="1260" y="812" class="small" text-anchor="middle">leases closed; Push rechecked</text>
+<path d="M960,270 L1040,270" class="assoc" marker-end="url(#arrow)"/>
+<path d="M1280,270 L1390,270" class="assoc" marker-end="url(#arrow)"/>
+<text x="1335" y="245" class="small" text-anchor="middle">owner 更新 grants</text>
+<polyline points="1510,226 1510,205 1160,205 1160,226" class="assoc" marker-end="url(#arrow)"/>
+<text x="1335" y="196" class="small" text-anchor="middle">授权重新确认</text>
+<path d="M1160,314 L1160,476" class="assoc" marker-end="url(#arrow)"/>
+<text x="1070" y="397" class="small" text-anchor="middle">停用空间/账号</text>
+<polyline points="1265,314 1265,350 1645,350 1645,520 1630,520" class="assoc" marker-end="url(#arrow)"/>
+<text x="1450" y="340" class="small" text-anchor="middle">owner 撤销成员</text>
+<path d="M1510,314 L1510,476" class="assoc" marker-end="url(#arrow)"/>
+<text x="1570" y="397" class="small" text-anchor="middle">权限关系撤销</text>
+<polyline points="1160,564 1160,650 1240,650 1240,740" class="ref"/>
+<text x="1175" y="632" class="small" text-anchor="start">停用后撤租</text>
+<polyline points="1510,564 1510,650 1300,650 1300,740" class="ref"/>
+<text x="1410" y="632" class="small" text-anchor="middle">撤权 outbox</text>
+<polyline points="1040,520 995,520 995,270 1040,270" class="assoc" marker-end="url(#arrow)"/>
+<text x="1000" y="405" class="small" text-anchor="middle">恢复并重验策略</text>
+<rect x="90" y="850" width="710" height="62" rx="10" class="note"/>
+<text x="112" y="878" class="body" text-anchor="start">邀请由 auth-service 原子消费；已过期或已撤销的 token 不可兑换。</text>
+<rect x="920" y="850" width="740" height="62" rx="10" class="note"/>
+<text x="942" y="878" class="body" text-anchor="start">恢复账号不自动恢复旧授权；下游失败保留待重试状态。</text>
+</svg>

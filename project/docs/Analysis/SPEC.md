@@ -6,6 +6,8 @@
 >
 > 输入：[PRD](PRD.md)、[调研决策](../Research/RESEARCH.md)、[架构设计](../Design/STRUCTURE.md)、[README](../../../README.md)。产品范围以 PRD 为准；本文件细化接口、数据和运行合同。
 
+> 范围说明：本文件 §§1–10 描述现有 MVP 的单账号基线。三类用户与工作空间属于下一阶段目标，统一目标合同见[三类用户与工作空间授权规格](../Specification/multi_user_workspace_access/)。该组实施并验收前，不能把目标行为当作当前能力；冲突与切换按该组 T-01–T-03 处理。
+
 ## 1. 范围与需求追踪
 
 首发运行 auth、device、event、media、push 五个 Go 业务服务，以及 Nginx、PostgreSQL、Mosquitto 和 MediaMTX。mcp-service 仅保留目录和边界，不构建或部署。五个首发 Go 服务分别交付为一个 Linux amd64 二进制，由 systemd 管理；Web/PWA 构建为静态文件，由主机 Nginx 提供。部署及验收状态以对应 `tasks.md` 和[平台部署任务记录](../Specification/platform_deployment/tasks.md)为准。[架构设计 §1–§3](../Design/STRUCTURE.md)
@@ -90,7 +92,7 @@ Nginx 对受保护 /api/v1 请求调用 auth-service 的内部会话校验，清
 | PUT /api/v1/devices/{deviceId}/algorithms/{assignmentId}/parameters | expected_version、parameters；返回新期望版本和 pending 状态。 | 校验允许的参数；命令回执成功后才标记 applied。 |
 | GET /api/v1/devices/stats | registered、online、as_of。 | 仅当前账号，online 依据心跳计算。 |
 
-边缘代理使用 POST /edge/v1/activate 携带一次性凭据与 device_id，device-service 核对后发放唯一 MQTT client_id 与一次显示的设备密码，并通过 Mosquitto 的安全管理能力写入该设备的 ACL。设备激活与 MQTT 凭据均可撤销；重新激活须由账号用户重新签发凭据。设备状态心跳默认每 30 秒一次，超过 90 秒未收到有效心跳判定离线；离线不代表摄像头或媒体一定不可达。SSH 只供人工运维。[Mosquitto Dynamic Security](https://mosquitto.org/documentation/dynamic-security/)
+边缘代理使用 POST /edge/v1/activate 携带一次性凭据与 device_id，device-service 核对后发放唯一 MQTT client_id 与一次显示的设备密码，并通过 Mosquitto 的安全管理能力写入该设备的 ACL。设备激活与 MQTT 凭据均可撤销；重新激活须由账号用户重新签发凭据。设备状态心跳默认每 30 秒一次，超过 90 秒未收到有效心跳判定离线；离线不代表摄像头或媒体一定不可达。当前 Web 设备详情页还通过受限 SSH 向导完成首次引导接入；SSH 不承载常规业务通信，设备状态、事件和命令走 HTTPS/MQTT。三角色目标下保留此指纹确认和任务状态 UI，另新增工作空间成员对设备能力的授权流程；这是两种不同的“设备授权”。[Mosquitto Dynamic Security](https://mosquitto.org/documentation/dynamic-security/)
 
 算法参数遵循“期望版本 → MQTT 命令 → 设备 ACK/实报版本”的异步过程。UI 不将请求成功解释成边缘已生效；失败、超时和设备不支持都保留原因。没有能力描述的参数仅可查看，不可编辑。
 
@@ -194,13 +196,13 @@ event.events 建 (account_id,occurred_at DESC,id DESC) 主列表索引，以及�
 
 ## 6. Web/PWA 实现合同
 
-前端仍使用同一个 Vue 3 + TypeScript 工程 [project/src/clients/web](../../src/clients/web/README.md)，页面放在 src/pages，路由集中在 src/router，类型化请求客户端放在 src/api。首发路由为 /login、/register、/account、/devices、/devices/:deviceId、/events、/events/:eventId、/monitor、/analytics、/notifications；/mcp 暂不启用。/monitor 是桌面监控大屏，手机窄屏进入时说明需桌面端；其余页面提供手机 PWA 布局。[架构设计 §4](../Design/STRUCTURE.md)
+前端仍使用同一个 Vue 3 + TypeScript 工程 [project/src/clients/web](../../src/clients/web/README.md)，页面放在 src/pages，路由集中在 src/router，类型化请求客户端放在 src/api。当前代码路由为 /login、/register、/、/devices、/devices/:deviceId、/events、/events/:eventId、/monitor、/analytics、/settings；用户设置含密码和 Push 订阅管理。设备详情页现有设备登记后的首次 SSH 引导/指纹确认/进度、激活续期、摄像头与 RTSP 来源管理；/monitor 最多渲染 12 个 CameraPlayer，窄屏 CSS 仅把栅格改为单列，每个 CameraPlayer 挂载时都会申请自己的观看租约。这些均按统一个人账号，不构成 admin/PC/mobile 路由或成员授权。目标 /admin、/app、/m 及迁移兼容路由由[三类用户规格组 REQ-08](../Specification/multi_user_workspace_access/spec.md#req-08-角色化-webpwa-导航)定义；移动成员单路播放器需确保只有所选摄像头持有活动租约；/mcp 暂不启用。[架构设计 §4](../Design/STRUCTURE.md)
 
 路由守卫调用 /api/v1/auth/me 恢复会话；未登录访问受保护页面时保存安全的站内目标路径，登录后返回原页。通知点击仅允许 /events/{eventId} 这样的站内路径，不接受服务端返回的任意外部跳转地址。API 客户端在写请求附 X-CSRF-Token，遇 401 导向登录并保留回跳，遇 409 提示刷新冲突状态，截图 410 显示“截图已过期”。/analytics 将 device/event 两份统计按 as_of 分别标注，不在客户端用其他账号数据补齐缺项。
 
 现有 vite-plugin-pwa 配置生成应用壳缓存，但没有 Push 事件处理。首发接入时改为该插件支持的自定义 service worker 构建，使一个 worker 同时处理预缓存、push、notificationclick 和更新提示；保留“提示更新”行为。只预缓存静态应用资源，/api、/media、截图、通知内容和 MCP 路径始终走网络，避免账号切换后读到旧内容。Service worker 从推送负载取得 event_id，调用 showNotification 并以 event.waitUntil 保证处理；notificationclick 打开或聚焦事件详情。应用安装、通知权限和订阅必须向用户明确展示。[vite-plugin-pwa injectManifest](https://vite-pwa-org.netlify.app/guide/inject-manifest)、[Push API](https://www.w3.org/TR/push-api/)
 
-监控大屏按当前账号设备和摄像头加载最多 12 格，先请求 media-service 的播放信息再启动 WebRTC；播放器明确显示连接中、拉流失败、编码不兼容、额度已满和 HLS 回退。页面关闭或切换摄像头时释放观看租约。统计页进入及切换今天/近 7 天/近 30 天时刷新，前台每 60 秒刷新；事件详情在状态流转后重新拉取服务端结果。PWA 仅保留离线应用壳，不承诺离线设备、事件或媒体数据。
+监控大屏按当前账号设备和摄像头加载最多 12 格，先请求 media-service 的播放信息再启动 WebRTC。窄屏只把栅格改成单列；每个挂载的 CameraPlayer 都会申请媒体租约，当前页面仍可能同时建立多路连接。播放器明确显示连接中、拉流失败、编码不兼容、额度已满和 HLS 回退；组件卸载时释放观看租约。现有窄屏布局没有移动成员/设备 grant 语义，也不保证单路播放；未来 PWA 必须按服务端当前授权筛选设备和摄像头，并只为用户选中的摄像头创建播放器，切换时先释放旧租约。统计页进入及切换今天/近 7 天/近 30 天时刷新，前台每 60 秒刷新；事件详情在状态流转后重新拉取服务端结果。PWA 仅保留离线应用壳，不承诺离线设备、事件或媒体数据。
 
 ## 7. 运行质量、安全与部署
 
@@ -239,7 +241,7 @@ PostgreSQL 做定期备份并验证恢复；Mosquitto 持久化与安全配置�
 | --- | --- | --- |
 | 五个运行中的 Go 服务，mcp-service 后置 | 与已确认的业务边界和 Go/Gin/GORM 栈一致，服务数据归属清晰。 | 一开始部署 MCP：工具权限和审计尚无产品范围，会扩大发布面。 |
 | PostgreSQL 单实例、分 schema/账号 | 首发运维成本可控，仍保留服务数据隔离及事务 outbox。 | 每服务独立数据库实例：当前 12 路规模没有足够收益，备份和运维成本更高。 |
-| Mosquitto + MQTT 3.1.1 控制面 | 边缘设备可主动连接、离线重连，适合状态/事件/命令。 | SSH 作为业务通信：连接方向、可恢复性和消息确认不符合设备常规上报；SSH 留给人工运维。 |
+| Mosquitto + MQTT 3.1.1 控制面 | 边缘设备可主动连接、离线重连，适合状态/事件/命令。 | SSH 作为常规设备业务通信：连接方向、可恢复性和消息确认不符合设备常规上报；SSH 只用于受限首次 provisioning 或人工维护。 |
 | MediaMTX 数据面 + media-service 控制面 | 复用成熟 RTSP 拉流与 WebRTC/HLS，业务层保留账号授权、来源配置和观看配额。 | Go 服务自行转发或统一软件转码：媒体协议与 12 路处理复杂度更高；MVP 在 Atlas 200I DK A2 侧生成兼容码流。 |
 | Atlas 200I DK A2 输出 H.264 Baseline 预览流 | 与主流浏览器 WebRTC 的无 B 帧要求匹配，12 分屏按 720p/15 fps 控制解码负载。 | H.265 作为首发浏览器流：WebRTC 浏览器支持范围较窄；统一后端转码会增加资源与部署复杂度。 |
 | PostgreSQL outbox + 内部投递 | 事件落库与通知意图同事务，首发不必维护第三套消息基础设施。 | 直接在请求事务里调用 Push 或引入 Kafka/NATS：前者可能丢通知或拖慢入库，后者增加部署和运维。 |
@@ -273,4 +275,25 @@ PostgreSQL 做定期备份并验证恢复；Mosquitto 持久化与安全配置�
 | 2026-10-04 | 依据 PRD、调研与架构设计建立首发 SPEC，明确五个运行服务和 MCP 占位、Web/PWA、Atlas 200I DK A2/MQTT/媒体、事件/证据、Push、统计、留存、部署及验收合同。 |
 | 2026-10-04 | 增加五份服务实现任务书索引；mcp-service 继续保持待设计状态。 |
 | 2026-10-15 | 首发边缘设备改为华为 Atlas 200I DK A2（Ascend 310B4），模型链路改为 CANN ATC/OM/AscendCL。 |
+| 2026-10-29 | 新增三类用户目标入口及代码分层边界；目标未实现，细节由跨服务规格与系统结构维护。 |
 | 2026-10-18 | 首发场景改为教室行为检测，采用 YOLO11n/640；三类告警规则默认关闭，只有设备已应用且命中显式配置的规则才能产生事件。新增 Atlas、课堂场景和 Web/PWA 规格组，五个服务均细分服务内集成测试任务；模型产物后续提供。 |
+
+## 11. 三类用户与工作空间扩展目标
+
+本节只为 PRD 中的下一阶段目标建立入口，详细身份、授权、数据迁移、错误语义和验收条件由[跨服务规格组](../Specification/multi_user_workspace_access/)唯一维护。本节不改写当前 §§1–10 的 MVP 行为或证明实现完成。
+
+目标增加 `admin`、`pc`、`mobile` 三类服务端身份；PC 用户拥有一个工作空间，移动用户经邀请加入一个工作空间，资源授权按设备与能力执行；管理员管理平台账号并查看运行元数据，不默认获得客户 RTSP、视频或截图访问。目标规格保留现有五个服务、Nginx、PostgreSQL 各服务独立 schema、Atlas/MQTT、RTSP/MediaMTX、WebRTC/HLS、Push outbox 和 24 小时截图边界。
+
+代码现状与目标差异、产品待确认项和回滚顺序见该规格组。落实前，当前单账号、`account_id` 隔离及无成员邀请仍是现有服务规格的基线。
+
+## 12. 代码分层与依赖约束（下一阶段目标）
+
+本节描述目标代码边界，不表示仓库已完成分层。现状证据、目录映射、分层图和渐进迁移约束见[系统结构 §12](../Design/STRUCTURE.md#12-当前源码层次与目标代码边界)；三类用户改造中的分层验收见[跨服务规格 REQ-10](../Specification/multi_user_workspace_access/spec.md#req-10-代码边界与分层依赖)。
+
+每个 Go 服务独立演进：cmd/service-name 是组合根；HTTP/MQTT/worker 等入站适配器把协议转换为 application 用例；application 定义用例和出站端口；domain 保存本域实体、值对象、策略与状态机；出站适配器实现端口并访问本服务数据库或外部设施。目标导入方向为 inbound → application → domain；outbound adapters → application ports/domain primitives；cmd 负责装配。domain 不导入 Gin、GORM、MQTT、MediaMTX 或其他基础设施 SDK。禁止服务间 Go 包导入、跨 schema 查询和共享可变领域模型；服务协作使用有版本的 HTTP/MQTT/outbox 合同，数据由所属服务写入。
+
+每个现有 Go module 是独立服务的边界，目标目录建议为 cmd/service-name、internal/domain、internal/application、internal/transport/{http,mqtt,worker}、internal/adapters/outbound/{postgres,serviceclient,broker,media,push,filesystem}。目录示例不要求一次迁移，也不能仅靠目录命名宣称依赖规则已满足。
+
+Web 目标沿用单一 Vue 工程：页面和布局负责呈现与导航，按业务 feature 放置状态及用例，类型化 API client 负责 HTTP 边界，共享 components 只放通用展示；服务端才是身份、工作空间和能力授权权威。Atlas 目标由 main.cpp 组装 agent/runtime 用例，硬件、MQTT、RTSP、SQLite 等适配器实现稳定端口，算法插件依稳定接口接入；现有 subsystem 目录不自动等同于已具备领域分层。
+
+采用逐服务、逐垂直切片迁移；每次保留既有 API、数据库所有权、设备协议和媒体链路，先抽用例/端口，再替换适配器并验证行为。依赖检查需阻止 domain 导入框架、服务间包依赖、循环依赖和越过所有权的数据库访问。完整目标和代码级验收仍处于待实现状态。

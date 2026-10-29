@@ -1,3 +1,4 @@
+#include "adapters/sqlite_event_outbox.hpp"
 #include "common/core.hpp"
 #include "config_fixture.hpp"
 
@@ -7,7 +8,7 @@
 #include <iostream>
 
 using yunshao::Json;
-using yunshao::EventOutbox;
+using yunshao::adapters::SQLiteEventOutbox;
 using yunshao::ModelManifest;
 
 int main() {
@@ -42,7 +43,7 @@ int main() {
         ("yunshao-agent-test-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     std::filesystem::create_directories(root);
     const auto db_path = root / "agent.db";
-    EventOutbox outbox(db_path, "device-test", config);
+    SQLiteEventOutbox outbox(db_path, "device-test", config);
     Json event{{"schema_version", 1}, {"device_id", "device-test"},
                {"event_id", "123e4567-e89b-12d3-a456-426614174000"},
                {"camera_id", "123e4567-e89b-12d3-a456-426614174001"},

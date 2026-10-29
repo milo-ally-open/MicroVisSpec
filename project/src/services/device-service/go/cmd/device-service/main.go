@@ -52,6 +52,7 @@ type Config struct {
 	AtlasBootstrapBundleFile string
 	AtlasSSHAllowedCIDRs     []netip.Prefix
 	InternalToken            string
+	AuthServiceURL           string
 	MediaServiceURL          string
 	MediaServiceToken        string
 	ActivationRatePerMin     int
@@ -88,6 +89,7 @@ func LoadConfig() (Config, error) {
 		AtlasActivationCAFile:    env("ATLAS_ACTIVATION_CA_FILE", "/run/secrets/atlas_activation_ca_certificate"),
 		AtlasBootstrapBundleFile: env("ATLAS_BOOTSTRAP_BUNDLE_FILE", "/opt/yunshao/atlas200idka2-bootstrap.tar.gz"),
 		InternalToken:            read("DEVICE_INTERNAL_SERVICE_TOKEN"),
+		AuthServiceURL:           strings.TrimRight(os.Getenv("AUTH_SERVICE_INTERNAL_URL"), "/"),
 		MediaServiceURL:          strings.TrimRight(os.Getenv("MEDIA_SERVICE_INTERNAL_URL"), "/"),
 		MediaServiceToken:        read("MEDIA_SERVICE_INTERNAL_TOKEN"),
 		ActivationRatePerMin:     envPositiveInt("DEVICE_ACTIVATION_RATE_PER_MINUTE", 10),
@@ -111,6 +113,12 @@ func LoadConfig() (Config, error) {
 	}
 	if c.InternalToken == "" {
 		return c, errors.New("DEVICE_INTERNAL_SERVICE_TOKEN is required")
+	}
+	if c.AuthServiceURL == "" {
+		return c, errors.New("AUTH_SERVICE_INTERNAL_URL is required")
+	}
+	if parsed, err := url.ParseRequestURI(c.AuthServiceURL); err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" || parsed.User != nil {
+		return c, errors.New("AUTH_SERVICE_INTERNAL_URL must be an absolute HTTP(S) URL without user information")
 	}
 	if err := validateMQTTBrokerURL(c.BrokerURL); err != nil {
 		return c, errors.New("MQTT_BROKER_URL must be an absolute ssl:// broker URL without credentials or path")
@@ -154,6 +162,7 @@ func envPositiveInt(key string, fallback int) int {
 type Device struct {
 	ID                    uuid.UUID       `gorm:"type:uuid;primaryKey" json:"device_id"`
 	AccountID             uuid.UUID       `gorm:"type:uuid;not null;index:idx_devices_account_active,priority:1" json:"-"`
+	WorkspaceID           *uuid.UUID      `gorm:"type:uuid;index" json:"-"`
 	Name                  string          `gorm:"size:120;not null" json:"name"`
 	IP                    string          `gorm:"size:45;not null" json:"ip"`
 	Location              string          `gorm:"size:256;not null" json:"location"`
@@ -174,6 +183,7 @@ func (Device) TableName() string { return "device.devices" }
 type Camera struct {
 	ID             uuid.UUID  `gorm:"type:uuid;primaryKey" json:"camera_id"`
 	AccountID      uuid.UUID  `gorm:"type:uuid;not null;index;uniqueIndex:idx_cameras_account_device_key,priority:1" json:"-"`
+	WorkspaceID    *uuid.UUID `gorm:"type:uuid;index" json:"-"`
 	DeviceID       uuid.UUID  `gorm:"type:uuid;not null;index;uniqueIndex:idx_cameras_account_device_key,priority:2" json:"device_id"`
 	Name           string     `gorm:"size:120;not null" json:"name"`
 	CameraKey      string     `gorm:"size:120;not null;uniqueIndex:idx_cameras_account_device_key,priority:3" json:"camera_key"`
@@ -307,6 +317,15 @@ func openDatabase(dsn string) (*gorm.DB, error) {
 	if err := db.AutoMigrate(&Device{}, &Camera{}, &AlgorithmAssignment{}, &ActivationTicket{}, &CommandRecord{}, &ConfigSnapshot{}, &Outbox{}, &BrokerCredential{}, &ProvisioningJob{}); err != nil {
 		return nil, err
 	}
+	// Expand/backfill phase: current workspace IDs intentionally equal their PC
+	// owner account IDs. Keep the new columns nullable until orphan review and
+	// dual-read migration verification is complete.
+	if err := db.Exec("UPDATE device.devices SET workspace_id = account_id WHERE workspace_id IS NULL").Error; err != nil {
+		return nil, err
+	}
+	if err := db.Exec("UPDATE device.cameras SET workspace_id = account_id WHERE workspace_id IS NULL").Error; err != nil {
+		return nil, err
+	}
 	if err := db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_device_provisioning_one_active_per_device ON device.provisioning_jobs (device_id) WHERE status IN ('queued', 'running')").Error; err != nil {
 		return nil, err
 	}
@@ -326,6 +345,7 @@ type App struct {
 	config             Config
 	broker             DeviceBroker
 	messages           DeviceMessagePlane
+	authorization      DeviceAuthorizationClient
 	outboxHTTP         *http.Client
 	activationLimiter  *windowLimiter
 	provisionMu        sync.Mutex
@@ -338,6 +358,25 @@ type DeviceView struct {
 	Provisioned bool                  `json:"provisioned"`
 	Cameras     []Camera              `json:"cameras"`
 	Algorithms  []AlgorithmAssignment `json:"algorithms"`
+}
+
+type MobileCameraView struct {
+	CameraID    uuid.UUID `json:"camera_id"`
+	DeviceID    uuid.UUID `json:"device_id"`
+	Name        string    `json:"name"`
+	CameraState string    `json:"camera_state"`
+	StreamState string    `json:"stream_state"`
+}
+
+type MobileDeviceView struct {
+	DeviceID        uuid.UUID          `json:"device_id"`
+	Name            string             `json:"name"`
+	Location        string             `json:"location"`
+	ActivationState string             `json:"activation_state"`
+	Active          bool               `json:"active"`
+	LastSeenAt      *time.Time         `json:"last_seen_at,omitempty"`
+	Online          bool               `json:"online"`
+	Cameras         []MobileCameraView `json:"cameras"`
 }
 
 func NewHandler(db *gorm.DB) http.Handler {
@@ -353,7 +392,8 @@ func NewHandlerWithServices(config Config, db *gorm.DB, broker DeviceBroker, mes
 }
 
 func NewApp(config Config, db *gorm.DB, broker DeviceBroker, messages DeviceMessagePlane) *App {
-	return &App{db: db, config: config, broker: broker, messages: messages, outboxHTTP: &http.Client{Timeout: 5 * time.Second}, activationLimiter: newWindowLimiter(config.ActivationRatePerMin), activeProvisioning: make(map[uuid.UUID]bool)}
+	return &App{db: db, config: config, broker: broker, messages: messages, authorization: NewDeviceAuthorizationClient(config),
+		outboxHTTP: &http.Client{Timeout: 5 * time.Second}, activationLimiter: newWindowLimiter(config.ActivationRatePerMin), activeProvisioning: make(map[uuid.UUID]bool)}
 }
 
 func (app *App) Handler() http.Handler {
@@ -365,24 +405,25 @@ func (app *App) Handler() http.Handler {
 	api := r.Group("/api/v1/devices", app.requireAccount())
 	api.GET("/activation-config", app.activationConfig)
 	api.GET("/stats", app.stats)
-	api.POST("", app.createDevice)
+	api.POST("", app.requirePCOwner(), app.createDevice)
 	api.GET("", app.listDevices)
 	api.GET("/:device_id", app.getDevice)
-	api.PATCH("/:device_id", app.updateDevice)
-	api.DELETE("/:device_id", app.disableDevice)
-	api.POST("/:device_id/activation-tickets", app.createActivationTicket)
-	api.POST("/:device_id/activation-requests", app.createActivationRequest)
-	api.GET("/:device_id/activation-requests/:request_id", app.getActivationRequest)
-	api.POST("/:device_id/provisioning/ssh-host-key", app.getProvisioningSSHHostKey)
-	api.POST("/:device_id/provisioning", app.startProvisioning)
-	api.GET("/:device_id/provisioning", app.getLatestProvisioningJob)
-	api.GET("/:device_id/provisioning/:job_id", app.getProvisioningJob)
-	api.POST("/:device_id/cameras", app.createCamera)
-	api.GET("/:device_id/algorithms", app.listAlgorithms)
-	api.PUT("/:device_id/algorithms/:assignment_id/parameters", app.updateAlgorithmParameters)
+	api.PATCH("/:device_id", app.requirePCOwner(), app.updateDevice)
+	api.DELETE("/:device_id", app.requirePCOwner(), app.disableDevice)
+	api.POST("/:device_id/activation-tickets", app.requirePCOwner(), app.createActivationTicket)
+	api.POST("/:device_id/activation-requests", app.requirePCOwner(), app.createActivationRequest)
+	api.GET("/:device_id/activation-requests/:request_id", app.requirePCOwner(), app.getActivationRequest)
+	api.POST("/:device_id/provisioning/ssh-host-key", app.requirePCOwner(), app.getProvisioningSSHHostKey)
+	api.POST("/:device_id/provisioning", app.requirePCOwner(), app.startProvisioning)
+	api.GET("/:device_id/provisioning", app.requirePCOwner(), app.getLatestProvisioningJob)
+	api.GET("/:device_id/provisioning/:job_id", app.requirePCOwner(), app.getProvisioningJob)
+	api.POST("/:device_id/cameras", app.requirePCOwner(), app.createCamera)
+	api.GET("/:device_id/algorithms", app.requirePCOwner(), app.listAlgorithms)
+	api.PUT("/:device_id/algorithms/:assignment_id/parameters", app.requirePCOwner(), app.updateAlgorithmParameters)
 	r.POST("/edge/v1/activate", app.activateDevice)
 	r.GET("/edge/v1/devices/:device_id/activation", app.pollDeviceActivation)
 	r.POST("/internal/v1/devices/:device_id/http-authenticate", app.requireInternalToken(), app.authenticateDeviceHTTP)
+	r.GET("/internal/v1/devices/:device_id/ownership", app.requireInternalToken(), app.resolveDeviceOwnership)
 	r.GET("/internal/v1/cameras/:camera_id/ownership", app.requireInternalToken(), app.resolveCameraOwnershipByID)
 	r.GET("/internal/v1/devices/:device_id/cameras/:camera_id/ownership", app.requireInternalToken(), app.resolveCameraOwnership)
 	r.POST("/internal/v1/devices/:device_id/classroom-events/validate", app.requireInternalToken(), app.validateClassroomEvent)
@@ -466,17 +507,32 @@ func (a *App) requireInternalToken() gin.HandlerFunc {
 func (a *App) requireAccount() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id, err := uuid.Parse(c.GetHeader("X-Account-ID"))
-		if err != nil || id == uuid.Nil {
+		sessionID := strings.TrimSpace(c.GetHeader("X-Session-ID"))
+		userType := strings.TrimSpace(c.GetHeader("X-User-Type"))
+		if err != nil || id == uuid.Nil || sessionID == "" || len(sessionID) > 128 || (userType != "pc" && userType != "mobile") {
 			writeError(c, http.StatusUnauthorized, "unauthorized", "a valid account session is required")
 			c.Abort()
 			return
 		}
 		c.Set("account_id", id)
+		c.Set("session_id", sessionID)
+		c.Set("user_type", userType)
 		c.Next()
 	}
 }
 
 func accountID(c *gin.Context) uuid.UUID { return c.MustGet("account_id").(uuid.UUID) }
+
+func (a *App) requirePCOwner() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if c.GetString("user_type") != "pc" {
+			writeError(c, http.StatusForbidden, "forbidden", "only a PC workspace owner can manage devices")
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
 
 func decodeJSON(c *gin.Context, dst any) error {
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 64<<10)
@@ -502,7 +558,8 @@ func (a *App) createDevice(c *gin.Context) {
 		return
 	}
 	now := time.Now().UTC()
-	device := Device{ID: uuid.New(), AccountID: accountID(c), Name: strings.TrimSpace(input.Name), IP: strings.TrimSpace(input.IP), Location: strings.TrimSpace(input.Location), ActivationState: "pending", Active: true, ReportedState: json.RawMessage(`{}`), CreatedAt: now, UpdatedAt: now}
+	workspaceID := accountID(c)
+	device := Device{ID: uuid.New(), AccountID: workspaceID, WorkspaceID: &workspaceID, Name: strings.TrimSpace(input.Name), IP: strings.TrimSpace(input.IP), Location: strings.TrimSpace(input.Location), ActivationState: "pending", Active: true, ReportedState: json.RawMessage(`{}`), CreatedAt: now, UpdatedAt: now}
 	if err := a.db.Create(&device).Error; err != nil {
 		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "device could not be registered")
 		return
@@ -527,23 +584,62 @@ func (a *App) listDevices(c *gin.Context) {
 		writeError(c, http.StatusUnprocessableEntity, "invalid_pagination", "limit must be between 1 and 100")
 		return
 	}
-	query := a.db.Where("account_id = ? AND (active = ? OR activation_state = ?)", accountID(c), true, "expired")
-	if token := c.Query("cursor"); token != "" {
-		createdAt, id, err := decodeCursor(token)
-		if err != nil {
-			writeError(c, http.StatusUnprocessableEntity, "invalid_cursor", "cursor is invalid")
+	mobile := c.GetString("user_type") == "mobile"
+	query := a.db.Model(&Device{}).Where("(active = ? OR activation_state = ?)", true, "expired")
+	var mobileNext string
+	if mobile {
+		deviceIDs, nextCursor, err := a.authorization.ListAuthorizedDevices(c.Request.Context(), accountID(c), c.GetString("session_id"), "device.read", c.Query("cursor"), limit, c.GetString("request_id"))
+		if errors.Is(err, errDeviceCapabilityDenied) {
+			writeError(c, http.StatusForbidden, "forbidden", "active workspace membership is required")
 			return
 		}
-		query = query.Where("(created_at < ? OR (created_at = ? AND id < ?))", createdAt, createdAt, id)
+		if err != nil {
+			writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "device authorization could not be checked")
+			return
+		}
+		if len(deviceIDs) == 0 {
+			c.JSON(http.StatusOK, gin.H{"items": []MobileDeviceView{}, "next_cursor": ""})
+			return
+		}
+		mobileNext = nextCursor
+		query = query.Where("id IN ? AND (activation_expires_at IS NULL OR activation_expires_at > ?)", deviceIDs, time.Now().UTC())
+	} else {
+		query = query.Where("account_id = ?", accountID(c))
+		if token := c.Query("cursor"); token != "" {
+			createdAt, id, err := decodeCursor(token)
+			if err != nil {
+				writeError(c, http.StatusUnprocessableEntity, "invalid_cursor", "cursor is invalid")
+				return
+			}
+			query = query.Where("(created_at < ? OR (created_at = ? AND id < ?))", createdAt, createdAt, id)
+		}
 	}
 	var devices []Device
-	if err := query.Order("created_at DESC, id DESC").Limit(limit + 1).Find(&devices).Error; err != nil {
+	if mobile {
+		query = query.Order("id ASC").Limit(limit)
+	} else {
+		query = query.Order("created_at DESC, id DESC").Limit(limit + 1)
+	}
+	if err := query.Find(&devices).Error; err != nil {
 		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "devices could not be listed")
 		return
 	}
-	more := len(devices) > limit
+	more := !mobile && len(devices) > limit
 	if more {
 		devices = devices[:limit]
+	}
+	if mobile {
+		items := make([]MobileDeviceView, 0, len(devices))
+		for _, device := range devices {
+			view, err := a.mobileDeviceView(device)
+			if err != nil {
+				writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "device details could not be loaded")
+				return
+			}
+			items = append(items, view)
+		}
+		c.JSON(http.StatusOK, gin.H{"items": items, "next_cursor": mobileNext})
+		return
 	}
 	items := make([]DeviceView, 0, len(devices))
 	for _, device := range devices {
@@ -612,6 +708,22 @@ func (a *App) deviceView(device Device) (DeviceView, error) {
 	return view, nil
 }
 
+func (a *App) mobileDeviceView(device Device) (MobileDeviceView, error) {
+	view := MobileDeviceView{DeviceID: device.ID, Name: device.Name, Location: device.Location,
+		ActivationState: device.ActivationState, Active: device.Active, LastSeenAt: device.LastSeenAt,
+		Online: isOnline(device, time.Now().UTC()), Cameras: []MobileCameraView{}}
+	var cameras []Camera
+	if err := a.db.Where("account_id = ? AND device_id = ? AND active = ?", device.AccountID, device.ID, true).
+		Order("created_at ASC").Find(&cameras).Error; err != nil {
+		return MobileDeviceView{}, err
+	}
+	for _, camera := range cameras {
+		view.Cameras = append(view.Cameras, MobileCameraView{CameraID: camera.ID, DeviceID: camera.DeviceID,
+			Name: camera.Name, CameraState: camera.CameraState, StreamState: camera.StreamState})
+	}
+	return view, nil
+}
+
 func isOnline(device Device, now time.Time) bool {
 	return device.Active && device.ActivationState == "active" && (device.ActivationExpiresAt == nil || device.ActivationExpiresAt.After(now)) && device.LastSeenAt != nil && now.Sub(*device.LastSeenAt) <= heartbeatTimeout
 }
@@ -619,6 +731,15 @@ func isOnline(device Device, now time.Time) bool {
 func (a *App) getDevice(c *gin.Context) {
 	device, ok := a.findOwnedActivatableDevice(c, c.Param("device_id"))
 	if !ok {
+		return
+	}
+	if c.GetString("user_type") == "mobile" {
+		view, err := a.mobileDeviceView(device)
+		if err != nil {
+			writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "device details could not be loaded")
+			return
+		}
+		c.JSON(http.StatusOK, view)
 		return
 	}
 	view, err := a.deviceView(device)
@@ -636,7 +757,20 @@ func (a *App) findOwnedActivatableDevice(c *gin.Context, rawID string) (Device, 
 		return Device{}, false
 	}
 	var device Device
-	query := a.db.Where("id = ? AND account_id = ? AND (active = ? OR activation_state = ?)", id, accountID(c), true, "expired")
+	query := a.db.Where("id = ? AND (active = ? OR activation_state = ?)", id, true, "expired")
+	if c.GetString("user_type") == "mobile" {
+		if err := a.authorization.CheckDeviceCapability(c.Request.Context(), accountID(c), c.GetString("session_id"), id,
+			"device.read", c.GetString("request_id")); err != nil {
+			if errors.Is(err, errDeviceCapabilityDenied) {
+				writeError(c, http.StatusNotFound, "not_found", "device was not found")
+			} else {
+				writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "device authorization could not be checked")
+			}
+			return Device{}, false
+		}
+	} else {
+		query = query.Where("account_id = ?", accountID(c))
+	}
 	if err := query.First(&device).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			writeError(c, http.StatusNotFound, "not_found", "device was not found")
@@ -774,7 +908,8 @@ func (a *App) createCamera(c *gin.Context) {
 		return
 	}
 	now := time.Now().UTC()
-	camera := Camera{ID: uuid.New(), AccountID: device.AccountID, DeviceID: device.ID, Name: strings.TrimSpace(input.Name), CameraKey: strings.TrimSpace(input.CameraKey), Active: true, CreatedAt: now, UpdatedAt: now}
+	workspaceID := device.AccountID
+	camera := Camera{ID: uuid.New(), AccountID: device.AccountID, WorkspaceID: &workspaceID, DeviceID: device.ID, Name: strings.TrimSpace(input.Name), CameraKey: strings.TrimSpace(input.CameraKey), Active: true, CreatedAt: now, UpdatedAt: now}
 	if err := a.db.Create(&camera).Error; err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
 			writeError(c, http.StatusConflict, "camera_key_conflict", "camera_key is already registered for this device")
@@ -806,6 +941,39 @@ func (a *App) stats(c *gin.Context) {
 	var registered int64
 	var online int64
 	account := accountID(c)
+	if c.GetString("user_type") == "mobile" {
+		cursor := ""
+		for {
+			deviceIDs, nextCursor, err := a.authorization.ListAuthorizedDevices(c.Request.Context(), account, c.GetString("session_id"), "device.read", cursor, 100, c.GetString("request_id"))
+			if errors.Is(err, errDeviceCapabilityDenied) {
+				writeError(c, http.StatusForbidden, "forbidden", "active workspace membership is required")
+				return
+			}
+			if err != nil {
+				writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "device authorization could not be checked")
+				return
+			}
+			if len(deviceIDs) > 0 {
+				var devices []Device
+				if err := a.db.Where("id IN ? AND active = ? AND (activation_expires_at IS NULL OR activation_expires_at > ?)", deviceIDs, true, time.Now().UTC()).Find(&devices).Error; err != nil {
+					writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "device statistics could not be loaded")
+					return
+				}
+				for _, device := range devices {
+					registered++
+					if isOnline(device, time.Now().UTC()) {
+						online++
+					}
+				}
+			}
+			if nextCursor == "" {
+				break
+			}
+			cursor = nextCursor
+		}
+		c.JSON(http.StatusOK, gin.H{"registered": registered, "online": online, "as_of": time.Now().UTC()})
+		return
+	}
 	if err := a.db.Model(&Device{}).Where("account_id = ? AND active = ? AND (activation_expires_at IS NULL OR activation_expires_at > ?)", account, true, time.Now().UTC()).Count(&registered).Error; err != nil {
 		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "device statistics could not be loaded")
 		return

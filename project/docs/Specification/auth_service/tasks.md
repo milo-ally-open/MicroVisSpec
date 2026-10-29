@@ -11,6 +11,8 @@
 - [ ] **T-05 auth-service 服务内集成测试** — 临时 PostgreSQL + HTTP/Nginx 身份模拟，覆盖重复用户名/并发注册、登录失败不泄露、CSRF、旧密码错误/改密撤销、跨账号隔离、过期与 outbox 重启补投；覆盖 REQ-01、REQ-02、REQ-03、REQ-04 / AC-01.1、AC-01.2、AC-02.1、AC-02.2、AC-03.1、AC-03.2、AC-04.1、AC-04.2；依赖 T-01–T-04。
 - [ ] **T-06 原生运行配置与恢复说明** — 单文件 Go 构建、systemd 非 root 运行、密钥文件注入、迁移与备份/恢复说明；完成构建与健康探针验收；覆盖 REQ-01、REQ-04 / AC-01.1、AC-04.2；依赖 T-01–T-05。
 
+- [~] **T-07 三类账号与工作空间授权扩展** — 已新增 `user_type/status` 字段并维持旧账号默认兼容；注册固定创建 PC 并事务创建以 owner UUID 为 ID 的 workspace；启动时幂等回填既有 PC workspace。登录和会话校验拒绝非 active 账号，`/me`/login 返回服务端 `user_type`，内部会话验证返回可信 `X-User-Type`。新增 workspace/member/invitation/device grant/audit 模型，24 小时单次邀请创建/兑换事务、设备服务在线归属校验和受控内部设备能力判定；兑换路由在 Nginx 清除身份头。新增 workspace 摘要、PC 成员/邀请列表、一次性邀请撤销、成员全量设备权限替换及成员撤销 API；授权接口校验有效 session/account、owner/workspace 状态、移动成员关系及精确设备 capability，停用 owner 的 workspace 不允许成员读取或兑换。仍未实现受控 admin bootstrap、admin 账号/状态管理、统一撤权 outbox 发布与消费及完整审计矩阵；本轮仅 Go build 证据，未运行测试，不能标记验收通过。workspace 是资源租户边界，session/account ID 仍表示真实主体。覆盖本组 REQ-01 / AC-01.2、REQ-02 / AC-02.1、REQ-03 / AC-03.1、AC-03.2、REQ-04 / AC-04.1、AC-04.2；依赖 multi_user_workspace_access T-01、T-03。
+
 ## 验收证据
 
 | REQ/AC | 检查方法 | 当前证据 | 状态 |

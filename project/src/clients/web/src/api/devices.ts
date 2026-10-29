@@ -62,7 +62,18 @@ export type ProvisioningJob = {
 }
 
 export const deviceApi = {
-  list: () => apiRequest<DevicePage>('/api/v1/devices?limit=100'),
+  list: (cursor = '', limit = 100) => apiRequest<DevicePage>(`/api/v1/devices?limit=${limit}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`),
+  listAll: async () => {
+    const items: Device[] = []
+    let cursor = ''
+    do {
+      const page = await deviceApi.list(cursor)
+      items.push(...page.items)
+      if (page.next_cursor && page.next_cursor === cursor) throw new Error('设备分页游标未前进。')
+      cursor = page.next_cursor
+    } while (cursor)
+    return items
+  },
   stats: () => apiRequest<DeviceStats>('/api/v1/devices/stats'),
   get: (id: string) => apiRequest<Device>(`/api/v1/devices/${encodeURIComponent(id)}`),
   create: (input: { name: string; ip: string; location: string }) => apiRequest<{ device_id: string; activation_state: string }>('/api/v1/devices', { method: 'POST', body: JSON.stringify(input) }),

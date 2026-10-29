@@ -1,28 +1,21 @@
+#include "adapters/agent_event_socket_outbox.hpp"
+#include "adapters/file_activation_lease_status.hpp"
+#include "adapters/file_alarm_evidence_outbox.hpp"
+#include "adapters/file_runtime_rule_state_reader.hpp"
+#include "adapters/atlas_evidence_frame_encoder.hpp"
+#include "adapters/system_event_metadata.hpp"
+#include "application/activation_lease_gate.hpp"
+#include "application/alarm_event_publisher.hpp"
 #include "common/core.hpp"
-#include "common/cloud_config.hpp"
 #include "manager/config_service.hpp"
 #include "manager/inference_manager.hpp"
 #include "manager/video_stream_manager.hpp"
 
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <unistd.h>
-
-#include <array>
-#include <cerrno>
-#include <chrono>
 #include <cstdlib>
-#include <cstring>
-#include <ctime>
 #include <filesystem>
-#include <iomanip>
-#include <fstream>
 #include <iostream>
-#include <random>
-#include <sstream>
 #include <stdexcept>
 #include <string>
-#include <thread>
 #include <vector>
 
 namespace {
@@ -30,110 +23,15 @@ namespace {
 using yunshao::AlarmTrigger;
 using yunshao::ConfigService;
 using yunshao::EdgeAppConfig;
-using yunshao::EventOutbox;
 using yunshao::InferenceManager;
 using yunshao::Json;
 using yunshao::ModelCatalog;
 using yunshao::RtspServerConfig;
-using yunshao::StreamProfile;
 using yunshao::VideoStreamManager;
 
 std::string env(const char* name, const std::string& fallback = "") {
     const char* value = std::getenv(name);
     return value && *value ? value : fallback;
-}
-
-std::string utc_now() {
-    const auto now = std::chrono::system_clock::now();
-    const auto time = std::chrono::system_clock::to_time_t(now);
-    std::tm utc{};
-    gmtime_r(&time, &utc);
-    std::ostringstream result;
-    result << std::put_time(&utc, "%Y-%m-%dT%H:%M:%SZ");
-    return result.str();
-}
-
-bool activation_lease_expired() {
-    const char* configured = std::getenv("YUNSHAO_ACTIVATION_LEASE_FILE");
-    const std::filesystem::path path = configured && *configured ? configured : "/var/lib/yunshao/activation-lease.json";
-    if (!std::filesystem::exists(path)) return false;
-    try {
-        const auto lease = yunshao::read_json_file(path);
-        if (!lease.contains("expires_at_unix") || lease["expires_at_unix"].is_null()) return false;
-        return lease.at("expires_at_unix").get<std::int64_t>() <= std::time(nullptr);
-    } catch (...) {
-        return true;
-    }
-}
-
-void wait_for_activation_lease() {
-    while (activation_lease_expired()) {
-        std::cout << "设备授权已到期，runtime 暂停；网页续期后将自动恢复" << std::endl;
-        std::this_thread::sleep_for(std::chrono::seconds(5));
-    }
-}
-
-std::string make_event_id() {
-    std::random_device random;
-    std::array<unsigned char, 16> bytes{};
-    for (auto& value : bytes) value = static_cast<unsigned char>(random());
-    bytes[6] = static_cast<unsigned char>((bytes[6] & 0x0fU) | 0x40U);
-    bytes[8] = static_cast<unsigned char>((bytes[8] & 0x3fU) | 0x80U);
-    std::ostringstream result;
-    result << std::hex << std::setfill('0');
-    for (std::size_t i = 0; i < bytes.size(); ++i) {
-        result << std::setw(2) << static_cast<unsigned int>(bytes[i]);
-        if (i == 3 || i == 5 || i == 7 || i == 9) result << '-';
-    }
-    return result.str();
-}
-
-void write_all(int fd, const std::string& value) {
-    std::size_t offset = 0;
-    while (offset < value.size()) {
-        const ssize_t count = write(fd, value.data() + offset, value.size() - offset);
-        if (count < 0 && errno == EINTR) continue;
-        if (count <= 0) throw std::runtime_error("cannot send local agent request");
-        offset += static_cast<std::size_t>(count);
-    }
-}
-
-Json enqueue_event(const std::filesystem::path& socket_path, const Json& event) {
-    const int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
-    if (fd < 0) throw std::runtime_error("cannot create event IPC socket");
-    sockaddr_un address{};
-    address.sun_family = AF_UNIX;
-    const std::string path = socket_path.string();
-    if (path.size() >= sizeof(address.sun_path)) {
-        close(fd);
-        throw std::runtime_error("agent socket path is too long");
-    }
-    std::strncpy(address.sun_path, path.c_str(), sizeof(address.sun_path) - 1);
-    if (connect(fd, reinterpret_cast<sockaddr*>(&address), sizeof(address)) != 0) {
-        close(fd);
-        throw std::runtime_error("agent event queue is unavailable");
-    }
-    try {
-        write_all(fd, Json{{"command", "enqueue_event"}, {"event", event}}.dump() + "\n");
-        std::string input;
-        char buffer[4096];
-        while (input.size() <= 64 * 1024) {
-            const auto count = read(fd, buffer, sizeof(buffer));
-            if (count < 0 && errno == EINTR) continue;
-            if (count <= 0) break;
-            input.append(buffer, static_cast<std::size_t>(count));
-            if (input.find('\n') != std::string::npos) break;
-        }
-        close(fd);
-        const auto response = Json::parse(input);
-        if (!response.value("accepted", false)) {
-            throw std::runtime_error("agent rejected event: " + response.value("error", "unknown error"));
-        }
-        return response;
-    } catch (...) {
-        close(fd);
-        throw;
-    }
 }
 
 struct Options {
@@ -166,41 +64,6 @@ Options parse_options(int argc, char** argv) {
         } else throw std::invalid_argument("unknown option: " + argument);
     }
     return options;
-}
-
-void publish_alarm(const AlarmTrigger& trigger, const StreamProfile& stream,
-                   const yunshao::ModelProfile& model, const std::string& model_version,
-                   const std::filesystem::path& socket_path, const std::vector<unsigned char>& jpeg) {
-    const std::string device_id = env("YUNSHAO_DEVICE_ID");
-    if (device_id.empty()) throw std::runtime_error("YUNSHAO_DEVICE_ID is required before enabling any alarm rule");
-    const auto event_id = make_event_id();
-    const auto evidence_directory = std::filesystem::path(env("YUNSHAO_EVIDENCE_OUTBOX_DIR", "/var/lib/yunshao/evidence-outbox"));
-    const auto evidence = evidence_directory / (event_id + ".jpg");
-    if (!jpeg.empty() && jpeg.size() <= 4 * 1024 * 1024) {
-        try {
-            std::filesystem::create_directories(evidence_directory);
-            std::uintmax_t used = 0;
-            for (const auto& item : std::filesystem::directory_iterator(evidence_directory))
-                if (item.is_regular_file()) used += item.file_size();
-            if (used + jpeg.size() > 100 * 1024 * 1024) throw std::runtime_error("evidence outbox is full");
-            auto temporary = evidence; temporary += ".tmp";
-            { std::ofstream output(temporary, std::ios::binary);
-              output.write(reinterpret_cast<const char*>(jpeg.data()), static_cast<std::streamsize>(jpeg.size()));
-              output.flush();
-              if (!output) throw std::runtime_error("cannot persist evidence"); }
-            std::filesystem::rename(temporary, evidence);
-        } catch (const std::exception&) { std::cerr << "alarm_evidence_persist_failed\n"; }
-    }
-    Json event{{"schema_version", 1}, {"device_id", device_id}, {"event_id", event_id},
-               {"camera_id", stream.camera_id}, {"event_type", trigger.event_type},
-               {"severity", trigger.severity}, {"occurred_at", utc_now()}, {"sent_at", utc_now()},
-               {"algorithm_key", model.algorithm_key}, {"algorithm_version", model_version},
-               {"attributes", Json{{"model_id", trigger.model_id}, {trigger.class_attribute, trigger.class_name},
-                                    {"confidence", trigger.confidence},
-                                    {"rule_config_version", trigger.config_version},
-                                    {"observed_duration_ms", trigger.observed_duration_ms}}}};
-    const auto result = enqueue_event(socket_path, event);
-    std::cout << "persisted classroom alarm event " << result.value("event_id", "") << '\n';
 }
 
 void print_config(const EdgeAppConfig& config) {
@@ -261,7 +124,11 @@ int main(int argc, char** argv) {
             std::cout << "Stream " << stream.stream_id << " is disabled.\n";
             return 0;
         }
-        wait_for_activation_lease();
+        const char* lease_file = std::getenv("YUNSHAO_ACTIVATION_LEASE_FILE");
+        yunshao::adapters::FileActivationLeaseStatus lease_status(
+            lease_file && *lease_file ? lease_file : "/var/lib/yunshao/activation-lease.json");
+        yunshao::application::ActivationLeaseGate lease_gate(lease_status);
+        lease_gate.wait_until_valid();
         const auto& model = config.require_model(stream.model_id);
         const std::string input_uri = env(stream.source_ref.c_str());
         if (input_uri.empty()) throw std::runtime_error("configured camera source is not injected: " + stream.source_ref);
@@ -272,6 +139,12 @@ int main(int argc, char** argv) {
             throw std::runtime_error("active model is not ready: " + model_state.dump());
         }
         const std::string model_version = model_state.value("model_version", "unknown");
+        yunshao::adapters::AgentEventSocketOutbox event_outbox(options.socket_path);
+        yunshao::adapters::FileAlarmEvidenceOutbox evidence_outbox(
+            std::filesystem::path(env("YUNSHAO_EVIDENCE_OUTBOX_DIR", "/var/lib/yunshao/evidence-outbox")));
+        yunshao::adapters::SystemEventMetadata event_metadata;
+        yunshao::application::AlarmEventPublisher alarm_event_publisher(
+            event_outbox, evidence_outbox, event_metadata);
         if (options.output.empty()) {
             if (!stream.rtsp_output.enabled) {
                 options.output = std::filesystem::path("/var/lib/yunshao/preview") / (stream.stream_id + ".h264");
@@ -290,14 +163,30 @@ int main(int argc, char** argv) {
         }
         InferenceManager inference(config.max_loaded_models, config.npu_device_id,
                                    options.model_root, options.plugin_dir);
+        yunshao::adapters::AtlasEvidenceFrameEncoder evidence_frame_encoder;
+        yunshao::adapters::FileRuntimeRuleStateReader rule_state_reader(options.config_dir);
         VideoStreamManager stream_manager(config, inference,
             [&](const AlarmTrigger& trigger, const std::vector<unsigned char>& jpeg) {
-                publish_alarm(trigger, stream, model, model_version, options.socket_path, jpeg);
-            }, options.config_dir);
+                yunshao::application::AlarmEventData event;
+                event.device_id = env("YUNSHAO_DEVICE_ID");
+                event.camera_id = stream.camera_id;
+                event.event_type = trigger.event_type;
+                event.severity = trigger.severity;
+                event.algorithm_key = model.algorithm_key;
+                event.algorithm_version = model_version;
+                event.model_id = trigger.model_id;
+                event.class_attribute = trigger.class_attribute;
+                event.class_name = trigger.class_name;
+                event.confidence = trigger.confidence;
+                event.rule_config_version = trigger.config_version;
+                event.observed_duration_ms = trigger.observed_duration_ms;
+                const auto result = alarm_event_publisher.publish(event, jpeg);
+                std::cout << "persisted classroom alarm event " << result.value("event_id", "") << '\n';
+            }, options.config_dir, evidence_frame_encoder, lease_status, rule_state_reader);
         for (;;) {
             stream_manager.run(stream, input_uri, options.output, rtsp_server_config);
-            if (!activation_lease_expired()) break;
-            wait_for_activation_lease();
+            if (!lease_gate.expired()) break;
+            lease_gate.wait_until_valid();
         }
         std::cout << "Processed stream " << stream.stream_id << " with model " << stream.model_id
                   << '@' << model_version;

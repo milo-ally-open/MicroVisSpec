@@ -12,6 +12,8 @@
 
 订阅绑定 account_id/来源会话；事件和撤销幂等接收；持久化投递；点击后重新鉴权。
 
+三类用户目标：push subscription/delivery 继续按真实移动账号主体存储，不迁移为 workspace 资源；投递前重新查询有效邀请成员及设备 grant，保证撤权后不再创建后续投递。详细合同见 [共享授权规格](../multi_user_workspace_access/)。
+
 ## 决策记录
 
 2026-10-22：本机调试工具以 Python HTTP 静态表单、独立账号会话和 MQTT 模拟设备实现。沿用现有规则、事件和 Push 合同，不修改生产代码/路由；Docker PostgreSQL 观察器只在 READ ONLY 事务下返回工具所建事件的脱敏状态。完整决定、幂等/重启、配置和停止边界见 [工具合同](../../../src/tools/push-debug/CONTRACT.md)。当前无有效订阅时只证明事件与 inbox 接入；物理手机显示和点击另行验收。

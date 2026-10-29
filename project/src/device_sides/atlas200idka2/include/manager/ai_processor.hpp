@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ai_interface.hpp"
+#include "adapters/ai_model_plugin.hpp"
 
 #include <filesystem>
 #include <memory>
@@ -26,9 +26,7 @@ public:
 
 private:
     ModelProfile profile_;
-    void* library_ = nullptr;
-    DestroyAIModelFn destroy_ = nullptr;
-    IAIModel* model_ = nullptr;
+    std::unique_ptr<AIModelPlugin> plugin_;
     mutable std::mutex mutex_;
 };
 

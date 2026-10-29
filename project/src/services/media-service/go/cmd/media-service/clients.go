@@ -30,6 +30,56 @@ type AuthSessionClient struct {
 	client  *http.Client
 }
 
+type DeviceCapabilityAuthorizer interface {
+	CheckDeviceCapability(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, string, string) error
+}
+
+type AuthAuthorizationClient struct {
+	baseURL string
+	token   string
+	client  *http.Client
+}
+
+func NewAuthAuthorizationClient(config Config) *AuthAuthorizationClient {
+	return &AuthAuthorizationClient{baseURL: strings.TrimRight(config.AuthServiceInternalURL, "/"), token: config.InternalAuthToken,
+		client: &http.Client{Timeout: 3 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}
+}
+
+func (c *AuthAuthorizationClient) CheckDeviceCapability(ctx context.Context, accountID, sessionID, deviceID uuid.UUID, capability, requestID string) error {
+	if accountID == uuid.Nil || sessionID == uuid.Nil || deviceID == uuid.Nil || c.baseURL == "" || c.token == "" {
+		return errors.New("authorization client is not configured")
+	}
+	body, err := json.Marshal(map[string]string{"account_id": accountID.String(), "session_id": sessionID.String(),
+		"device_id": deviceID.String(), "capability": capability})
+	if err != nil {
+		return errors.New("authorization request could not be encoded")
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/internal/v1/authorization/check", bytes.NewReader(body))
+	if err != nil {
+		return errors.New("authorization request could not be created")
+	}
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("X-Internal-Service-Token", c.token)
+	request.Header.Set("X-Internal-Service", "media-service")
+	request.Header.Set("X-Request-ID", requestID)
+	response, err := c.client.Do(request)
+	if err != nil {
+		return errors.New("authorization service is unavailable")
+	}
+	defer response.Body.Close()
+	_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 16<<10))
+	switch response.StatusCode {
+	case http.StatusNoContent:
+		return nil
+	case http.StatusForbidden, http.StatusNotFound:
+		return errDeviceCapabilityDenied
+	default:
+		return fmt.Errorf("authorization service returned HTTP %d", response.StatusCode)
+	}
+}
+
+var errDeviceCapabilityDenied = errors.New("device capability is not granted")
+
 func NewAuthSessionClient(config Config) *AuthSessionClient {
 	return &AuthSessionClient{
 		baseURL: strings.TrimRight(config.AuthServiceInternalURL, "/"),

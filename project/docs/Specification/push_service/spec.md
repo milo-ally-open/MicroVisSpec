@@ -6,6 +6,8 @@
 >
 > 首发边界：向当前账号已授权的手机 PWA 发送事件摘要并打开详情。原生 Android、iOS、Harmony 推送和“用户已读”回执不在首发范围。
 
+三类用户目标见[共享授权规格](../multi_user_workspace_access/spec.md)。Push 订阅、delivery 与投递尝试仍按真实 `mobile account_id` 隔离，不迁移为 workspace 资源；每次投递均重新解析当前有效邀请成员及其设备 grant，保证撤权后停止新投递。推送点击后的事件页仍由 event-service 再次校验当前主体权限。
+
 ## 稳定需求与验收索引
 
 > 本索引用于跨文档追踪；详细行为以本文件正文为准。编号保持稳定，需求变更时同步更新。

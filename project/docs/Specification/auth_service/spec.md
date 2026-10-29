@@ -6,6 +6,8 @@
 >
 > 首发边界：仅支持用户名和密码注册、登录、查看本人信息、退出及使用旧密码改密；不实现成员邀请、共享、组织、角色或找回密码。
 
+三类用户与工作空间合同见[共享授权规格](../multi_user_workspace_access/spec.md)。当前实现已包含基础账号角色、owner workspace、邀请兑换、成员/设备 grant 查询与管理、内部设备 capability 判定、受控的一次性 admin bootstrap、PC 账号创建/状态管理和健康/审计 API；数据迁移、统一撤权 outbox、全量安全矩阵及部署/运行验收仍未完成。下文早期单账号 API 描述只作为兼容行为记录，角色扩展按共享授权规格的 REQ/AC 执行。
+
 ## 稳定需求与验收索引
 
 > 本索引用于跨文档追踪；详细行为以本文件正文为准。编号保持稳定，需求变更时同步更新。
@@ -143,9 +145,39 @@
 
 - 源码、数据库迁移、可运行镜像、接口说明、Nginx 配置、机密配置清单和恢复步骤。
 - 可复现记录覆盖注册、登录、刷新恢复、退出、改密、会话超时、CSRF、伪造身份头、跨账号访问及撤销事件重投。
-- 首发仅做个人账号登录与数据归属；不出现邀请成员、角色授权或共享数据入口。
+- 多角色扩展行为以本文件第七节和共享授权规格为准；账号扩展、管理与迁移仍在进行，未完成验收时不能把现有垂直切片视为完整交付。
 
-## 七、变更记录
+## 七、三类用户与工作空间扩展合同
+
+此节只补充 auth-service 自有 API 与数据边界；完整产品行为及 AC 见[共享授权规格](../multi_user_workspace_access/spec.md)。
+
+### 7.1 当前已提供的浏览器 API
+
+| 方法与路径 | 行为/限制 |
+| --- | --- |
+| `GET /api/v1/auth/workspace` | PC 返回本人 workspace 摘要；mobile 返回当前有效 membership 与设备 capability；停用 owner/workspace 时 mobile 查询被拒绝。 |
+| `GET /api/v1/auth/workspace/members` | 仅 workspace PC owner 可列成员及逐设备 grant。 |
+| `GET/POST /api/v1/auth/workspace/invitations` | owner 可查看邀请并创建 24 小时单次邀请；创建时在线验证所选设备处于活动状态且归属本人 workspace。原始 token 仅创建成功时返回一次。 |
+| `DELETE /api/v1/auth/workspace/invitations/:id` | 撤销当前 workspace 未兑换邀请。 |
+| `PUT /api/v1/auth/workspace/members/:id/grants` | 以请求体完整替换成员 grant；每个设备逐项设置 `device.read`、`event.read`、`event.handle`、`stream.view`、`alert.receive`。 |
+| `DELETE /api/v1/auth/workspace/members/:id` | 撤销当前 workspace 成员并删除其 grants；授权读取实时拒绝。 |
+| `POST /api/v1/invitations/redeem` | 公开同源兑换；移动账号只能由该路径创建或绑定。停用 owner 的空间不可兑换。 |
+
+所有浏览器写操作受同源 Origin、会话 CSRF 和 owner 身份检查。邀请原始 token 不入库；状态变化写 auth audit。成员撤权当前会立即影响在线 authz check 和 Push 发送前复核，但统一撤权 outbox/media 消费尚未实现。
+
+### 7.2 管理员 API 与初始化
+
+- `POST /internal/v1/admin/bootstrap` 仅在配置独立的 `AUTH_ADMIN_BOOTSTRAP_TOKEN` 且数据库还没有任何 admin 账号时接受创建；事务 advisory lock 防并发重复创建。成功后必须从服务配置与主机 secret store 移除 token。
+- `/api/v1/admin/accounts` 仅由 admin 会话访问；允许列账号、受控创建 `pc`、停用/恢复 `pc` 与 `mobile`。不提供移动账号直接创建接口；mobile 只能邀请绑定。
+- 停用 PC owner 会把 workspace 状态设为 `restricted`、撤销 owner 会话；其成员访问同时失败。本期没有所有权转移。
+- `/api/v1/admin/health` 只请求五个现有服务的 `/health/ready`，并汇总探针暴露的 PostgreSQL、MQTT、MediaMTX/Web Push 元数据。探针不可达显示 `unavailable`，未报告项显示 `unknown`。不读取客户 URL、业务明细、视频、截图、部署配置或服务日志。
+- `/api/v1/admin/audit` 只供 admin 会话访问。平台 bootstrap 与后续高风险账号/成员/邀请变更写 audit；审计完整性与目标环境权限仍待验收。
+
+### 7.3 数据迁移状态
+
+workspace ID 首版沿用 owner account UUID。auth-service 启动时幂等创建旧 PC workspace。device/camera/media stream/event/outbox 的 nullable `workspace_id` 扩展列及 owner-ID 回填已部分实现，新业务写入双写；旧账号计数、孤儿报告、约束切换和副本恢复/回滚尚未验证。session、viewer lease、处置 actor、Push subscription/delivery 的 `account_id` 保持真实主体语义。
+
+## 八、变更记录
 
 | 日期 | 变更 |
 | --- | --- |

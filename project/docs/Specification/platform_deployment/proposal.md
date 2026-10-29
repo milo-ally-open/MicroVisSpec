@@ -29,6 +29,8 @@
 
 ## 部署约束
 
+三类用户目标的管理端边界已确认：Web 管理员只查看脱敏健康、诊断和审计，不通过产品界面修改主机部署配置或重启服务。部署密钥、服务生命周期、迁移和备份恢复继续由受控主机运维流程管理；相关用户与数据合同见[三类用户与工作空间授权规格](../multi_user_workspace_access/)。
+
 - 首发部署平台为 Linux amd64。Go 服务监听 loopback：auth `18081`、device `18082`、event `18083`、media `18084`、push `18085`。
 - Nginx 发布 Web/API HTTPS；Mosquitto 发布园区 MQTT/TLS；媒体 ICE 端口按园区网络开放。Go、PostgreSQL、MediaMTX 控制/RTSP/HLS/WHEP 端口不得向外部网络公开。
 - 服务敏感配置仍用 `*_FILE`；部署机密存 `/etc/microvisspec` 并限制权限。仓库样例不得包含密钥。

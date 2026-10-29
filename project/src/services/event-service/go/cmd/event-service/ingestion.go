@@ -239,7 +239,8 @@ func (a *App) persistEvent(ctx context.Context, message EdgeEvent, attributes Cl
 		slog.Warn("event_device_clock_skew", "edge_event_id", message.EventID, "skew_seconds", int64(skew.Seconds()))
 	}
 	internalID := uuid.New()
-	entity := Event{ID: internalID, AccountID: owner.AccountID, DeviceID: message.DeviceID, CameraID: message.CameraID,
+	workspaceID := owner.AccountID
+	entity := Event{ID: internalID, AccountID: owner.AccountID, WorkspaceID: &workspaceID, DeviceID: message.DeviceID, CameraID: message.CameraID,
 		EdgeEventID: message.EventID, EventType: message.EventType, Severity: message.Severity,
 		OccurredAt: message.OccurredAt.UTC(), ReceivedAt: now, DeviceName: owner.DeviceName, CameraName: owner.CameraName,
 		Location: owner.Location, AlgorithmKey: message.AlgorithmKey, AlgorithmVersion: message.AlgorithmVersion,
@@ -262,14 +263,14 @@ func (a *App) persistEvent(ctx context.Context, message EdgeEvent, attributes Cl
 			return nil
 		}
 		outboxPayload, err := json.Marshal(map[string]any{
-			"account_id": entity.AccountID, "event_id": entity.ID, "location": entity.Location,
+			"account_id": entity.AccountID, "event_id": entity.ID, "device_id": entity.DeviceID, "location": entity.Location,
 			"severity": entity.Severity, "occurred_at": entity.OccurredAt.Format(time.RFC3339Nano),
 			"detail_path": "/events/" + entity.ID.String(),
 		})
 		if err != nil {
 			return err
 		}
-		outbox := Outbox{ID: entity.ID, EventType: "event.created", Payload: outboxPayload, CreatedAt: now, UpdatedAt: now, NextAttemptAt: now}
+		outbox := Outbox{ID: entity.ID, WorkspaceID: &workspaceID, EventType: "event.created", Payload: outboxPayload, CreatedAt: now, UpdatedAt: now, NextAttemptAt: now}
 		if err := tx.Table(Outbox{}.TableName()).Create(&outbox).Error; err != nil {
 			return err
 		}

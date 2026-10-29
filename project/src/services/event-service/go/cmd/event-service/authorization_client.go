@@ -1,0 +1,112 @@
+package main
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+)
+
+var errEventCapabilityDenied = errors.New("event capability is not granted")
+
+type EventAuthorizationClient interface {
+	ListAuthorizedDevices(context.Context, uuid.UUID, string, string, string) ([]uuid.UUID, error)
+	CheckDeviceCapability(context.Context, uuid.UUID, string, uuid.UUID, string, string) error
+}
+
+type AuthEventAuthorizationClient struct {
+	baseURL string
+	token   string
+	client  *http.Client
+}
+
+func NewEventAuthorizationClient(config Config) *AuthEventAuthorizationClient {
+	return &AuthEventAuthorizationClient{baseURL: strings.TrimRight(config.AuthServiceURL, "/"), token: config.DeviceServiceToken,
+		client: &http.Client{Timeout: 3 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}
+}
+
+func (c *AuthEventAuthorizationClient) ListAuthorizedDevices(ctx context.Context, accountID uuid.UUID, sessionID, capability, requestID string) ([]uuid.UUID, error) {
+	var all []uuid.UUID
+	cursor := ""
+	for {
+		var response struct {
+			DeviceIDs  []uuid.UUID `json:"device_ids"`
+			NextCursor string      `json:"next_cursor"`
+		}
+		status, err := c.post(ctx, "/internal/v1/authorization/devices", map[string]any{
+			"account_id": accountID.String(), "session_id": sessionID, "capability": capability, "cursor": cursor, "limit": 100,
+		}, requestID, &response)
+		if err != nil {
+			return nil, err
+		}
+		if status == http.StatusForbidden {
+			return nil, errEventCapabilityDenied
+		}
+		if status != http.StatusOK {
+			return nil, fmt.Errorf("authorization service returned HTTP %d", status)
+		}
+		all = append(all, response.DeviceIDs...)
+		if response.NextCursor == "" {
+			return all, nil
+		}
+		if response.NextCursor == cursor {
+			return nil, errors.New("authorization service returned a non-advancing cursor")
+		}
+		cursor = response.NextCursor
+	}
+}
+
+func (c *AuthEventAuthorizationClient) CheckDeviceCapability(ctx context.Context, accountID uuid.UUID, sessionID string, deviceID uuid.UUID, capability, requestID string) error {
+	status, err := c.post(ctx, "/internal/v1/authorization/check", map[string]string{
+		"account_id": accountID.String(), "session_id": sessionID, "device_id": deviceID.String(), "capability": capability,
+	}, requestID, nil)
+	if err != nil {
+		return err
+	}
+	switch status {
+	case http.StatusNoContent:
+		return nil
+	case http.StatusForbidden, http.StatusNotFound:
+		return errEventCapabilityDenied
+	default:
+		return fmt.Errorf("authorization service returned HTTP %d", status)
+	}
+}
+
+func (c *AuthEventAuthorizationClient) post(ctx context.Context, path string, body any, requestID string, responseBody any) (int, error) {
+	if c.baseURL == "" || c.token == "" {
+		return 0, errors.New("authorization client is not configured")
+	}
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return 0, errors.New("authorization request could not be encoded")
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+path, bytes.NewReader(payload))
+	if err != nil {
+		return 0, errors.New("authorization request could not be created")
+	}
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("X-Internal-Service-Token", c.token)
+	request.Header.Set("X-Internal-Service", "event-service")
+	request.Header.Set("X-Request-ID", requestID)
+	response, err := c.client.Do(request)
+	if err != nil {
+		return 0, errors.New("authorization service is unavailable")
+	}
+	defer response.Body.Close()
+	if responseBody != nil && response.StatusCode == http.StatusOK {
+		if err := json.NewDecoder(io.LimitReader(response.Body, 1<<20)).Decode(responseBody); err != nil {
+			return 0, errors.New("authorization response is invalid")
+		}
+	} else {
+		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 16<<10))
+	}
+	return response.StatusCode, nil
+}

@@ -68,6 +68,8 @@ flowchart LR
 
 机密只以文件放于 `/etc/microvisspec`，配置环境文件包含路径而非密钥值。Go 服务由 `*_FILE` 读取密钥；Nginx 通过 root-only include 注入内部 token。部署目录和机密文件不在 Git 中。
 
+三类用户目标下，管理 Web 只读展示脱敏健康、诊断与审计；主机部署修改、服务重启、密钥操作和数据库恢复仍属受控运维。workspace schema 迁移须遵循共享规格的扩展、回填、双写核对和回滚顺序；不得在迁移验收前删旧字段。见 [共享授权规格](../multi_user_workspace_access/)。
+
 ## 变更记录
 
 | 日期 | 内容 |

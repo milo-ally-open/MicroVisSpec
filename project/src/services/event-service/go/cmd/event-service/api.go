@@ -47,6 +47,15 @@ type eventCount struct {
 }
 
 func (a *App) listEvents(c *gin.Context) {
+	deviceIDs, mobile, scopeErr := a.eventDeviceScope(c, "event.read")
+	if scopeErr != nil {
+		if errors.Is(scopeErr, errEventCapabilityDenied) {
+			writeError(c, http.StatusForbidden, "forbidden", "event.read permission is required")
+		} else {
+			writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "event authorization could not be checked")
+		}
+		return
+	}
 	var cursor *eventCursor
 	if token := c.Query("cursor"); token != "" {
 		decoded, err := a.decodeEventCursor(token, time.Now().UTC())
@@ -88,7 +97,7 @@ func (a *App) listEvents(c *gin.Context) {
 			filters, filterHash = cursor.Filters, cursor.FilterHash
 		}
 	}
-	query := a.filteredEvents(c.Request.Context(), accountID(c), filters)
+	query := a.filteredEvents(c.Request.Context(), accountID(c), filters, deviceIDs, mobile)
 	if cursor != nil {
 		query = query.Where("(occurred_at < ?) OR (occurred_at = ? AND id < ?)", cursor.OccurredAt, cursor.OccurredAt, cursor.ID)
 	}
@@ -172,8 +181,38 @@ func parseEventFilters(c *gin.Context, defaults *eventFilters) (eventFilters, er
 	return filters, nil
 }
 
-func (a *App) filteredEvents(ctx context.Context, account uuid.UUID, filters eventFilters) *gorm.DB {
-	query := a.db.WithContext(ctx).Table(Event{}.TableName()).Where("account_id = ? AND occurred_at >= ? AND occurred_at < ?", account, filters.StartAt, filters.EndAt)
+func (a *App) eventDeviceScope(c *gin.Context, capability string) ([]uuid.UUID, bool, error) {
+	if c.GetString("user_type") == "pc" {
+		return nil, false, nil
+	}
+	if a.authorization == nil {
+		return nil, true, errors.New("authorization client is not configured")
+	}
+	deviceIDs, err := a.authorization.ListAuthorizedDevices(c.Request.Context(), accountID(c), c.GetString("session_id"), capability, c.GetString("request_id"))
+	return deviceIDs, true, err
+}
+
+func (a *App) requireEventCapability(c *gin.Context, deviceID uuid.UUID, capability string) error {
+	if c.GetString("user_type") == "pc" {
+		return nil
+	}
+	if a.authorization == nil {
+		return errors.New("authorization client is not configured")
+	}
+	return a.authorization.CheckDeviceCapability(c.Request.Context(), accountID(c), c.GetString("session_id"), deviceID, capability, c.GetString("request_id"))
+}
+
+func (a *App) filteredEvents(ctx context.Context, account uuid.UUID, filters eventFilters, deviceIDs []uuid.UUID, mobile bool) *gorm.DB {
+	query := a.db.WithContext(ctx).Table(Event{}.TableName()).Where("occurred_at >= ? AND occurred_at < ?", filters.StartAt, filters.EndAt)
+	if mobile {
+		if len(deviceIDs) == 0 {
+			query = query.Where("1 = 0")
+		} else {
+			query = query.Where("device_id IN ?", deviceIDs)
+		}
+	} else {
+		query = query.Where("workspace_id = ?", account)
+	}
 	if filters.EventType != "" {
 		query = query.Where("event_type = ?", filters.EventType)
 	}
@@ -256,12 +295,24 @@ func (a *App) getEvent(c *gin.Context) {
 		return
 	}
 	var event Event
-	if err := a.db.WithContext(c.Request.Context()).Table(Event{}.TableName()).Where("id = ? AND account_id = ?", id, accountID(c)).Take(&event).Error; err != nil {
+	eventQuery := a.db.WithContext(c.Request.Context()).Table(Event{}.TableName()).Where("id = ?", id)
+	if c.GetString("user_type") == "pc" {
+		eventQuery = eventQuery.Where("workspace_id = ?", accountID(c))
+	}
+	if err := eventQuery.Take(&event).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			writeError(c, http.StatusNotFound, "not_found", "event was not found")
 			return
 		}
 		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "event could not be loaded")
+		return
+	}
+	if err := a.requireEventCapability(c, event.DeviceID, "event.read"); err != nil {
+		if errors.Is(err, errEventCapabilityDenied) {
+			writeError(c, http.StatusNotFound, "not_found", "event was not found")
+		} else {
+			writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "event authorization could not be checked")
+		}
 		return
 	}
 	evidenceStatus, err := a.evidenceStatus(c.Request.Context(), id, time.Now().UTC())
@@ -297,12 +348,38 @@ func (a *App) transitionEvent(c *gin.Context) {
 		writeError(c, http.StatusUnprocessableEntity, "result_required", "a result is required to close an event")
 		return
 	}
+	var targetEvent Event
+	targetQuery := a.db.WithContext(c.Request.Context()).Table(Event{}.TableName()).Where("id = ?", id)
+	if c.GetString("user_type") == "pc" {
+		targetQuery = targetQuery.Where("workspace_id = ?", accountID(c))
+	}
+	if err := targetQuery.Take(&targetEvent).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			writeError(c, http.StatusNotFound, "not_found", "event was not found")
+		} else {
+			writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "event could not be loaded")
+		}
+		return
+	}
+	if err := a.requireEventCapability(c, targetEvent.DeviceID, "event.handle"); err != nil {
+		if errors.Is(err, errEventCapabilityDenied) {
+			writeError(c, http.StatusNotFound, "not_found", "event was not found")
+		} else {
+			writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "event authorization could not be checked")
+		}
+		return
+	}
 	now := time.Now().UTC()
 	var updated Event
 	err = a.db.WithContext(c.Request.Context()).Transaction(func(tx *gorm.DB) error {
 		var current Event
-		if err := tx.Table(Event{}.TableName()).Clauses(clause.Locking{Strength: "UPDATE"}).
-			Where("id = ? AND account_id = ?", id, accountID(c)).Take(&current).Error; err != nil {
+		currentQuery := tx.Table(Event{}.TableName()).Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", id)
+		if c.GetString("user_type") == "pc" {
+			currentQuery = currentQuery.Where("workspace_id = ?", accountID(c))
+		} else {
+			currentQuery = currentQuery.Where("device_id = ?", targetEvent.DeviceID)
+		}
+		if err := currentQuery.Take(&current).Error; err != nil {
 			return err
 		}
 		if current.Version != input.ExpectedVersion {
@@ -315,7 +392,13 @@ func (a *App) transitionEvent(c *gin.Context) {
 		if isTerminalEventStatus(input.ToStatus) {
 			updates["resolved_at"] = now
 		}
-		if err := tx.Table(Event{}.TableName()).Where("id = ? AND account_id = ? AND version = ?", current.ID, accountID(c), current.Version).Updates(updates).Error; err != nil {
+		updateQuery := tx.Table(Event{}.TableName()).Where("id = ? AND version = ?", current.ID, current.Version)
+		if c.GetString("user_type") == "pc" {
+			updateQuery = updateQuery.Where("workspace_id = ?", accountID(c))
+		} else {
+			updateQuery = updateQuery.Where("device_id = ?", targetEvent.DeviceID)
+		}
+		if err := updateQuery.Updates(updates).Error; err != nil {
 			return err
 		}
 		disposition := Disposition{ID: uuid.New(), EventID: current.ID, ActorAccountID: accountID(c), FromStatus: current.Status,
@@ -381,6 +464,15 @@ func (a *App) eventStats(c *gin.Context) {
 		writeError(c, http.StatusUnprocessableEntity, "invalid_request", "range must be today, 7d, or 30d")
 		return
 	}
+	deviceIDs, mobile, scopeErr := a.eventDeviceScope(c, "event.read")
+	if scopeErr != nil {
+		if errors.Is(scopeErr, errEventCapabilityDenied) {
+			writeError(c, http.StatusForbidden, "forbidden", "event.read permission is required")
+		} else {
+			writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "event authorization could not be checked")
+		}
+		return
+	}
 	location, _ := time.LoadLocation("Asia/Shanghai")
 	now := time.Now().UTC()
 	localNow := now.In(location)
@@ -396,12 +488,24 @@ func (a *App) eventStats(c *gin.Context) {
 	}
 	start := startLocal.UTC()
 	var total int64
-	if err := a.db.WithContext(c.Request.Context()).Table(Event{}.TableName()).Where("account_id = ? AND occurred_at >= ? AND occurred_at < ?", accountID(c), start, now).Count(&total).Error; err != nil {
+	totalQuery := a.db.WithContext(c.Request.Context()).Table(Event{}.TableName()).Where("occurred_at >= ? AND occurred_at < ?", start, now)
+	if mobile {
+		totalQuery = totalQuery.Where("device_id IN ?", deviceIDs)
+	} else {
+		totalQuery = totalQuery.Where("workspace_id = ?", accountID(c))
+	}
+	if err := totalQuery.Count(&total).Error; err != nil {
 		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "event statistics could not be loaded")
 		return
 	}
 	var open int64
-	if err := a.db.WithContext(c.Request.Context()).Table(Event{}.TableName()).Where("account_id = ? AND status IN ?", accountID(c), []string{"pending", "processing"}).Count(&open).Error; err != nil {
+	openQuery := a.db.WithContext(c.Request.Context()).Table(Event{}.TableName()).Where("status IN ?", []string{"pending", "processing"})
+	if mobile {
+		openQuery = openQuery.Where("device_id IN ?", deviceIDs)
+	} else {
+		openQuery = openQuery.Where("workspace_id = ?", accountID(c))
+	}
+	if err := openQuery.Count(&open).Error; err != nil {
 		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "open event statistics could not be loaded")
 		return
 	}
@@ -409,8 +513,15 @@ func (a *App) eventStats(c *gin.Context) {
 		Bucket string `json:"bucket"`
 		Count  int64  `json:"count"`
 	}
-	trendQuery := "SELECT to_char(date_trunc(?, occurred_at AT TIME ZONE 'Asia/Shanghai'), ?) AS bucket, COUNT(*) AS count FROM event.events WHERE account_id = ? AND occurred_at >= ? AND occurred_at < ? GROUP BY 1 ORDER BY 1"
-	if err := a.db.WithContext(c.Request.Context()).Raw(trendQuery, unit, format, accountID(c), start, now).Scan(&trendRows).Error; err != nil {
+	trendQuery := a.db.WithContext(c.Request.Context()).Table(Event{}.TableName()).
+		Select("to_char(date_trunc(?, occurred_at AT TIME ZONE 'Asia/Shanghai'), ?) AS bucket, COUNT(*) AS count", unit, format).
+		Where("occurred_at >= ? AND occurred_at < ?", start, now)
+	if mobile {
+		trendQuery = trendQuery.Where("device_id IN ?", deviceIDs)
+	} else {
+		trendQuery = trendQuery.Where("workspace_id = ?", accountID(c))
+	}
+	if err := trendQuery.Group("bucket").Order("bucket ASC").Scan(&trendRows).Error; err != nil {
 		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "event trend could not be loaded")
 		return
 	}
@@ -430,22 +541,22 @@ func (a *App) eventStats(c *gin.Context) {
 			trend = append(trend, eventCount{Key: key, Count: trendMap[key]})
 		}
 	}
-	bySeverity, err := a.groupEventCounts(c, "severity", start, now)
+	bySeverity, err := a.groupEventCounts(c, "severity", start, now, deviceIDs, mobile)
 	if err != nil {
 		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "severity statistics could not be loaded")
 		return
 	}
-	byType, err := a.groupEventCounts(c, "event_type", start, now)
+	byType, err := a.groupEventCounts(c, "event_type", start, now, deviceIDs, mobile)
 	if err != nil {
 		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "type statistics could not be loaded")
 		return
 	}
-	byLocation, err := a.groupEventCounts(c, "location", start, now)
+	byLocation, err := a.groupEventCounts(c, "location", start, now, deviceIDs, mobile)
 	if err != nil {
 		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "location statistics could not be loaded")
 		return
 	}
-	byStatus, err := a.groupEventCounts(c, "status", start, now)
+	byStatus, err := a.groupEventCounts(c, "status", start, now, deviceIDs, mobile)
 	if err != nil {
 		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "status statistics could not be loaded")
 		return
@@ -457,15 +568,20 @@ func (a *App) eventStats(c *gin.Context) {
 		"by_location": topFiveWithOther(byLocation), "by_status": byStatus})
 }
 
-func (a *App) groupEventCounts(c *gin.Context, column string, start, end time.Time) ([]eventCount, error) {
+func (a *App) groupEventCounts(c *gin.Context, column string, start, end time.Time, deviceIDs []uuid.UUID, mobile bool) ([]eventCount, error) {
 	allowed := map[string]bool{"severity": true, "event_type": true, "location": true, "status": true}
 	if !allowed[column] {
 		return nil, fmt.Errorf("unsupported event statistics column")
 	}
 	var rows []eventCount
-	err := a.db.WithContext(c.Request.Context()).Table(Event{}.TableName()).Select(column+" AS key, COUNT(*) AS count").
-		Where("account_id = ? AND occurred_at >= ? AND occurred_at < ?", accountID(c), start, end).
-		Group(column).Order("count DESC, key ASC").Find(&rows).Error
+	query := a.db.WithContext(c.Request.Context()).Table(Event{}.TableName()).Select(column+" AS key, COUNT(*) AS count").
+		Where("occurred_at >= ? AND occurred_at < ?", start, end)
+	if mobile {
+		query = query.Where("device_id IN ?", deviceIDs)
+	} else {
+		query = query.Where("workspace_id = ?", accountID(c))
+	}
+	err := query.Group(column).Order("count DESC, key ASC").Find(&rows).Error
 	return rows, err
 }
 

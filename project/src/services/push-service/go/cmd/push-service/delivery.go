@@ -220,6 +220,19 @@ func (a *App) deliverClaimed(ctx context.Context, item Delivery) error {
 		if !delivery.ExpiresAt.After(now) {
 			return a.finishDelivery(tx, delivery, "expired", "event_too_old", "")
 		}
+		if delivery.DeviceID == nil || *delivery.DeviceID == uuid.Nil || a.authorization == nil {
+			return a.finishDelivery(tx, delivery, "cancelled", "event_scope_missing", "")
+		}
+		authCtx, authCancel := context.WithTimeout(ctx, 3*time.Second)
+		authErr := a.authorization.CheckDeviceCapability(authCtx, subscription.AccountID, subscription.SourceSessionID, *delivery.DeviceID,
+			"alert.receive", delivery.EventID.String())
+		authCancel()
+		if errors.Is(authErr, errPushCapabilityDenied) {
+			return a.finishDelivery(tx, delivery, "cancelled", "alert_permission_revoked", "")
+		}
+		if authErr != nil {
+			return a.retryDelivery(tx, delivery, "authorization_unavailable", "")
+		}
 		var notification notificationPayload
 		if err := jsonUnmarshalStrict(delivery.Payload, &notification); err != nil || notification.EventID != delivery.EventID || notification.DetailPath != "/events/"+delivery.EventID.String() {
 			return a.finishDelivery(tx, delivery, "permanent_failure", "invalid_payload", "")

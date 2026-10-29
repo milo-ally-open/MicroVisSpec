@@ -28,6 +28,7 @@ type internalInboxEnvelope struct {
 type createdEventPayload struct {
 	AccountID  uuid.UUID `json:"account_id"`
 	EventID    uuid.UUID `json:"event_id"`
+	DeviceID   uuid.UUID `json:"device_id"`
 	Location   string    `json:"location"`
 	Severity   string    `json:"severity"`
 	OccurredAt time.Time `json:"occurred_at"`
@@ -62,7 +63,7 @@ func (a *App) receiveInbox(c *gin.Context) {
 	var sessionPayload revokedSessionPayload
 	switch envelope.EventType {
 	case "event.created":
-		if decodeStrict(envelope.Payload, &eventPayload) != nil || eventPayload.AccountID == uuid.Nil || eventPayload.EventID != envelope.EventID ||
+		if decodeStrict(envelope.Payload, &eventPayload) != nil || eventPayload.AccountID == uuid.Nil || eventPayload.EventID != envelope.EventID || eventPayload.DeviceID == uuid.Nil ||
 			eventPayload.OccurredAt.IsZero() || !eventPayload.OccurredAt.Equal(envelope.OccurredAt) || len(eventPayload.Location) > 256 ||
 			!validEventSeverity(eventPayload.Severity) || eventPayload.DetailPath != "/events/"+envelope.EventID.String() {
 			writeError(c, http.StatusUnprocessableEntity, "invalid_request", "event.created payload is invalid")
@@ -75,6 +76,19 @@ func (a *App) receiveInbox(c *gin.Context) {
 		}
 	}
 
+	var recipientIDs []uuid.UUID
+	if envelope.EventType == "event.created" {
+		if a.authorization == nil {
+			writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "authorization service is unavailable")
+			return
+		}
+		var err error
+		recipientIDs, err = a.authorization.ListAlertRecipients(c.Request.Context(), eventPayload.DeviceID, c.GetString("request_id"))
+		if err != nil {
+			writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "alert recipients could not be resolved")
+			return
+		}
+	}
 	duplicate := false
 	err := a.db.WithContext(c.Request.Context()).Transaction(func(tx *gorm.DB) error {
 		now := time.Now().UTC()
@@ -93,7 +107,7 @@ func (a *App) receiveInbox(c *gin.Context) {
 		}
 		switch envelope.EventType {
 		case "event.created":
-			if err := a.createDeliveries(tx, envelope.EventID, eventPayload, now); err != nil {
+			if err := a.createDeliveries(tx, envelope.EventID, eventPayload, recipientIDs, now); err != nil {
 				return err
 			}
 		case "session.revoked":
@@ -111,10 +125,10 @@ func (a *App) receiveInbox(c *gin.Context) {
 	c.JSON(http.StatusAccepted, gin.H{"status": "accepted", "duplicate": duplicate})
 }
 
-func (a *App) createDeliveries(tx *gorm.DB, eventID uuid.UUID, event createdEventPayload, now time.Time) error {
+func (a *App) createDeliveries(tx *gorm.DB, eventID uuid.UUID, event createdEventPayload, recipients []uuid.UUID, now time.Time) error {
 	var subscriptions []Subscription
 	if err := tx.Table(Subscription{}.TableName()).Clauses(clause.Locking{Strength: "UPDATE"}).
-		Where("account_id = ? AND disabled_at IS NULL", event.AccountID).Order("created_at ASC").Find(&subscriptions).Error; err != nil {
+		Where("account_id IN ? AND disabled_at IS NULL", recipients).Order("created_at ASC").Find(&subscriptions).Error; err != nil {
 		return err
 	}
 	notice, err := json.Marshal(notificationPayload{EventID: eventID, Location: event.Location, Severity: event.Severity,
@@ -130,7 +144,8 @@ func (a *App) createDeliveries(tx *gorm.DB, eventID uuid.UUID, event createdEven
 			status = "expired"
 			lastClass = "event_too_old"
 		}
-		delivery := Delivery{ID: uuid.New(), EventID: eventID, SubscriptionID: subscription.ID, AccountID: event.AccountID,
+		deviceID := event.DeviceID
+		delivery := Delivery{ID: uuid.New(), EventID: eventID, SubscriptionID: subscription.ID, AccountID: subscription.AccountID, DeviceID: &deviceID,
 			Payload: notice, Status: status, NextAttemptAt: now, ExpiresAt: expiresAt, LastClass: lastClass,
 			CreatedAt: now, UpdatedAt: now}
 		if err := tx.Table(Delivery{}.TableName()).Clauses(clause.OnConflict{

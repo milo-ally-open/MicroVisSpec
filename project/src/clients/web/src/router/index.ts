@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { ensureSession } from '../state/auth'
+import { authState, ensureSession } from '../state/auth'
 import { safeInAppPath } from '../lib/navigation'
 
 const router = createRouter({
@@ -18,6 +18,18 @@ const router = createRouter({
       meta: { public: true },
     },
     {
+      path: '/invite/redeem',
+      name: 'invite-redeem',
+      component: () => import('../pages/InviteRedeemPage.vue'),
+      meta: { public: true },
+    },
+    {
+      path: '/admin',
+      name: 'admin-home',
+      component: () => import('../pages/AdminPage.vue'),
+      meta: { requiresAuth: true, roles: ['admin'] },
+    },
+    {
       path: '/',
       component: () => import('../layouts/AppShell.vue'),
       meta: { requiresAuth: true },
@@ -30,6 +42,19 @@ const router = createRouter({
         { path: 'events/:eventId', name: 'event-detail', component: () => import('../pages/EventDetailPage.vue') },
         { path: 'analytics', name: 'analytics', component: () => import('../pages/AnalyticsPage.vue') },
         { path: 'settings', name: 'settings', component: () => import('../pages/SettingsPage.vue') },
+        { path: 'workspace', name: 'workspace', component: () => import('../pages/WorkspacePage.vue') },
+      ],
+    },
+    {
+      path: '/m',
+      component: () => import('../layouts/AppShell.vue'),
+      meta: { requiresAuth: true, roles: ['mobile'] },
+      children: [
+        { path: '', name: 'mobile-home', component: () => import('../pages/MobileHomePage.vue') },
+        { path: 'events', name: 'mobile-events', component: () => import('../pages/MobileEventsPage.vue') },
+        { path: 'events/:eventId', name: 'mobile-event-detail', component: () => import('../pages/EventDetailPage.vue') },
+        { path: 'cameras/:cameraId', name: 'mobile-camera', component: () => import('../pages/MobileCameraPage.vue') },
+        { path: 'settings', name: 'mobile-settings', component: () => import('../pages/SettingsPage.vue') },
       ],
     },
     { path: '/:pathMatch(.*)*', name: 'not-found', component: () => import('../pages/NotFoundPage.vue') },
@@ -39,10 +64,16 @@ const router = createRouter({
 router.beforeEach(async (to) => {
   const authenticated = await ensureSession()
   if (to.meta.public) {
+    if (to.name === 'invite-redeem') return true
     if (authenticated) return safeInAppPath(to.query.next) ?? '/'
     return true
   }
   if (!authenticated) return { name: 'login', query: { next: to.fullPath } }
+  const role = authState.user?.user_type
+  if (role === 'mobile' && !to.path.startsWith('/m')) return { path: '/m' }
+  if (role === 'pc' && to.path.startsWith('/m')) return { path: '/' }
+  if (role === 'admin' && !to.path.startsWith('/admin')) return { path: '/admin' }
+  if (role !== 'admin' && to.path.startsWith('/admin')) return role === 'mobile' ? { path: '/m' } : { path: '/' }
   return true
 })
 

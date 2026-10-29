@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -15,13 +16,47 @@ import (
 )
 
 const (
-	viewerLeaseLifetime  = 30 * time.Second
+	viewerLeaseLifetime  = 25 * time.Second
 	maxActiveSourceCount = 12
 	maxViewerLeaseCount  = 24
 	mediaQuotaLockID     = int64(728194631)
 )
 
 var errMediaCapacityFull = errors.New("media capacity is full")
+var errMediaStreamNotConfigured = errors.New("media stream is not configured")
+
+func (a *App) authorizedStreamForCamera(ctx context.Context, accountID, sessionID, cameraID uuid.UUID, requestID string) (Stream, error) {
+	var stream Stream
+	if a.device == nil || a.authorize == nil {
+		return stream, errors.New("device and authorization services are required")
+	}
+	ownership, err := a.device.ResolveCamera(ctx, cameraID.String())
+	if errors.Is(err, errOwnershipNotFound) {
+		return stream, errOwnershipNotFound
+	}
+	if err != nil {
+		return stream, err
+	}
+	ownerID, ownerErr := uuid.Parse(ownership.AccountID)
+	deviceID, deviceErr := uuid.Parse(ownership.DeviceID)
+	resolvedCameraID, cameraErr := uuid.Parse(ownership.CameraID)
+	if ownerErr != nil || deviceErr != nil || cameraErr != nil || deviceID == uuid.Nil || ownerID == uuid.Nil || resolvedCameraID != cameraID {
+		return stream, errOwnershipNotFound
+	}
+	if err := a.db.WithContext(ctx).Where("camera_id = ? AND account_id = ? AND active = ?", cameraID, ownerID, true).Take(&stream).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return stream, errMediaStreamNotConfigured
+		}
+		return stream, err
+	}
+	if stream.DeviceID != deviceID {
+		return stream, errOwnershipNotFound
+	}
+	if err := a.authorize.CheckDeviceCapability(ctx, accountID, sessionID, deviceID, "stream.view", requestID); err != nil {
+		return stream, err
+	}
+	return stream, nil
+}
 
 func (a *App) createPlaybackLease(c *gin.Context) {
 	cameraID, err := uuid.Parse(c.Param("camera_id"))
@@ -30,36 +65,22 @@ func (a *App) createPlaybackLease(c *gin.Context) {
 		return
 	}
 	accountID := c.MustGet("account_id").(uuid.UUID)
-	sessionID := strings.TrimSpace(c.GetHeader("X-Session-ID"))
-	if sessionID == "" || len(sessionID) > 128 {
+	sessionID, err := uuid.Parse(strings.TrimSpace(c.GetHeader("X-Session-ID")))
+	if err != nil || sessionID == uuid.Nil {
 		writeError(c, http.StatusUnauthorized, "unauthorized", "a valid session is required")
 		return
 	}
-	if a.device == nil {
-		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "camera ownership service is unavailable")
+	stream, err := a.authorizedStreamForCamera(c.Request.Context(), accountID, sessionID, cameraID, c.GetString("request_id"))
+	if errors.Is(err, errOwnershipNotFound) || errors.Is(err, errDeviceCapabilityDenied) {
+		writeError(c, http.StatusNotFound, "camera_not_found", "camera was not found")
 		return
 	}
-	ownership, err := a.device.ResolveCamera(c.Request.Context(), cameraID.String())
-	if errors.Is(err, errOwnershipNotFound) {
-		writeError(c, http.StatusNotFound, "camera_not_found", "camera was not found")
+	if errors.Is(err, errMediaStreamNotConfigured) {
+		writeError(c, http.StatusConflict, "stream_not_configured", "camera has no configured media source")
 		return
 	}
 	if err != nil {
-		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "camera ownership could not be verified")
-		return
-	}
-	ownerID, err := uuid.Parse(ownership.AccountID)
-	if err != nil || ownerID != accountID || ownership.CameraID != cameraID.String() {
-		writeError(c, http.StatusNotFound, "camera_not_found", "camera was not found")
-		return
-	}
-	var stream Stream
-	if err := a.db.WithContext(c.Request.Context()).Where("camera_id = ? AND account_id = ? AND active = ?", cameraID, accountID, true).Take(&stream).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			writeError(c, http.StatusConflict, "stream_not_configured", "camera has no configured media source")
-			return
-		}
-		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "media stream could not be loaded")
+		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "camera authorization could not be verified")
 		return
 	}
 	if stream.ConfigStatus != "applied" || stream.AppliedConfigVersion != stream.ConfigVersion {
@@ -71,7 +92,7 @@ func (a *App) createPlaybackLease(c *gin.Context) {
 		return
 	}
 	now := time.Now().UTC()
-	lease := ViewerLease{ID: uuid.New(), AccountID: accountID, SessionID: sessionID, StreamID: stream.ID,
+	lease := ViewerLease{ID: uuid.New(), AccountID: accountID, SessionID: sessionID.String(), StreamID: stream.ID,
 		ExpiresAt: now.Add(viewerLeaseLifetime), CreatedAt: now}
 	err = a.db.WithContext(c.Request.Context()).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Exec("SELECT pg_advisory_xact_lock(?)", mediaQuotaLockID).Error; err != nil {
@@ -121,15 +142,42 @@ func (a *App) renewViewerLease(c *gin.Context) {
 		return
 	}
 	accountID := c.MustGet("account_id").(uuid.UUID)
-	sessionID := strings.TrimSpace(c.GetHeader("X-Session-ID"))
-	if sessionID == "" || len(sessionID) > 128 {
+	sessionID, err := uuid.Parse(strings.TrimSpace(c.GetHeader("X-Session-ID")))
+	if err != nil || sessionID == uuid.Nil {
 		writeError(c, http.StatusUnauthorized, "unauthorized", "a valid session is required")
 		return
 	}
 	now := time.Now().UTC()
 	newExpiry := now.Add(viewerLeaseLifetime)
+	var lease ViewerLease
+	if err := a.db.WithContext(c.Request.Context()).Where("id = ? AND account_id = ? AND session_id = ? AND released_at IS NULL AND expires_at > ?",
+		leaseID, accountID, sessionID.String(), now).Take(&lease).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			writeError(c, http.StatusGone, "lease_expired", "viewer lease is no longer active")
+			return
+		}
+		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "viewer lease could not be loaded")
+		return
+	}
+	var stream Stream
+	if err := a.db.WithContext(c.Request.Context()).Where("id = ? AND active = ?", lease.StreamID, true).Take(&stream).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			writeError(c, http.StatusGone, "lease_expired", "viewer lease is no longer active")
+		} else {
+			writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "media stream could not be loaded")
+		}
+		return
+	}
+	if _, err := a.authorizedStreamForCamera(c.Request.Context(), accountID, sessionID, stream.CameraID, c.GetString("request_id")); err != nil {
+		if errors.Is(err, errOwnershipNotFound) || errors.Is(err, errDeviceCapabilityDenied) || errors.Is(err, errMediaStreamNotConfigured) {
+			writeError(c, http.StatusGone, "lease_expired", "viewer lease is no longer authorized")
+			return
+		}
+		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "viewer authorization could not be checked")
+		return
+	}
 	result := a.db.WithContext(c.Request.Context()).Model(&ViewerLease{}).
-		Where("id = ? AND account_id = ? AND session_id = ? AND released_at IS NULL AND expires_at > ?", leaseID, accountID, sessionID, now).
+		Where("id = ? AND account_id = ? AND session_id = ? AND released_at IS NULL AND expires_at > ?", leaseID, accountID, sessionID.String(), now).
 		Update("expires_at", newExpiry)
 	if result.Error != nil {
 		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "viewer lease could not be renewed")
@@ -257,6 +305,26 @@ func (a *App) authorizePlayback(c *gin.Context) {
 		writeError(c, http.StatusUnauthorized, "unauthorized", "media access is not authorized")
 		return
 	}
+	var stream Stream
+	if err := a.db.WithContext(c.Request.Context()).Where("id = ? AND active = ?", streamID, true).Take(&stream).Error; err != nil {
+		logReject("stream_not_found")
+		writeError(c, http.StatusUnauthorized, "unauthorized", "media access is not authorized")
+		return
+	}
+	authorizedSessionID, parseErr := uuid.Parse(identity.SessionID)
+	if parseErr != nil || authorizedSessionID == uuid.Nil {
+		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "session identity could not be validated")
+		return
+	}
+	if _, err := a.authorizedStreamForCamera(c.Request.Context(), identity.AccountID, authorizedSessionID, stream.CameraID, c.GetString("request_id")); err != nil {
+		if !errors.Is(err, errOwnershipNotFound) && !errors.Is(err, errDeviceCapabilityDenied) && !errors.Is(err, errMediaStreamNotConfigured) {
+			writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "media authorization could not be checked")
+			return
+		}
+		logReject("device_capability_denied")
+		writeError(c, http.StatusUnauthorized, "unauthorized", "media access is not authorized")
+		return
+	}
 	c.Status(http.StatusNoContent)
 }
 
@@ -278,16 +346,25 @@ func (a *App) processPendingKicks(ctx context.Context) {
 	if err := a.db.WithContext(ctx).Where("kick_pending = ?", true).Order("created_at ASC").Limit(100).Find(&leases).Error; err != nil {
 		return
 	}
+	semaphore := make(chan struct{}, maxViewerLeaseCount)
+	var workers sync.WaitGroup
 	for _, lease := range leases {
 		if ctx.Err() != nil {
-			return
+			break
 		}
-		callCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
-		err := a.mediaMTX.KickLease(callCtx, lease.StreamID.String(), lease.ID.String())
-		cancel()
-		if err != nil {
-			continue
-		}
-		_ = a.db.WithContext(ctx).Model(&ViewerLease{}).Where("id = ? AND kick_pending = ?", lease.ID, true).Update("kick_pending", false).Error
+		semaphore <- struct{}{}
+		workers.Add(1)
+		go func(item ViewerLease) {
+			defer workers.Done()
+			defer func() { <-semaphore }()
+			callCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+			err := a.mediaMTX.KickLease(callCtx, item.StreamID.String(), item.ID.String())
+			cancel()
+			if err != nil {
+				return
+			}
+			_ = a.db.WithContext(ctx).Model(&ViewerLease{}).Where("id = ? AND kick_pending = ?", item.ID, true).Update("kick_pending", false).Error
+		}(lease)
 	}
+	workers.Wait()
 }
