@@ -62,7 +62,7 @@
 
 | 日期 | 偏差/新发现 | 规格/设计更新 | 决定人或依据 |
 |---|---|---|---|
-| 2026-10-29 | 原方案的 PC 自助注册与管理员创建路径未区分；`account_id` 字段同时表示资源租户和用户主体。 | 已在 proposal 中给出并行创建建议及按字段语义分类的迁移原则。 | 仓库 `auth`、`device`、`event`、`media`、`push` 模型代码；产品选择待确认。 |
+| 2026-10-29 | 原方案的 PC 自助注册与管理员创建路径未区分；`account_id` 字段同时表示资源租户和用户主体。 | 已在 proposal 中记录并行创建规则及按字段语义分类的迁移原则；用户已确认 PC 自助注册与管理员创建并存。 | 仓库模型与路由；产品负责人确认（2026-10-29）。 |
 | 2026-10-29 | Atlas 的 main/VideoStreamManager 曾重复处理租期文件和等待；告警事件/截图持久化、Agent Unix socket 协议处理、SQLite outbox 和 AIProcessor 动态库生命周期也缺少独立边界。 | 新增 alarm event publisher 与 lease gate use cases、ports，以及 socket client/server、SQLite/file/metadata/plugin adapters；VideoStreamManager 注入租期状态 port；Agent socket server 经 `LocalAgentControl` 访问状态和事件入队，Agent 依赖 `DurableAgentEventOutbox`，SQLite 实现移至 adapter；更新 Atlas README/spec/design 与本组现状图。插件接口仍是 C++ ABI，runtime 与插件须成对构建部署。 | 源码边界检查；本次未运行构建、测试或目标板验证。 |
 | 2026-10-29 | Agent 直接管理 libmosquitto 连接、TLS、发布、订阅和 C callbacks。 | 新增 `MqttTransport` port 与 `MosquittoMqttTransport` adapter；Agent 改为通过回调接收连接/消息状态及通过 transport publish/subscribe，业务消息路由仍在 Agent。 | 源码边界检查；本次未运行构建、测试或目标板验证。 |
 | 2026-10-29 | Agent MQTT callback 直接负责主题分流、ACK 应用和 16 条命令队列。 | 新增 application `AgentMqttInbox`，处理命令 JSON/有界队列与事件 ACK；Agent callback 现在转发消息，主循环从 inbox 取命令。 | 源码边界检查；本次未运行构建、测试或目标板验证。 |
@@ -77,7 +77,8 @@
 
 ## 完成摘要
 
-- 已完成任务：T-02 基线状态标注与规格组入口；T-13 现状源码地图、目标分层和 UML 文档更新。T-16 已推进 runtime use case/ports 与多类 adapter；此前切片和本次配置存储 adapter 的 Atlas ARM64 `yunshao-agent` 构建均已通过；任务未完成，也不代表产品授权、运行时回归或媒体链路验收。
-- 未执行/未通过检查：本次未运行 CTest、组件/运行时回归、激活与 MQTT ACK 验收；所有新 REQ/AC、数据库迁移、服务集成、完整代码分层门禁、真实媒体和手机 Push 验收仍待执行。板端构建存在时钟偏差警告。
-- 已同步的权威来源：PRD、全局 SPEC、STRUCTURE、Specification README 已链接本组并区分现状/目标；服务领域合同的正式切换待 T-01/T-03。
-- 完成日期：尚未完成实现验收。
+- 已完成任务：T-02 基线状态标注与规格组入口；T-03 受影响服务规格同步；T-13 现状源码地图、目标分层和 UML 文档更新。T-16 已推进 runtime use case/ports 与多类 adapter；Atlas ARM64 `yunshao-agent`/runtime 构建证据见上文，但任务和运行时验收未完成。
+- 本轮构建/文档检查：五个 Go 服务 `go build` 通过；Web `npm run build`（含 Vue/Service Worker 类型检查）通过；8 个规格组结构校验通过；`git diff --check` 通过。未运行测试、CTest、集成/运行时回归、激活或 MQTT ACK 验收。目标板构建历史上存在时钟偏差警告。
+- 未完成验收：新 REQ/AC、数据库旧库迁移/回滚、跨服务授权和撤权、真实媒体 30 秒断流、真实浏览器/手机 Push、完整代码分层与自动门禁仍待执行。
+- 已同步的权威来源：PRD、全局 SPEC、STRUCTURE、Specification README、受影响服务规格均链接本组并区分当前实现与验收缺口；本轮部署文档新增管理 API 同源代理说明。
+- 完成日期：本轮文档与功能切片已提交；整体重构验收尚未完成。
