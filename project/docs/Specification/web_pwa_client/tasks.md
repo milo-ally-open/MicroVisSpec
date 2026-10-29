@@ -19,7 +19,7 @@
 - [ ] **T-13 Web/PWA 局域网入口配置** — 由主机 Nginx 托管静态站点并代理 loopback Go 服务；HTTPS 证书 SAN、PUBLIC_ORIGIN、MediaMTX 来源/WebRTC candidates 与主机防火墙说明保持一致；覆盖 REQ-07 / AC-07.1、AC-07.2、AC-07.3。
 - [ ] **T-15 网页激活与设备期限续期** — 设备详情提供无限期/自定义分钟、小时、天选择；提交无秘密值的激活请求并轮询 `pending`、`syncing`、完成状态；移除用户可见票据和命令行，MQTT 凭据仅由 Atlas agent 经 HTTPS 领取并由 agent 确认；覆盖 REQ-02 / AC-02.6、AC-02.7、AC-02.8；依赖 device-service T-08 与 Atlas agent 轮询流程。
 - [ ] **T-16 网页 SSH 设备首次接入** — 设备详情提供 SSH 用户名/密码表单、设备指纹确认和安全阶段进度；仅通过设备服务启动登记 IP 的固定端口 SSH 任务，清空密码且不持久化；覆盖 REQ-08 / AC-08.1、AC-08.2、AC-08.3、AC-08.4、AC-08.5；依赖 device-service T-09。
-- [~] **T-17 三角色工作空间界面切片** — PC 工作台新增按设备授予/替换移动成员 capability、撤销成员、创建/撤销 24 小时单次邀请及复制邀请链接；新增邀请兑换页；mobile 角色路由到移动入口，可查看服务端授权设备/事件并在 `stream.view` 下打开单路播放器；事件详情按 `event.handle` 隐藏处置表单。admin 页面已有 PC 账号创建/停用恢复、mobile 停用恢复、服务健康和审计查看。当前只有 TypeScript 类型检查和生产构建证据，未做真实浏览器/手机、Push 点击或后端联调验收；角色账号切换、健康探针部署校验和完整 PWA 路由回归仍待处理。覆盖共享授权 REQ-03、REQ-08 / AC-03.1–03.6、AC-08.1–08.8；依赖 multi_user_workspace_access T-04、T-06、T-07。
+- [~] **T-17 三角色工作空间界面切片** — PC 工作台新增按设备授予/替换移动成员 capability、撤销成员、创建/撤销 24 小时单次邀请及复制邀请链接；新增邀请兑换页；mobile 角色路由到移动入口，设备信息按 `device.read`、摄像头发现和播放器按独立 `stream.view` 返回，事件按 `event.read`/`event.handle` 筛选。admin 页面已有 PC 账号创建/停用恢复、mobile 停用恢复、服务健康和审计查看。Web 14 项 Vitest、类型检查和生产构建通过；未做真实浏览器/手机、Push 点击或真实后端联调验收；角色账号切换、健康探针部署校验和完整 PWA 路由回归仍待处理。覆盖共享授权 REQ-03、REQ-08 / AC-03.1–03.6、AC-08.1–08.8；依赖 multi_user_workspace_access T-04、T-06、T-07。
 
 ## 验收记录
 

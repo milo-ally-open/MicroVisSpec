@@ -54,6 +54,14 @@ func openDatabase(dsn string) (*gorm.DB, error) {
 	if err := db.Exec("UPDATE event.outbox AS outboxes SET workspace_id = events.workspace_id FROM event.events AS events WHERE outboxes.id = events.id AND outboxes.workspace_id IS NULL").Error; err != nil {
 		return nil, err
 	}
+	for _, statement := range []string{
+		"UPDATE event.evidence AS child SET workspace_id = parent.workspace_id FROM event.events AS parent WHERE child.event_id = parent.id AND child.workspace_id IS NULL",
+		"UPDATE event.dispositions AS child SET workspace_id = parent.workspace_id FROM event.events AS parent WHERE child.event_id = parent.id AND child.workspace_id IS NULL",
+	} {
+		if err := db.Exec(statement).Error; err != nil {
+			return nil, err
+		}
+	}
 	return db, nil
 }
 

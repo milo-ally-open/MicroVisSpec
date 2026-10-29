@@ -296,6 +296,7 @@ func NewHandler(config Config, db *gorm.DB) http.Handler {
 	api.POST("/logout", app.sameOrigin, app.logout)
 	api.PUT("/password", app.sameOrigin, app.changePassword)
 	api.GET("/workspace", app.getWorkspace)
+	api.PUT("/workspace", app.sameOrigin, app.updateWorkspace)
 	api.GET("/workspace/members", app.listWorkspaceMembers)
 	api.PUT("/workspace/members/:member_id/grants", app.sameOrigin, app.replaceMemberGrants)
 	api.DELETE("/workspace/members/:member_id", app.sameOrigin, app.revokeWorkspaceMember)

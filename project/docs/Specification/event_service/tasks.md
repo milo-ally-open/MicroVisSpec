@@ -12,7 +12,7 @@
 - [ ] **T-06 event-service 服务内集成测试** — PostgreSQL + Mosquitto + 可控 device-service/push-service stub + 临时证据卷，覆盖重复 MQTT/ACK 丢失、未授权/停用设备、禁用/未应用/越阈规则、截图到期/丢失、跨账号查询与处置、并发版本冲突、时区统计、push 故障后补投；覆盖 REQ-01、REQ-02、REQ-03、REQ-04 / AC-01.1、AC-01.2、AC-01.3、AC-02.1、AC-02.2、AC-03.1、AC-03.2、AC-04.1、AC-04.2；依赖 T-01–T-05。
 - [ ] **T-07 数据恢复、镜像和可观测性** — 数据库权限、私卷容量、每日/每小时维护任务、服务重启及日志/指标；覆盖 REQ-02、REQ-04 / AC-02.2、AC-04.2；依赖 T-01–T-06。
 
-- [~] **T-08 workspace 事件授权与真实操作者记录** — 已按 auth-service `event.read` grant 过滤移动列表/统计，在详情/证据/处置入口逐次检查设备能力，处置记录保存可信 `actor_account_id`。event/event.created outbox 增加 `workspace_id` nullable 扩展列，并按 owner-account/workspace ID 规则幂等回填及在新事件事务中双写；Push outbox 包含可信 device ID。旧库迁移、孤儿核对、真实跨服务撤权/证据访问和集成验收未完成；本轮仅 Go build 编译证据。覆盖本组 REQ-02 / AC-02.1、AC-02.2、REQ-03 / AC-03.1、REQ-04 / AC-04.1，并满足共享授权规格定义的事件、证据、处置授权合同；依赖 multi_user_workspace_access T-04、T-05、T-07。
+- [~] **T-08 workspace 事件授权与真实操作者记录** — 已按 auth-service `event.read` grant 过滤移动列表/统计，在详情/证据/处置入口逐次检查设备能力，处置记录保存可信 `actor_account_id`。event、outbox、evidence、disposition 均增加 `workspace_id` nullable 扩展列，并按父 event 关系幂等回填、新写入同步写入；共享只读迁移审计 SQL 检查空值和父子租户不一致。Push outbox 包含可信 device ID。旧库迁移审计、真实跨服务撤权/证据访问和 PostgreSQL 集成验收未完成；Go 单测通过。覆盖本组 REQ-02 / AC-02.1、AC-02.2、REQ-03 / AC-03.1、REQ-04 / AC-04.1，并满足共享授权规格定义的事件、证据、处置授权合同；依赖 multi_user_workspace_access T-04、T-05、T-07。
 
 ## 验收证据
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { authApi, type DeviceGrant, type WorkspaceInvitation, type WorkspaceMember } from '../api/auth'
+import { authApi, type DeviceGrant, type WorkspaceInfo, type WorkspaceInvitation, type WorkspaceMember } from '../api/auth'
 import { deviceApi, type Device } from '../api/devices'
 import { errorMessage } from '../api/client'
 
@@ -12,6 +12,8 @@ const capabilities = [
   { key: 'alert.receive', label: '接收通知' },
 ] as const
 const devices = ref<Device[]>([])
+const workspace = ref<WorkspaceInfo | null>(null)
+const workspaceName = ref('')
 const members = ref<WorkspaceMember[]>([])
 const invitations = ref<WorkspaceInvitation[]>([])
 const busy = ref(true)
@@ -45,7 +47,9 @@ async function load() {
   busy.value = true
   error.value = ''
   try {
-    const [workspaceDevices, memberPage, invitationPage] = await Promise.all([deviceApi.listAll(), authApi.members(), authApi.invitations()])
+    const [workspaceInfo, workspaceDevices, memberPage, invitationPage] = await Promise.all([authApi.workspace(), deviceApi.listAll(), authApi.members(), authApi.invitations()])
+    workspace.value = workspaceInfo
+    workspaceName.value = workspaceInfo.name
     devices.value = workspaceDevices
     members.value = memberPage.items
     invitations.value = invitationPage.items
@@ -53,6 +57,20 @@ async function load() {
     error.value = errorMessage(cause)
   } finally {
     busy.value = false
+  }
+}
+
+async function saveWorkspaceName() {
+  saving.value = true
+  error.value = ''
+  try {
+    workspace.value = await authApi.updateWorkspace(workspaceName.value)
+    workspaceName.value = workspace.value.name
+    notice.value = '工作空间名称已更新。'
+  } catch (cause) {
+    error.value = errorMessage(cause)
+  } finally {
+    saving.value = false
   }
 }
 
@@ -130,6 +148,15 @@ onMounted(load)
   <div v-if="error" class="notice notice--error" role="alert">{{ error }}</div>
   <div v-if="notice" class="notice notice--success" role="status">{{ notice }}</div>
 
+  <section class="panel workspace-panel workspace-profile">
+    <div class="panel-heading"><div><span class="eyebrow">PROFILE</span><h2>工作空间资料</h2></div></div>
+    <form class="workspace-profile__form" @submit.prevent="saveWorkspaceName">
+      <label for="workspace-name">名称</label>
+      <input id="workspace-name" v-model="workspaceName" maxlength="100" required autocomplete="organization" :disabled="saving || workspace?.role !== 'owner'">
+      <button class="button button--primary" :disabled="saving || !workspace || workspace.role !== 'owner'">{{ saving ? '正在保存…' : '保存名称' }}</button>
+    </form>
+  </section>
+
   <section class="panel workspace-panel">
     <div class="panel-heading"><div><span class="eyebrow">MEMBERS</span><h2>工作空间成员</h2></div><button class="button button--secondary" @click="load" :disabled="busy">刷新</button></div>
     <p v-if="busy">正在加载成员…</p>
@@ -173,6 +200,8 @@ onMounted(load)
 
 <style scoped>
 .workspace-panel { margin-top: 20px; padding: 24px; }
+.workspace-profile__form { display: flex; align-items: center; gap: 12px; }
+.workspace-profile__form input { min-width: 0; flex: 1; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
 .muted-copy { color: var(--muted); margin: -6px 0 18px; }
 .workspace-member-list { display: grid; gap: 10px; }
 .workspace-member { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; border-top: 1px solid var(--line); }
@@ -186,5 +215,5 @@ onMounted(load)
 .grant-option small { color: var(--muted); font-size: 11px; }
 .invite-link-box { display: flex; gap: 10px; margin-top: 16px; }
 .invite-link-box input { min-width: 0; flex: 1; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
-@media (max-width: 650px) { .workspace-member { align-items: flex-start; flex-direction: column; } .invite-link-box { align-items: stretch; flex-direction: column; } }
+@media (max-width: 650px) { .workspace-member { align-items: flex-start; flex-direction: column; } .invite-link-box, .workspace-profile__form { align-items: stretch; flex-direction: column; } }
 </style>

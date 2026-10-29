@@ -401,7 +401,7 @@ func (a *App) transitionEvent(c *gin.Context) {
 		if err := updateQuery.Updates(updates).Error; err != nil {
 			return err
 		}
-		disposition := Disposition{ID: uuid.New(), EventID: current.ID, ActorAccountID: accountID(c), FromStatus: current.Status,
+		disposition := Disposition{ID: uuid.New(), WorkspaceID: current.WorkspaceID, EventID: current.ID, ActorAccountID: accountID(c), FromStatus: current.Status,
 			ToStatus: input.ToStatus, Result: input.Result, ActedAt: now}
 		if err := tx.Table(Disposition{}.TableName()).Create(&disposition).Error; err != nil {
 			return err

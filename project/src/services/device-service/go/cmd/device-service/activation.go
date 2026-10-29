@@ -178,7 +178,8 @@ func (a *App) issueActivationTicket(ctx context.Context, account, deviceID uuid.
 	if err != nil {
 		return ActivationTicket{}, "", err
 	}
-	ticket := ActivationTicket{ID: uuid.New(), DeviceID: deviceID, TokenHash: hashOpaque(token), ExpiresAt: now.Add(activationTicketLifetime), UsageDurationSeconds: duration, CreatedAt: now}
+	workspaceID := account
+	ticket := ActivationTicket{ID: uuid.New(), WorkspaceID: &workspaceID, DeviceID: deviceID, TokenHash: hashOpaque(token), ExpiresAt: now.Add(activationTicketLifetime), UsageDurationSeconds: duration, CreatedAt: now}
 	err = a.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var inFlight ActivationTicket
 		inFlightErr := tx.Where("device_id = ? AND consumed_at IS NULL AND revoked_at IS NULL AND claim_expires_at > ?", deviceID, now).First(&inFlight).Error
@@ -338,7 +339,7 @@ func (a *App) completeActivation(c *gin.Context, ticket ActivationTicket, claimI
 		expiresAt := completedAt.Add(time.Duration(*ticket.UsageDurationSeconds) * time.Second)
 		activationExpiresAt = &expiresAt
 	}
-	credential := BrokerCredential{ID: uuid.New(), DeviceID: device.ID, Username: username, ClientID: clientID, PasswordHash: hashOpaque(password), CreatedAt: completedAt}
+	credential := BrokerCredential{ID: uuid.New(), WorkspaceID: device.WorkspaceID, DeviceID: device.ID, Username: username, ClientID: clientID, PasswordHash: hashOpaque(password), CreatedAt: completedAt}
 	err = a.db.Transaction(func(tx *gorm.DB) error {
 		var current Device
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND (active = ? OR activation_state = ?)", device.ID, true, "expired").Take(&current).Error; err != nil {
@@ -384,7 +385,7 @@ func (a *App) completeActivation(c *gin.Context, ticket ActivationTicket, claimI
 			if err != nil {
 				return err
 			}
-			if err := tx.Create(&Outbox{ID: uuid.New(), EventType: "device.activated", Payload: payload, CreatedAt: completedAt, NextAttemptAt: completedAt}).Error; err != nil {
+			if err := tx.Create(&Outbox{ID: uuid.New(), WorkspaceID: current.WorkspaceID, EventType: "device.activated", Payload: payload, CreatedAt: completedAt, NextAttemptAt: completedAt}).Error; err != nil {
 				return err
 			}
 		}
@@ -535,7 +536,7 @@ func (a *App) expireDevices(ctx context.Context, now time.Time) {
 					continue
 				}
 				payload, _ := json.Marshal(map[string]string{"account_id": device.AccountID.String(), "device_id": device.ID.String()})
-				if err := tx.Create(&Outbox{ID: uuid.New(), EventType: "device.disabled", Payload: payload, CreatedAt: now, NextAttemptAt: now}).Error; err != nil {
+				if err := tx.Create(&Outbox{ID: uuid.New(), WorkspaceID: device.WorkspaceID, EventType: "device.disabled", Payload: payload, CreatedAt: now, NextAttemptAt: now}).Error; err != nil {
 					return err
 				}
 				expiredIDs = append(expiredIDs, device.ID)

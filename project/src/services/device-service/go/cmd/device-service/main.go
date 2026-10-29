@@ -200,6 +200,7 @@ func (Camera) TableName() string { return "device.cameras" }
 type AlgorithmAssignment struct {
 	ID                 uuid.UUID       `gorm:"type:uuid;primaryKey" json:"assignment_id"`
 	AccountID          uuid.UUID       `gorm:"type:uuid;not null;index" json:"-"`
+	WorkspaceID        *uuid.UUID      `gorm:"type:uuid;index" json:"-"`
 	DeviceID           uuid.UUID       `gorm:"type:uuid;not null;index;uniqueIndex:idx_assignments_device_algorithm,priority:1" json:"device_id"`
 	AlgorithmKey       string          `gorm:"size:120;not null;index;uniqueIndex:idx_assignments_device_algorithm,priority:2" json:"algorithm_key"`
 	AlgorithmVersion   string          `gorm:"size:120;not null" json:"algorithm_version"`
@@ -219,6 +220,7 @@ func (AlgorithmAssignment) TableName() string { return "device.algorithm_assignm
 
 type ActivationTicket struct {
 	ID                   uuid.UUID  `gorm:"type:uuid;primaryKey"`
+	WorkspaceID          *uuid.UUID `gorm:"type:uuid;index" json:"-"`
 	DeviceID             uuid.UUID  `gorm:"type:uuid;not null;index"`
 	TokenHash            string     `gorm:"size:64;not null;uniqueIndex"`
 	ExpiresAt            time.Time  `gorm:"not null;index"`
@@ -234,6 +236,7 @@ func (ActivationTicket) TableName() string { return "device.activation_tickets" 
 
 type CommandRecord struct {
 	ID              uuid.UUID       `gorm:"type:uuid;primaryKey" json:"command_id"`
+	WorkspaceID     *uuid.UUID      `gorm:"type:uuid;index" json:"-"`
 	AssignmentID    uuid.UUID       `gorm:"type:uuid;not null;index" json:"assignment_id"`
 	DeviceID        uuid.UUID       `gorm:"type:uuid;not null;index" json:"device_id"`
 	ExpectedVersion int64           `gorm:"not null" json:"expected_version"`
@@ -251,6 +254,7 @@ func (CommandRecord) TableName() string { return "device.command_records" }
 
 type ConfigSnapshot struct {
 	ID               uuid.UUID       `gorm:"type:uuid;primaryKey"`
+	WorkspaceID      *uuid.UUID      `gorm:"type:uuid;index" json:"-"`
 	AssignmentID     uuid.UUID       `gorm:"type:uuid;not null;uniqueIndex:idx_config_snapshots_version,priority:1"`
 	DeviceID         uuid.UUID       `gorm:"type:uuid;not null;index"`
 	Version          int64           `gorm:"not null;uniqueIndex:idx_config_snapshots_version,priority:2"`
@@ -264,6 +268,7 @@ func (ConfigSnapshot) TableName() string { return "device.config_snapshots" }
 
 type Outbox struct {
 	ID            uuid.UUID       `gorm:"type:uuid;primaryKey" json:"event_id"`
+	WorkspaceID   *uuid.UUID      `gorm:"type:uuid;index" json:"-"`
 	EventType     string          `gorm:"size:100;not null;index" json:"event_type"`
 	Payload       json.RawMessage `gorm:"type:jsonb;not null" json:"payload"`
 	CreatedAt     time.Time       `gorm:"not null;index" json:"created_at"`
@@ -279,6 +284,7 @@ func (Outbox) TableName() string { return "device.outbox" }
 
 type BrokerCredential struct {
 	ID                   uuid.UUID  `gorm:"type:uuid;primaryKey"`
+	WorkspaceID          *uuid.UUID `gorm:"type:uuid;index" json:"-"`
 	DeviceID             uuid.UUID  `gorm:"type:uuid;not null;uniqueIndex"`
 	Username             string     `gorm:"size:120;not null;uniqueIndex"`
 	ClientID             string     `gorm:"size:120;not null;uniqueIndex"`
@@ -292,16 +298,17 @@ type BrokerCredential struct {
 func (BrokerCredential) TableName() string { return "device.broker_credentials" }
 
 type ProvisioningJob struct {
-	ID         uuid.UUID  `gorm:"type:uuid;primaryKey" json:"job_id"`
-	AccountID  uuid.UUID  `gorm:"type:uuid;not null;index" json:"-"`
-	DeviceID   uuid.UUID  `gorm:"type:uuid;not null;index" json:"device_id"`
-	Status     string     `gorm:"size:24;not null;index" json:"status"`
-	Stage      string     `gorm:"size:40;not null" json:"stage"`
-	ErrorCode  string     `gorm:"size:64" json:"error_code,omitempty"`
-	Message    string     `gorm:"size:240" json:"message"`
-	CreatedAt  time.Time  `gorm:"not null;index" json:"created_at"`
-	UpdatedAt  time.Time  `gorm:"not null" json:"updated_at"`
-	FinishedAt *time.Time `json:"finished_at,omitempty"`
+	ID          uuid.UUID  `gorm:"type:uuid;primaryKey" json:"job_id"`
+	AccountID   uuid.UUID  `gorm:"type:uuid;not null;index" json:"-"`
+	WorkspaceID *uuid.UUID `gorm:"type:uuid;index" json:"-"`
+	DeviceID    uuid.UUID  `gorm:"type:uuid;not null;index" json:"device_id"`
+	Status      string     `gorm:"size:24;not null;index" json:"status"`
+	Stage       string     `gorm:"size:40;not null" json:"stage"`
+	ErrorCode   string     `gorm:"size:64" json:"error_code,omitempty"`
+	Message     string     `gorm:"size:240" json:"message"`
+	CreatedAt   time.Time  `gorm:"not null;index" json:"created_at"`
+	UpdatedAt   time.Time  `gorm:"not null" json:"updated_at"`
+	FinishedAt  *time.Time `json:"finished_at,omitempty"`
 }
 
 func (ProvisioningJob) TableName() string { return "device.provisioning_jobs" }
@@ -325,6 +332,19 @@ func openDatabase(dsn string) (*gorm.DB, error) {
 	}
 	if err := db.Exec("UPDATE device.cameras SET workspace_id = account_id WHERE workspace_id IS NULL").Error; err != nil {
 		return nil, err
+	}
+	for _, statement := range []string{
+		"UPDATE device.algorithm_assignments AS child SET workspace_id = parent.workspace_id FROM device.devices AS parent WHERE child.device_id = parent.id AND child.workspace_id IS NULL",
+		"UPDATE device.activation_tickets AS child SET workspace_id = parent.workspace_id FROM device.devices AS parent WHERE child.device_id = parent.id AND child.workspace_id IS NULL",
+		"UPDATE device.command_records AS child SET workspace_id = parent.workspace_id FROM device.devices AS parent WHERE child.device_id = parent.id AND child.workspace_id IS NULL",
+		"UPDATE device.config_snapshots AS child SET workspace_id = parent.workspace_id FROM device.devices AS parent WHERE child.device_id = parent.id AND child.workspace_id IS NULL",
+		"UPDATE device.provisioning_jobs AS child SET workspace_id = parent.workspace_id FROM device.devices AS parent WHERE child.device_id = parent.id AND child.workspace_id IS NULL",
+		"UPDATE device.broker_credentials AS child SET workspace_id = parent.workspace_id FROM device.devices AS parent WHERE child.device_id = parent.id AND child.workspace_id IS NULL",
+		"UPDATE device.outbox AS child SET workspace_id = parent.workspace_id FROM device.devices AS parent WHERE parent.id::text = child.payload->>'device_id' AND child.workspace_id IS NULL",
+	} {
+		if err := db.Exec(statement).Error; err != nil {
+			return nil, err
+		}
 	}
 	if err := db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_device_provisioning_one_active_per_device ON device.provisioning_jobs (device_id) WHERE status IN ('queued', 'running')").Error; err != nil {
 		return nil, err
@@ -379,6 +399,12 @@ type MobileDeviceView struct {
 	Cameras         []MobileCameraView `json:"cameras"`
 }
 
+type MobileStreamCameraDevice struct {
+	DeviceID uuid.UUID          `json:"device_id"`
+	Name     string             `json:"name"`
+	Cameras  []MobileCameraView `json:"cameras"`
+}
+
 func NewHandler(db *gorm.DB) http.Handler {
 	return NewHandlerWithDependencies(Config{}, db, nil)
 }
@@ -405,6 +431,7 @@ func (app *App) Handler() http.Handler {
 	api := r.Group("/api/v1/devices", app.requireAccount())
 	api.GET("/activation-config", app.activationConfig)
 	api.GET("/stats", app.stats)
+	api.GET("/stream-cameras", app.listStreamAuthorizedCameras)
 	api.POST("", app.requirePCOwner(), app.createDevice)
 	api.GET("", app.listDevices)
 	api.GET("/:device_id", app.getDevice)
@@ -657,6 +684,67 @@ func (a *App) listDevices(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"items": items, "next_cursor": next})
 }
 
+func (a *App) listStreamAuthorizedCameras(c *gin.Context) {
+	if c.GetString("user_type") != "mobile" {
+		writeError(c, http.StatusForbidden, "forbidden", "stream camera discovery is available to authorized mobile members")
+		return
+	}
+	limit, err := parseLimit(c.Query("limit"))
+	if err != nil {
+		writeError(c, http.StatusUnprocessableEntity, "invalid_pagination", "limit must be between 1 and 100")
+		return
+	}
+	if a.authorization == nil {
+		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "camera authorization is unavailable")
+		return
+	}
+	deviceIDs, nextCursor, err := a.authorization.ListAuthorizedDevices(c.Request.Context(), accountID(c), c.GetString("session_id"),
+		"stream.view", c.Query("cursor"), limit, c.GetString("request_id"))
+	if errors.Is(err, errDeviceCapabilityDenied) {
+		writeError(c, http.StatusForbidden, "forbidden", "active workspace membership is required")
+		return
+	}
+	if err != nil {
+		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "camera authorization could not be checked")
+		return
+	}
+	items := make([]MobileStreamCameraDevice, 0, len(deviceIDs))
+	if len(deviceIDs) == 0 {
+		c.JSON(http.StatusOK, gin.H{"items": items, "next_cursor": nextCursor})
+		return
+	}
+	var devices []Device
+	if err := a.db.WithContext(c.Request.Context()).Where("id IN ? AND active = ? AND (activation_expires_at IS NULL OR activation_expires_at > ?)",
+		deviceIDs, true, time.Now().UTC()).Find(&devices).Error; err != nil {
+		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "authorized devices could not be loaded")
+		return
+	}
+	devicesByID := make(map[uuid.UUID]Device, len(devices))
+	for _, device := range devices {
+		devicesByID[device.ID] = device
+	}
+	var cameras []Camera
+	if err := a.db.WithContext(c.Request.Context()).Where("device_id IN ? AND active = ?", deviceIDs, true).
+		Order("device_id ASC, created_at ASC").Find(&cameras).Error; err != nil {
+		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "authorized cameras could not be loaded")
+		return
+	}
+	camerasByDevice := make(map[uuid.UUID][]MobileCameraView, len(deviceIDs))
+	for _, camera := range cameras {
+		camerasByDevice[camera.DeviceID] = append(camerasByDevice[camera.DeviceID], MobileCameraView{CameraID: camera.ID,
+			DeviceID: camera.DeviceID, Name: camera.Name, CameraState: camera.CameraState, StreamState: camera.StreamState})
+	}
+	for _, deviceID := range deviceIDs {
+		device, ok := devicesByID[deviceID]
+		if !ok {
+			continue
+		}
+		items = append(items, MobileStreamCameraDevice{DeviceID: device.ID, Name: device.Name,
+			Cameras: camerasByDevice[device.ID]})
+	}
+	c.JSON(http.StatusOK, gin.H{"items": items, "next_cursor": nextCursor})
+}
+
 func parseLimit(raw string) (int, error) {
 	if raw == "" {
 		return 20, nil
@@ -880,7 +968,7 @@ func (a *App) disableDevice(c *gin.Context) {
 		if result.RowsAffected == 0 {
 			return nil
 		}
-		return tx.Create(&Outbox{ID: uuid.New(), EventType: "device.disabled", Payload: payload, CreatedAt: now, NextAttemptAt: now}).Error
+		return tx.Create(&Outbox{ID: uuid.New(), WorkspaceID: device.WorkspaceID, EventType: "device.disabled", Payload: payload, CreatedAt: now, NextAttemptAt: now}).Error
 	})
 	if err != nil {
 		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "device could not be disabled")

@@ -10,8 +10,10 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 func TestAuthSessionLifecycleIntegration(t *testing.T) {
@@ -146,6 +148,158 @@ func TestAuthSessionLifecycleIntegration(t *testing.T) {
 	}
 	if outboxCount != 1 {
 		t.Fatalf("expected one transactional revocation event; got %d", outboxCount)
+	}
+}
+
+func TestWorkspaceMemberRevocationRevokesSessionsAndQueuesMediaEvents(t *testing.T) {
+	dsn := os.Getenv("TEST_DATABASE_URL")
+	if dsn == "" {
+		t.Skip("TEST_DATABASE_URL must point at an isolated PostgreSQL test database")
+	}
+	db, err := openDatabase(dsn)
+	if err != nil {
+		t.Fatalf("open isolated test database: %v", err)
+	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = sqlDB.Close() })
+
+	now := time.Now().UTC()
+	ownerName := "owner_" + uuid.NewString()[:8]
+	memberName := "member_" + uuid.NewString()[:8]
+	owner := Account{ID: uuid.New(), Username: ownerName, NormalizedUser: ownerName,
+		PasswordHash: "unused", UserType: "pc", Status: "active", CreatedAt: now, UpdatedAt: now}
+	memberAccount := Account{ID: uuid.New(), Username: memberName, NormalizedUser: memberName,
+		PasswordHash: "unused", UserType: "mobile", Status: "active", CreatedAt: now, UpdatedAt: now}
+	workspace := Workspace{ID: owner.ID, OwnerAccountID: owner.ID, Name: owner.Username, Status: "active", CreatedAt: now, UpdatedAt: now}
+	member := WorkspaceMember{ID: uuid.New(), WorkspaceID: workspace.ID, AccountID: memberAccount.ID, Status: "active", InvitedBy: owner.ID,
+		JoinedAt: now, CreatedAt: now, UpdatedAt: now}
+	sessions := []Session{
+		{ID: uuid.New(), AccountID: memberAccount.ID, TokenHash: uuid.NewString(), CSRFHash: uuid.NewString(), LastActivityAt: now, ExpiresAt: now.Add(time.Hour), CreatedAt: now},
+		{ID: uuid.New(), AccountID: memberAccount.ID, TokenHash: uuid.NewString(), CSRFHash: uuid.NewString(), LastActivityAt: now, ExpiresAt: now.Add(time.Hour), CreatedAt: now},
+	}
+	if err := db.Create(&owner).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&memberAccount).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&workspace).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&member).Error; err != nil {
+		t.Fatal(err)
+	}
+	for _, session := range sessions {
+		if err := db.Create(&session).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Cleanup(func() {
+		_ = db.Table(Outbox{}.TableName()).Where("payload->>'account_id' = ?", memberAccount.ID.String()).Delete(&Outbox{}).Error
+		_ = db.Table(AuditLog{}.TableName()).Where("workspace_id = ? AND resource_id = ?", workspace.ID, member.ID.String()).Delete(&AuditLog{}).Error
+		_ = db.Delete(&Session{}, "account_id = ?", memberAccount.ID).Error
+		_ = db.Delete(&WorkspaceMember{}, "id = ?", member.ID).Error
+		_ = db.Delete(&Workspace{}, "id = ?", workspace.ID).Error
+		_ = db.Delete(&Account{}, "id IN ?", []uuid.UUID{owner.ID, memberAccount.ID}).Error
+	})
+
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		return revokeWorkspaceMemberTx(tx, member, owner, workspace, "member-revoke-test", now)
+	}); err != nil {
+		t.Fatalf("revoke member sessions: %v", err)
+	}
+	var storedMember WorkspaceMember
+	if err := db.Table(WorkspaceMember{}.TableName()).Where("id = ?", member.ID).Take(&storedMember).Error; err != nil {
+		t.Fatal(err)
+	}
+	if storedMember.Status != "revoked" || storedMember.RevokedAt == nil {
+		t.Fatalf("member status was not revoked transactionally: %+v", storedMember)
+	}
+	var revoked int64
+	if err := db.Table(Session{}.TableName()).Where("account_id = ? AND revoked_at = ?", memberAccount.ID, now).Count(&revoked).Error; err != nil {
+		t.Fatal(err)
+	}
+	if revoked != int64(len(sessions)) {
+		t.Fatalf("expected %d revoked sessions, got %d", len(sessions), revoked)
+	}
+	var queued int64
+	if err := db.Table(Outbox{}.TableName()).Where("event_type = ? AND payload->>'account_id' = ?", "session.revoked", memberAccount.ID.String()).Count(&queued).Error; err != nil {
+		t.Fatal(err)
+	}
+	if queued != int64(len(sessions)) {
+		t.Fatalf("expected %d media/push revocation events, got %d", len(sessions), queued)
+	}
+	var audits int64
+	if err := db.Table(AuditLog{}.TableName()).Where("action = ? AND workspace_id = ? AND resource_id = ? AND request_id = ?",
+		"member.revoked", workspace.ID, member.ID.String(), "member-revoke-test").Count(&audits).Error; err != nil {
+		t.Fatal(err)
+	}
+	if audits != 1 {
+		t.Fatalf("expected one member revocation audit, got %d", audits)
+	}
+}
+
+func TestWorkspaceOwnerCanRenameWorkspaceAndCreatesAuditRecord(t *testing.T) {
+	dsn := os.Getenv("TEST_DATABASE_URL")
+	if dsn == "" {
+		t.Skip("TEST_DATABASE_URL must point at an isolated PostgreSQL test database")
+	}
+	db, err := openDatabase(dsn)
+	if err != nil {
+		t.Fatalf("open isolated test database: %v", err)
+	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = sqlDB.Close() })
+	config := Config{PublicOrigin: "https://yunshao.test", CookieName: "test_session", InternalToken: "integration-internal-token",
+		MediaServiceToken: "integration-media-token", RateLimitPerMinute: 1000}
+	handler := NewHandler(config, db)
+	now := time.Now().UTC()
+	username := "workspace_" + uuid.NewString()[:8]
+	owner := Account{ID: uuid.New(), Username: username, NormalizedUser: username, PasswordHash: "unused", UserType: "pc", Status: "active", CreatedAt: now, UpdatedAt: now}
+	workspace := Workspace{ID: owner.ID, OwnerAccountID: owner.ID, Name: "Original", Status: "active", CreatedAt: now, UpdatedAt: now}
+	cookieValue, csrfValue := uuid.NewString(), uuid.NewString()
+	session := Session{ID: uuid.New(), AccountID: owner.ID, TokenHash: hashToken(cookieValue), CSRFHash: hashToken(csrfValue),
+		LastActivityAt: now, ExpiresAt: now.Add(time.Hour), CreatedAt: now}
+	if err := db.Create(&owner).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Table(Workspace{}.TableName()).Create(&workspace).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Table(Session{}.TableName()).Create(&session).Error; err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = db.Table(AuditLog{}.TableName()).Where("workspace_id = ? AND action = ?", workspace.ID, "workspace.updated").Delete(&AuditLog{}).Error
+		_ = db.Table(Session{}.TableName()).Where("id = ?", session.ID).Delete(&Session{}).Error
+		_ = db.Table(Workspace{}.TableName()).Where("id = ?", workspace.ID).Delete(&Workspace{}).Error
+		_ = db.Table(Account{}.TableName()).Where("id = ?", owner.ID).Delete(&Account{}).Error
+	})
+	response := request(t, handler, http.MethodPut, "/api/v1/auth/workspace", `{"name":"Research Lab"}`, map[string]string{
+		"Cookie": config.CookieName + "=" + cookieValue, "X-CSRF-Token": csrfValue,
+	}, config)
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"name":"Research Lab"`) {
+		t.Fatalf("rename workspace status=%d body=%s", response.Code, response.Body.String())
+	}
+	var stored Workspace
+	if err := db.Table(Workspace{}.TableName()).Where("id = ?", workspace.ID).Take(&stored).Error; err != nil {
+		t.Fatal(err)
+	}
+	if stored.Name != "Research Lab" {
+		t.Fatalf("workspace name was not saved: %q", stored.Name)
+	}
+	var auditCount int64
+	if err := db.Table(AuditLog{}.TableName()).Where("workspace_id = ? AND action = ? AND resource_id = ?", workspace.ID, "workspace.updated", workspace.ID.String()).Count(&auditCount).Error; err != nil {
+		t.Fatal(err)
+	}
+	if auditCount != 1 {
+		t.Fatalf("expected one workspace update audit, got %d", auditCount)
 	}
 }
 

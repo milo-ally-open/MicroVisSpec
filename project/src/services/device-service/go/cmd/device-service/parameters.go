@@ -204,10 +204,10 @@ func (a *App) updateAlgorithmParameters(c *gin.Context) {
 		}
 		desiredVersion = assignment.DesiredVersion + 1
 		command = CommandRecord{
-			ID: uuid.New(), AssignmentID: assignment.ID, DeviceID: device.ID, ExpectedVersion: desiredVersion,
+			ID: uuid.New(), WorkspaceID: assignment.WorkspaceID, AssignmentID: assignment.ID, DeviceID: device.ID, ExpectedVersion: desiredVersion,
 			Parameters: append(json.RawMessage(nil), request.Parameters...), Status: "pending", CreatedAt: now,
 		}
-		snapshot := ConfigSnapshot{ID: uuid.New(), AssignmentID: assignment.ID, DeviceID: device.ID, Version: desiredVersion, AlgorithmVersion: assignment.AlgorithmVersion, Parameters: append(json.RawMessage(nil), request.Parameters...), CreatedAt: now}
+		snapshot := ConfigSnapshot{ID: uuid.New(), WorkspaceID: assignment.WorkspaceID, AssignmentID: assignment.ID, DeviceID: device.ID, Version: desiredVersion, AlgorithmVersion: assignment.AlgorithmVersion, Parameters: append(json.RawMessage(nil), request.Parameters...), CreatedAt: now}
 		if err := tx.Create(&snapshot).Error; err != nil {
 			return err
 		}

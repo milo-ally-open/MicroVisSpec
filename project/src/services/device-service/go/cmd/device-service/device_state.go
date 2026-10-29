@@ -151,7 +151,7 @@ func upsertAlgorithmReport(tx *gorm.DB, device Device, report algorithmStateRepo
 			parameters = defaultClassroomParameters()
 		}
 		assignment = AlgorithmAssignment{
-			ID: uuid.New(), AccountID: device.AccountID, DeviceID: device.ID, AlgorithmKey: report.AlgorithmKey,
+			ID: uuid.New(), AccountID: device.AccountID, WorkspaceID: device.WorkspaceID, DeviceID: device.ID, AlgorithmKey: report.AlgorithmKey,
 			AlgorithmVersion: report.AlgorithmVersion, RuntimeState: report.RuntimeState, ConfigState: "pending",
 			Capabilities: normalizedObject(report.Capabilities), ReportedParameters: normalizedObject(report.ReportedParameters),
 			DesiredParameters: parameters, DesiredVersion: 0, ReportedVersion: report.ReportedVersion, ReportedAt: &sentAt,
@@ -161,7 +161,7 @@ func upsertAlgorithmReport(tx *gorm.DB, device Device, report algorithmStateRepo
 			return err
 		}
 		if report.AlgorithmKey == classroomAlgorithmKey {
-			snapshot := ConfigSnapshot{ID: uuid.New(), AssignmentID: assignment.ID, DeviceID: device.ID, Version: 0, AlgorithmVersion: report.AlgorithmVersion, Parameters: parameters, CreatedAt: now}
+			snapshot := ConfigSnapshot{ID: uuid.New(), WorkspaceID: device.WorkspaceID, AssignmentID: assignment.ID, DeviceID: device.ID, Version: 0, AlgorithmVersion: report.AlgorithmVersion, Parameters: parameters, CreatedAt: now}
 			if err := tx.Create(&snapshot).Error; err != nil {
 				return err
 			}

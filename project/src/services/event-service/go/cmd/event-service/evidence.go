@@ -148,7 +148,7 @@ func (a *App) uploadEvidence(c *gin.Context) {
 	// persisting and returning the 24-hour deadline so an idempotent retry
 	// returns the exact timestamp that was stored.
 	now := time.Now().UTC().Truncate(time.Microsecond)
-	evidence := Evidence{ID: uuid.New(), EventID: event.ID, RelativePath: finalName, MIME: mediaType,
+	evidence := Evidence{ID: uuid.New(), WorkspaceID: event.WorkspaceID, EventID: event.ID, RelativePath: finalName, MIME: mediaType,
 		SHA256: digestText, UploadedAt: now, ExpiresAt: now.Add(24 * time.Hour)}
 	created := false
 	err = a.db.WithContext(c.Request.Context()).Transaction(func(tx *gorm.DB) error {

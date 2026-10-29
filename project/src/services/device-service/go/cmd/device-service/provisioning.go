@@ -325,7 +325,8 @@ func (a *App) startProvisioning(c *gin.Context) {
 		return
 	}
 	now := time.Now().UTC()
-	job := ProvisioningJob{ID: uuid.New(), AccountID: accountID(c), DeviceID: device.ID, Status: "queued", Stage: "queued", Message: "等待连接设备", CreatedAt: now, UpdatedAt: now}
+	workspaceID := accountID(c)
+	job := ProvisioningJob{ID: uuid.New(), AccountID: workspaceID, WorkspaceID: &workspaceID, DeviceID: device.ID, Status: "queued", Stage: "queued", Message: "等待连接设备", CreatedAt: now, UpdatedAt: now}
 	err = a.db.WithContext(c.Request.Context()).Transaction(func(tx *gorm.DB) error {
 		var current Device
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND account_id = ? AND (active = ? OR activation_state = ?)", device.ID, accountID(c), true, "expired").Take(&current).Error; err != nil {

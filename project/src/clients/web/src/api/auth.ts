@@ -27,6 +27,9 @@ export const authApi = {
     method: 'PUT', body: JSON.stringify({ old_password: oldPassword, new_password: newPassword, new_password_confirmation: confirmation }),
   }),
   workspace: () => apiRequest<WorkspaceInfo>('/api/v1/auth/workspace'),
+  updateWorkspace: (name: string) => apiRequest<WorkspaceInfo>('/api/v1/auth/workspace', {
+    method: 'PUT', body: JSON.stringify({ name }),
+  }),
   members: () => apiRequest<{ workspace_id: string; items: WorkspaceMember[] }>('/api/v1/auth/workspace/members'),
   replaceMemberGrants: (memberId: string, deviceGrants: DeviceGrant[]) => apiRequest<void>(`/api/v1/auth/workspace/members/${encodeURIComponent(memberId)}/grants`, {
     method: 'PUT', body: JSON.stringify({ device_grants: deviceGrants }),

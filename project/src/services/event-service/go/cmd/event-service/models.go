@@ -45,6 +45,7 @@ func (event *Event) BeforeCreate(*gorm.DB) error {
 
 type Evidence struct {
 	ID           uuid.UUID  `gorm:"type:uuid;primaryKey"`
+	WorkspaceID  *uuid.UUID `gorm:"type:uuid;index" json:"-"`
 	EventID      uuid.UUID  `gorm:"type:uuid;not null;uniqueIndex"`
 	RelativePath string     `gorm:"size:512;not null"`
 	MIME         string     `gorm:"size:64;not null"`
@@ -57,13 +58,14 @@ type Evidence struct {
 func (Evidence) TableName() string { return "event.evidence" }
 
 type Disposition struct {
-	ID             uuid.UUID `gorm:"type:uuid;primaryKey" json:"disposition_id"`
-	EventID        uuid.UUID `gorm:"type:uuid;not null;index" json:"event_id"`
-	ActorAccountID uuid.UUID `gorm:"type:uuid;not null;index" json:"actor_account_id"`
-	FromStatus     string    `gorm:"size:24;not null" json:"from_status"`
-	ToStatus       string    `gorm:"size:24;not null" json:"to_status"`
-	Result         string    `gorm:"type:text;not null" json:"result"`
-	ActedAt        time.Time `gorm:"not null;index" json:"acted_at"`
+	ID             uuid.UUID  `gorm:"type:uuid;primaryKey" json:"disposition_id"`
+	WorkspaceID    *uuid.UUID `gorm:"type:uuid;index" json:"-"`
+	EventID        uuid.UUID  `gorm:"type:uuid;not null;index" json:"event_id"`
+	ActorAccountID uuid.UUID  `gorm:"type:uuid;not null;index" json:"actor_account_id"`
+	FromStatus     string     `gorm:"size:24;not null" json:"from_status"`
+	ToStatus       string     `gorm:"size:24;not null" json:"to_status"`
+	Result         string     `gorm:"type:text;not null" json:"result"`
+	ActedAt        time.Time  `gorm:"not null;index" json:"acted_at"`
 }
 
 func (Disposition) TableName() string { return "event.dispositions" }

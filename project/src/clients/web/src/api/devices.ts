@@ -40,6 +40,10 @@ export type Device = {
   algorithms: AlgorithmAssignment[]
 }
 
+export type StreamCamera = { camera_id: string; device_id: string; name: string; camera_state: string; stream_state: string }
+export type StreamCameraDevice = { device_id: string; name: string; cameras: StreamCamera[] }
+export type StreamCameraPage = { items: StreamCameraDevice[]; next_cursor: string }
+
 export type DeviceStats = { registered: number; online: number; as_of: string }
 export type DevicePage = { items: Device[]; next_cursor: string }
 export type ActivationRequest = {
@@ -70,6 +74,18 @@ export const deviceApi = {
       const page = await deviceApi.list(cursor)
       items.push(...page.items)
       if (page.next_cursor && page.next_cursor === cursor) throw new Error('设备分页游标未前进。')
+      cursor = page.next_cursor
+    } while (cursor)
+    return items
+  },
+  listStreamCameras: (cursor = '', limit = 100) => apiRequest<StreamCameraPage>(`/api/v1/devices/stream-cameras?limit=${limit}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`),
+  listAllStreamCameras: async () => {
+    const items: StreamCameraDevice[] = []
+    let cursor = ''
+    do {
+      const page = await deviceApi.listStreamCameras(cursor)
+      items.push(...page.items)
+      if (page.next_cursor && page.next_cursor === cursor) throw new Error('摄像头分页游标未前进。')
       cursor = page.next_cursor
     } while (cursor)
     return items

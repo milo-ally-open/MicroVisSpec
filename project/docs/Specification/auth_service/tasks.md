@@ -7,11 +7,11 @@
 - [ ] **T-01 服务骨架、auth schema 与健康检查** — 配置加载、迁移、日志/request_id、`/health/live` 与 `/health/ready`；数据库账号只访问 auth schema；覆盖 REQ-01 / AC-01.1、AC-01.2；依赖：无。
 - [ ] **T-02 账号注册、登录、退出与改密** — Argon2id、用户名规范化/唯一、限流、Cookie 属性、CSRF、会话过期/撤销 API；覆盖 REQ-02 / AC-02.1、AC-02.2。
 - [ ] **T-03 Nginx 会话校验与账号信任边界** — 实现内部校验接口、清理/验证身份头和可信代理；拒绝伪造 account/session 头；覆盖 REQ-03 / AC-03.1、AC-03.2。
-- [ ] **T-04 session.revoked outbox 与可靠发布** — 撤销同事务写 outbox、稳定事件 ID、退避重试、内部服务凭据；覆盖 REQ-04 / AC-04.1、AC-04.2。
+- [~] **T-04 session.revoked outbox 与可靠发布** — 账号停用、退出/改密及工作空间成员撤销均在撤销 session 的同一事务写 outbox；稳定事件 ID、退避重试和内部凭据已实现，投递 media-service/push-service inbox 并按下游幂等消费。单元与 stub 重试测试通过；本机无隔离 `TEST_DATABASE_URL`，数据库事务集成未执行。覆盖 REQ-04 / AC-04.1、AC-04.2。
 - [ ] **T-05 auth-service 服务内集成测试** — 临时 PostgreSQL + HTTP/Nginx 身份模拟，覆盖重复用户名/并发注册、登录失败不泄露、CSRF、旧密码错误/改密撤销、跨账号隔离、过期与 outbox 重启补投；覆盖 REQ-01、REQ-02、REQ-03、REQ-04 / AC-01.1、AC-01.2、AC-02.1、AC-02.2、AC-03.1、AC-03.2、AC-04.1、AC-04.2；依赖 T-01–T-04。
 - [ ] **T-06 原生运行配置与恢复说明** — 单文件 Go 构建、systemd 非 root 运行、密钥文件注入、迁移与备份/恢复说明；完成构建与健康探针验收；覆盖 REQ-01、REQ-04 / AC-01.1、AC-04.2；依赖 T-01–T-05。
 
-- [~] **T-07 三类账号与工作空间授权扩展** — 已新增 `user_type/status` 字段并维持旧账号默认兼容；注册固定创建 PC 并事务创建以 owner UUID 为 ID 的 workspace；启动时幂等回填既有 PC workspace。登录和会话校验拒绝非 active 账号，`/me`/login 返回服务端 `user_type`，内部会话验证返回可信 `X-User-Type`。新增 workspace/member/invitation/device grant/audit 模型，24 小时单次邀请创建/兑换事务、设备服务在线归属校验和受控内部设备能力判定；兑换路由在 Nginx 清除身份头。新增 workspace 摘要、PC 成员/邀请列表、一次性邀请撤销、成员全量设备权限替换及成员撤销 API；授权接口校验有效 session/account、owner/workspace 状态、移动成员关系及精确设备 capability，停用 owner 的 workspace 不允许成员读取或兑换。仍未实现受控 admin bootstrap、admin 账号/状态管理、统一撤权 outbox 发布与消费及完整审计矩阵；本轮仅 Go build 证据，未运行测试，不能标记验收通过。workspace 是资源租户边界，session/account ID 仍表示真实主体。覆盖本组 REQ-01 / AC-01.2、REQ-02 / AC-02.1、REQ-03 / AC-03.1、AC-03.2、REQ-04 / AC-04.1、AC-04.2；依赖 multi_user_workspace_access T-01、T-03。
+- [~] **T-07 三类账号与工作空间授权扩展** — 已新增 `user_type/status` 字段并维持旧账号默认兼容；注册固定创建 PC 并事务创建以 owner UUID 为 ID 的 workspace；启动时幂等回填既有 PC workspace。登录和会话校验拒绝非 active 账号，`/me`/login 返回服务端 `user_type`，内部会话验证返回可信 `X-User-Type`。新增 workspace/member/invitation/device grant/audit 模型，24 小时单次邀请创建/兑换事务、设备服务在线归属校验和受控内部设备能力判定；PC owner 可从 API 更新工作空间名称，事务内写审计；PC 成员管理/撤销以及 admin bootstrap、账号管理、健康和审计 API/UI 已实现。成员撤销在事务中撤销其所有 session 并写 revocation outbox。仍缺隔离 PostgreSQL HTTP 集成、完整审计矩阵和服务端故障验收；Go 单测通过，数据库集成因无隔离测试库而跳过。workspace 是资源租户边界，session/account ID 仍表示真实主体。覆盖本组 REQ-01 / AC-01.2、REQ-02 / AC-02.1、REQ-03 / AC-03.1、AC-03.2、REQ-04 / AC-04.1、AC-04.2；依赖 multi_user_workspace_access T-01、T-03。
 
 ## 验收证据
 

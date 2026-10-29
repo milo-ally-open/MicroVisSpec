@@ -3,24 +3,20 @@ import { onMounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import CameraPlayer from '../components/CameraPlayer.vue'
 import { deviceApi } from '../api/devices'
-import type { Camera } from '../api/devices'
-import { authApi } from '../api/auth'
+import type { StreamCamera } from '../api/devices'
 import { errorMessage } from '../api/client'
 
 const route = useRoute()
-const camera = ref<Camera | null>(null)
+const camera = ref<StreamCamera | null>(null)
 const deviceName = ref('')
 const error = ref('')
 
 onMounted(async () => {
   try {
-    const availableDevices = await deviceApi.listAll()
+    const availableDevices = await deviceApi.listAllStreamCameras()
     for (const device of availableDevices) {
       const match = device.cameras.find((item) => item.camera_id === route.params.cameraId)
       if (match) {
-        const workspace = await authApi.workspace()
-        const allowed = workspace.device_grants?.some((grant) => grant.device_id === device.device_id && grant.capabilities.includes('stream.view'))
-        if (!allowed) { error.value = '当前账号没有这台设备的视频权限。'; return }
         camera.value = match
         deviceName.value = device.name
         return

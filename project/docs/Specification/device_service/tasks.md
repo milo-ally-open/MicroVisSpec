@@ -14,7 +14,7 @@
 - [ ] **T-08 网页激活、设备授权期限与过期撤权** — 无限期/自定义期限由网页请求设定；Atlas agent 认证轮询并接收 MQTT 凭据，页面等待 agent 确认新身份；响应丢失时旧身份可安全重领同一凭据；调度器停用到期设备、写 `device.disabled` outbox 并撤销 MQTT 权限；保留过期资产，网页续期后写 `device.activated` outbox 并恢复已保存媒体来源；覆盖 REQ-02 / AC-02.5、AC-02.6、AC-02.7、AC-02.8、AC-02.9；依赖 T-02、Atlas agent、media-service。
 - [ ] **T-09 网页 SSH 首次接入** — 设备私网 SSH 指纹挑战与固定、账号范围校验、凭据一次性传递、任务状态、agent-only 源码包构建/安装、CA 配置和激活票据兑换；覆盖 REQ-06 / AC-06.1、AC-06.2、AC-06.3、AC-06.4、AC-06.5、AC-06.6；依赖 T-02、Atlas agent、device-service 镜像和 Web 设备详情页。
 
-- [~] **T-10 工作空间资产归属与成员设备筛选** — 已增加内部凭据保护的设备 owner/active 查询，auth-service 用它验证邀请设备和实时 capability 判定；`device.read` 移动列表/详情/统计按服务端 grant 过滤，移动视图不返回设备 IP、算法分配或配置字段；设备创建、配置、激活和运维路由仅 PC 类型可用。本查询暂以现有 `account_id` owner 规则绑定 workspace。资源 `workspace_id` 双写/回填及完整 API 权限矩阵仍待完成；本切片仅有 Go build 证据。覆盖本组 REQ-01 / AC-01.1、AC-01.2、REQ-04 / AC-04.1、AC-04.2，并满足共享授权 REQ-02、REQ-04；依赖 multi_user_workspace_access T-04–T-06。
+- [~] **T-10 工作空间资产归属与成员设备筛选** — 已增加内部凭据保护的设备 owner/active 查询，auth-service 用它验证邀请设备和实时 capability 判定；`device.read` 移动列表/详情/统计按服务端 grant 过滤，移动视图不返回设备 IP、算法分配或配置字段；新增独立 `stream.view` 摄像头目录，移动视频授权不要求同时授予 `device.read`。设备创建、配置、激活和运维路由仅 PC 类型可用。device、camera 及算法分配、激活票据、配置命令/快照、接入任务、broker 凭据、服务 outbox 已加 nullable workspace 字段并启动时幂等回填，新写入同步写入；迁移计数和父子租户一致性 SQL 审计已新增、未运行。完整 API 权限矩阵及数据库集成验收仍待完成。覆盖本组 REQ-01 / AC-01.1、AC-01.2、REQ-04 / AC-04.1、AC-04.2，并满足共享授权 REQ-02、REQ-04；依赖 multi_user_workspace_access T-04–T-06。
 
 ## 验收证据
 

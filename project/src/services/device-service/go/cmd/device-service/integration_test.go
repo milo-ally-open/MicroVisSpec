@@ -84,6 +84,89 @@ func requestAs(handler http.Handler, method, path string, account uuid.UUID, bod
 	return recorder
 }
 
+type staticDeviceAuthorizer struct {
+	deviceIDs  []uuid.UUID
+	capability string
+	called     bool
+	err        error
+}
+
+func (a *staticDeviceAuthorizer) ListAuthorizedDevices(_ context.Context, _ uuid.UUID, _, capability, cursor string, limit int, _ string) ([]uuid.UUID, string, error) {
+	a.called = true
+	a.capability = capability
+	if a.err != nil {
+		return nil, "", a.err
+	}
+	if cursor != "" || limit < 1 {
+		return nil, "", errors.New("unexpected pagination request")
+	}
+	return a.deviceIDs, "", nil
+}
+
+func (a *staticDeviceAuthorizer) CheckDeviceCapability(context.Context, uuid.UUID, string, uuid.UUID, string, string) error {
+	return nil
+}
+
+func TestStreamCameraDiscoveryRejectsPCBeforeAuthorizationLookup(t *testing.T) {
+	authorizer := &staticDeviceAuthorizer{}
+	app := NewApp(Config{}, nil, nil, nil)
+	app.authorization = authorizer
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/devices/stream-cameras", nil)
+	request.Header.Set("X-Account-ID", uuid.NewString())
+	request.Header.Set("X-Session-ID", uuid.NewString())
+	request.Header.Set("X-User-Type", "pc")
+	response := httptest.NewRecorder()
+	app.Handler().ServeHTTP(response, request)
+	if response.Code != http.StatusForbidden {
+		t.Fatalf("PC stream discovery status=%d body=%s", response.Code, response.Body.String())
+	}
+	if authorizer.called {
+		t.Fatal("PC request reached mobile member device-grant lookup")
+	}
+}
+
+func TestStreamCameraDiscoveryUsesOnlyStreamCapability(t *testing.T) {
+	db, _ := integrationApp(t)
+	accountID, deviceID, cameraID := uuid.New(), uuid.New(), uuid.New()
+	now := time.Now().UTC()
+	device := Device{ID: deviceID, AccountID: accountID, Name: "Lab camera hub", IP: "192.168.10.20", Location: "Room 1",
+		ActivationState: "active", Active: true, ReportedState: json.RawMessage(`{}`), CreatedAt: now, UpdatedAt: now}
+	camera := Camera{ID: cameraID, AccountID: accountID, DeviceID: deviceID, Name: "North entrance", CameraKey: "north",
+		Active: true, CameraState: "ready", StreamState: "ready", CreatedAt: now, UpdatedAt: now}
+	if err := db.Create(&device).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&camera).Error; err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = db.Delete(&Camera{}, "id = ?", cameraID).Error
+		_ = db.Delete(&Device{}, "id = ?", deviceID).Error
+	})
+	authorizer := &staticDeviceAuthorizer{deviceIDs: []uuid.UUID{deviceID}}
+	app := NewApp(Config{}, db, nil, nil)
+	app.authorization = authorizer
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/devices/stream-cameras?limit=20", nil)
+	request.Header.Set("X-Account-ID", uuid.NewString())
+	request.Header.Set("X-Session-ID", uuid.NewString())
+	request.Header.Set("X-User-Type", "mobile")
+	response := httptest.NewRecorder()
+	app.Handler().ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("stream camera list status=%d body=%s", response.Code, response.Body.String())
+	}
+	if authorizer.capability != "stream.view" {
+		t.Fatalf("camera discovery must require stream.view, got %q", authorizer.capability)
+	}
+	body := response.Body.String()
+	if !strings.Contains(body, cameraID.String()) || !strings.Contains(body, "North entrance") || !strings.Contains(body, "Lab camera hub") {
+		t.Fatalf("authorized camera is missing: %s", body)
+	}
+	if strings.Contains(body, "192.168.10.20") || strings.Contains(body, "camera_key") || strings.Contains(body, "algorithms") {
+		t.Fatalf("stream camera list exposed private device fields: %s", body)
+	}
+}
+
 func TestDeviceServiceTenantIsolationAndDisableOutbox(t *testing.T) {
 	db, handler := integrationApp(t)
 	accountA, accountB := uuid.New(), uuid.New()

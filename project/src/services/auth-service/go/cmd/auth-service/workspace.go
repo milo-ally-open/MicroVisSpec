@@ -3,7 +3,9 @@ package main
 import (
 	"errors"
 	"net/http"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -68,6 +70,48 @@ func (a *App) getWorkspace(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"workspace_id": workspace.ID, "name": workspace.Name, "status": workspace.Status,
 		"role": "member", "member_id": member.ID, "device_grants": items})
+}
+
+func (a *App) updateWorkspace(c *gin.Context) {
+	_, _, owner, workspace, ok := a.loadOwnerWorkspace(c, true)
+	if !ok {
+		return
+	}
+	var input struct {
+		Name string `json:"name"`
+	}
+	if decodeJSON(c, &input) != nil {
+		writeError(c, http.StatusUnprocessableEntity, "invalid_request", "a workspace name is required")
+		return
+	}
+	name := strings.TrimSpace(input.Name)
+	if name == "" || utf8.RuneCountInString(name) > 100 || strings.ContainsAny(name, "\r\n") {
+		writeError(c, http.StatusUnprocessableEntity, "invalid_request", "workspace name must contain 1 to 100 characters")
+		return
+	}
+	now := time.Now().UTC()
+	err := a.db.WithContext(c.Request.Context()).Transaction(func(tx *gorm.DB) error {
+		result := tx.Table(Workspace{}.TableName()).Where("id = ? AND owner_account_id = ? AND status = ?", workspace.ID, owner.ID, "active").
+			Updates(map[string]any{"name": name, "updated_at": now})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected != 1 {
+			return gorm.ErrRecordNotFound
+		}
+		audit := AuditLog{ID: uuid.New(), ActorID: owner.ID, WorkspaceID: workspace.ID, Action: "workspace.updated",
+			ResourceID: workspace.ID.String(), Result: "success", RequestID: c.GetString("request_id"), CreatedAt: now}
+		return tx.Table(AuditLog{}.TableName()).Create(&audit).Error
+	})
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		workspaceUnavailable(c)
+		return
+	}
+	if err != nil {
+		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "workspace could not be updated")
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"workspace_id": workspace.ID, "name": name, "status": workspace.Status, "role": "owner"})
 }
 
 func (a *App) listWorkspaceMembers(c *gin.Context) {
@@ -192,22 +236,41 @@ func (a *App) revokeWorkspaceMember(c *gin.Context) {
 			}
 			return err
 		}
-		if err := tx.Table(WorkspaceMember{}.TableName()).Where("id = ? AND status = ?", member.ID, "active").
-			Updates(map[string]any{"status": "revoked", "revoked_at": now, "updated_at": now}).Error; err != nil {
-			return err
-		}
-		if err := tx.Table(MemberDeviceGrant{}.TableName()).Where("member_id = ?", member.ID).Delete(&MemberDeviceGrant{}).Error; err != nil {
-			return err
-		}
-		audit := AuditLog{ID: uuid.New(), ActorID: owner.ID, WorkspaceID: workspace.ID, Action: "member.revoked",
-			ResourceID: member.ID.String(), Result: "success", RequestID: c.GetString("request_id"), CreatedAt: now}
-		return tx.Table(AuditLog{}.TableName()).Create(&audit).Error
+		return revokeWorkspaceMemberTx(tx, member, owner, workspace, c.GetString("request_id"), now)
 	})
 	if err != nil {
 		writeError(c, http.StatusServiceUnavailable, "dependency_unavailable", "workspace member could not be revoked")
 		return
 	}
 	c.Status(http.StatusNoContent)
+}
+
+func revokeWorkspaceMemberTx(tx *gorm.DB, member WorkspaceMember, owner Account, workspace Workspace, requestID string, now time.Time) error {
+	if err := tx.Table(WorkspaceMember{}.TableName()).Where("id = ? AND status = ?", member.ID, "active").
+		Updates(map[string]any{"status": "revoked", "revoked_at": now, "updated_at": now}).Error; err != nil {
+		return err
+	}
+	if err := tx.Table(MemberDeviceGrant{}.TableName()).Where("member_id = ?", member.ID).Delete(&MemberDeviceGrant{}).Error; err != nil {
+		return err
+	}
+	var sessions []Session
+	if err := tx.Table(Session{}.TableName()).Where("account_id = ? AND revoked_at IS NULL", member.AccountID).Find(&sessions).Error; err != nil {
+		return err
+	}
+	for _, session := range sessions {
+		result := tx.Table(Session{}.TableName()).Where("id = ? AND revoked_at IS NULL", session.ID).Update("revoked_at", now)
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 1 {
+			if err := writeRevocation(tx, session, now); err != nil {
+				return err
+			}
+		}
+	}
+	audit := AuditLog{ID: uuid.New(), ActorID: owner.ID, WorkspaceID: workspace.ID, Action: "member.revoked",
+		ResourceID: member.ID.String(), Result: "success", RequestID: requestID, CreatedAt: now}
+	return tx.Table(AuditLog{}.TableName()).Create(&audit).Error
 }
 
 func (a *App) listWorkspaceInvitations(c *gin.Context) {
