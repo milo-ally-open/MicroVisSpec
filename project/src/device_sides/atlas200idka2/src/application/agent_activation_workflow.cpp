@@ -7,7 +7,7 @@
 #include <string>
 #include <utility>
 
-namespace yunshao::application {
+namespace microvis::application {
 namespace {
 
 struct MqttEndpoint {
@@ -186,4 +186,4 @@ void AgentActivationWorkflow::validate_grant(const AgentActivationGrant& grant,
     }
 }
 
-}  // namespace yunshao::application
+}  // namespace microvis::application

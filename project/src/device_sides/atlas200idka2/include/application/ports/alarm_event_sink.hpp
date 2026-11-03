@@ -2,7 +2,7 @@
 
 #include <nlohmann/json.hpp>
 
-namespace yunshao::application::ports {
+namespace microvis::application::ports {
 
 // Outbound port for handing a runtime alarm event to the local agent.
 class AlarmEventSink {
@@ -11,4 +11,4 @@ public:
     virtual nlohmann::json enqueue(const nlohmann::json& event) = 0;
 };
 
-}  // namespace yunshao::application::ports
+}  // namespace microvis::application::ports

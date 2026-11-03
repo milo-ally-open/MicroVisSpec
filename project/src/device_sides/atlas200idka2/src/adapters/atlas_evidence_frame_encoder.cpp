@@ -8,7 +8,7 @@
 #include <limits>
 #include <stdexcept>
 
-namespace yunshao::adapters {
+namespace microvis::adapters {
 
 std::vector<unsigned char> AtlasEvidenceFrameEncoder::encode_jpeg(
     const application::ports::EvidenceFrameView& frame,
@@ -70,4 +70,4 @@ std::vector<unsigned char> AtlasEvidenceFrameEncoder::encode_jpeg(
     return jpeg;
 }
 
-}  // namespace yunshao::adapters
+}  // namespace microvis::adapters

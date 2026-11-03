@@ -7,7 +7,7 @@
 #include <mutex>
 #include <string>
 
-namespace yunshao::adapters {
+namespace microvis::adapters {
 
 class AgentCloudRuleCommandSettings final
     : public application::ports::CloudRuleCommandSettings {
@@ -28,4 +28,4 @@ private:
     std::string device_id_;
 };
 
-}  // namespace yunshao::adapters
+}  // namespace microvis::adapters

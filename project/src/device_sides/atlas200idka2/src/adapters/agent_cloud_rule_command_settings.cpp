@@ -5,7 +5,7 @@
 #include <stdexcept>
 #include <utility>
 
-namespace yunshao::adapters {
+namespace microvis::adapters {
 
 AgentCloudRuleCommandSettings::AgentCloudRuleCommandSettings(
     EdgeAppConfig& config,
@@ -24,7 +24,7 @@ void AgentCloudRuleCommandSettings::apply(const Json& command) {
         const auto model = models_.status(profile.model_id);
         if (model.value("model_state", "") != "installed")
             throw std::invalid_argument("model is not installed");
-        yunshao::apply_cloud_rules(config_directory_, device_id_, profile.model_id,
+        microvis::apply_cloud_rules(config_directory_, device_id_, profile.model_id,
             model.value("model_version", ""), command);
         supported = true;
         break;
@@ -33,4 +33,4 @@ void AgentCloudRuleCommandSettings::apply(const Json& command) {
     config_ = EdgeAppConfig::load(config_directory_);
 }
 
-}  // namespace yunshao::adapters
+}  // namespace microvis::adapters

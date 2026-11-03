@@ -7,7 +7,7 @@
 #include <random>
 #include <sstream>
 
-namespace yunshao::adapters {
+namespace microvis::adapters {
 
 std::string SystemEventMetadata::new_event_id() {
     std::random_device random;
@@ -34,4 +34,4 @@ std::string SystemEventMetadata::utc_timestamp() {
     return result.str();
 }
 
-}  // namespace yunshao::adapters
+}  // namespace microvis::adapters

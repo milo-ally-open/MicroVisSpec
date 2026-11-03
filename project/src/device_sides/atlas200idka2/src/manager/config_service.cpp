@@ -2,7 +2,7 @@
 
 #include <utility>
 
-namespace yunshao {
+namespace microvis {
 
 ConfigService::ConfigService(std::filesystem::path directory) : directory_(std::move(directory)) {
     config_ = EdgeAppConfig::load(directory_);
@@ -19,4 +19,4 @@ void ConfigService::reload() {
     config_ = std::move(candidate);
 }
 
-}  // namespace yunshao
+}  // namespace microvis

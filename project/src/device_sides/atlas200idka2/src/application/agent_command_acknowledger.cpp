@@ -5,7 +5,7 @@
 #include <stdexcept>
 #include <utility>
 
-namespace yunshao::application {
+namespace microvis::application {
 
 AgentCommandAcknowledger::AgentCommandAcknowledger(
     std::string device_id,
@@ -24,4 +24,4 @@ void AgentCommandAcknowledger::acknowledge(const nlohmann::json& command,
         throw std::runtime_error("cannot acknowledge cloud configuration");
 }
 
-}  // namespace yunshao::application
+}  // namespace microvis::application

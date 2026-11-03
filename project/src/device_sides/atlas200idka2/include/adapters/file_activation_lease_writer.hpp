@@ -4,7 +4,7 @@
 
 #include <filesystem>
 
-namespace yunshao::adapters {
+namespace microvis::adapters {
 
 class FileActivationLeaseWriter final : public application::ports::ActivationLeaseWriter {
 public:
@@ -16,4 +16,4 @@ private:
     std::filesystem::path lease_path_;
 };
 
-}  // namespace yunshao::adapters
+}  // namespace microvis::adapters

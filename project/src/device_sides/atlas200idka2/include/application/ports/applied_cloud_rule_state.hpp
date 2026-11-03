@@ -5,7 +5,7 @@
 #include <optional>
 #include <string>
 
-namespace yunshao::application::ports {
+namespace microvis::application::ports {
 
 // Persistence and runtime-state boundary used while acknowledging an applied
 // cloud rule command. Calls are serialized by the Agent configuration lock.
@@ -18,4 +18,4 @@ public:
     virtual void mark_ready(const nlohmann::json& command) = 0;
 };
 
-}  // namespace yunshao::application::ports
+}  // namespace microvis::application::ports

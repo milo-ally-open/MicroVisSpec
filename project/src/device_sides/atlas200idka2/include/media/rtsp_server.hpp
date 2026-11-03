@@ -11,7 +11,7 @@
 #include <string>
 #include <thread>
 
-namespace yunshao {
+namespace microvis {
 
 struct RtspServerConfig {
     bool enabled = false;
@@ -58,4 +58,4 @@ private:
     H264ParameterSets parameter_sets_;
 };
 
-}  // namespace yunshao
+}  // namespace microvis

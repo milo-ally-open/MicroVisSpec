@@ -5,7 +5,7 @@
 #include <ctime>
 #include <utility>
 
-namespace yunshao::adapters {
+namespace microvis::adapters {
 
 AgentAppliedCloudRuleState::AgentAppliedCloudRuleState(
     EdgeAppConfig& config,
@@ -17,7 +17,7 @@ AgentAppliedCloudRuleState::AgentAppliedCloudRuleState(
 
 std::optional<Json> AgentAppliedCloudRuleState::prepare_applied_ack(
     const std::string& previously_acknowledged_command_id) {
-    const auto command = yunshao::read_json_file(config_directory_ / "alarm_rules.json")
+    const auto command = microvis::read_json_file(config_directory_ / "alarm_rules.json")
         .value("cloud_command", Json::object());
     if (command.empty() ||
         command.value("command_id", "") == previously_acknowledged_command_id) return std::nullopt;
@@ -27,7 +27,7 @@ std::optional<Json> AgentAppliedCloudRuleState::prepare_applied_ack(
         if (!stream.enabled || !stream.enable_ai ||
             config_.require_model(stream.model_id).algorithm_key != command.value("algorithm_key", "")) continue;
         found = true;
-        const auto state = yunshao::fresh_runtime_state(
+        const auto state = microvis::fresh_runtime_state(
             runtime_state_directory_ / (stream.stream_id + ".json"), stream.model_id);
         if (state.value("cloud_command_id", "") != command.value("command_id", "")) return std::nullopt;
     }
@@ -38,8 +38,8 @@ std::optional<Json> AgentAppliedCloudRuleState::prepare_applied_ack(
 }
 
 void AgentAppliedCloudRuleState::mark_ready(const Json& command) {
-    yunshao::write_json_atomic(config_directory_ / "cloud-ready.json",
+    microvis::write_json_atomic(config_directory_ / "cloud-ready.json",
         Json{{"command_id", command.at("command_id")}, {"updated_at_unix", std::time(nullptr)}});
 }
 
-}  // namespace yunshao::adapters
+}  // namespace microvis::adapters

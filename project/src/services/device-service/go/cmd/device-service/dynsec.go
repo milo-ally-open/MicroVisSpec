@@ -93,7 +93,7 @@ func (b *DynamicSecurityBroker) Provision(ctx context.Context, deviceID uuid.UUI
 		if !isMissingDynsecObject(err, "role") {
 			return err
 		}
-		if _, err := b.command(ctx, map[string]any{"command": "createRole", "rolename": role, "textname": "Yunshao edge device", "acls": acls}); err != nil {
+		if _, err := b.command(ctx, map[string]any{"command": "createRole", "rolename": role, "textname": "MicroVisSpec edge device", "acls": acls}); err != nil {
 			return err
 		}
 	} else {
@@ -106,7 +106,7 @@ func (b *DynamicSecurityBroker) Provision(ctx context.Context, deviceID uuid.UUI
 		if !isMissingDynsecObject(err, "client") {
 			return err
 		}
-		_, err = b.command(ctx, map[string]any{"command": "createClient", "username": username, "password": password, "clientid": clientID, "textname": "Yunshao edge device " + deviceID.String(), "roles": roles})
+		_, err = b.command(ctx, map[string]any{"command": "createClient", "username": username, "password": password, "clientid": clientID, "textname": "MicroVisSpec edge device " + deviceID.String(), "roles": roles})
 		return err
 	}
 	if _, err := b.command(ctx, map[string]any{"command": "disableClient", "username": username}); err != nil && !strings.Contains(strings.ToLower(err.Error()), "disabled") {

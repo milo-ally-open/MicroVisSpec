@@ -15,7 +15,7 @@
 #include <thread>
 #include <utility>
 
-namespace yunshao::adapters {
+namespace microvis::adapters {
 namespace {
 
 using Json = nlohmann::json;
@@ -112,4 +112,4 @@ void UnixAgentControlServer::run(const std::atomic_bool& stopping) const {
     unlink(socket_path_.c_str());
 }
 
-}  // namespace yunshao::adapters
+}  // namespace microvis::adapters

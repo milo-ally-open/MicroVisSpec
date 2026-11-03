@@ -8,7 +8,7 @@
 
 struct sqlite3;
 
-namespace yunshao::adapters {
+namespace microvis::adapters {
 
 class SQLiteEventOutbox final : public application::ports::DurableAgentEventOutbox {
 public:
@@ -38,4 +38,4 @@ private:
     void validate_event(const nlohmann::json& event) const;
 };
 
-}  // namespace yunshao::adapters
+}  // namespace microvis::adapters

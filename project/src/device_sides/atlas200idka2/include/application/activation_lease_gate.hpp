@@ -2,7 +2,7 @@
 
 #include "application/ports/activation_lease_status.hpp"
 
-namespace yunshao::application {
+namespace microvis::application {
 
 class ActivationLeaseGate {
 public:
@@ -15,4 +15,4 @@ private:
     ports::ActivationLeaseStatus& lease_status_;
 };
 
-}  // namespace yunshao::application
+}  // namespace microvis::application

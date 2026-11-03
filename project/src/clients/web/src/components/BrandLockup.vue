@@ -14,7 +14,7 @@ withDefaults(defineProps<{
       <img src="/logo.png" alt="">
     </span>
     <span class="brand-lockup__copy">
-      <strong>云哨</strong>
+      <strong>MicroVisSpec</strong>
       <small>边缘智能识别，云端统一处置</small>
     </span>
   </span>

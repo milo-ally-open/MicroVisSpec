@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-namespace yunshao {
+namespace microvis {
 
 struct AlarmTrigger {
     std::string model_id;
@@ -40,4 +40,4 @@ private:
     int config_version_ = 1;
 };
 
-}  // namespace yunshao
+}  // namespace microvis

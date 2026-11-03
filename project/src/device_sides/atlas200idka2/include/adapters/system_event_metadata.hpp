@@ -2,7 +2,7 @@
 
 #include "application/ports/event_metadata.hpp"
 
-namespace yunshao::adapters {
+namespace microvis::adapters {
 
 class SystemEventMetadata final : public application::ports::EventMetadata {
 public:
@@ -10,4 +10,4 @@ public:
     std::string utc_timestamp() override;
 };
 
-}  // namespace yunshao::adapters
+}  // namespace microvis::adapters

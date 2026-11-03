@@ -5,7 +5,7 @@
 #include <cstddef>
 #include <vector>
 
-namespace yunshao::application::ports {
+namespace microvis::application::ports {
 
 struct EvidenceFrameView {
     const void* luma_device = nullptr;
@@ -25,4 +25,4 @@ public:
         const std::vector<Detection>& detections) = 0;
 };
 
-}  // namespace yunshao::application::ports
+}  // namespace microvis::application::ports

@@ -1,6 +1,6 @@
-# Atlas 200I DK A2 边缘运行时
+# MicroVisSpec Atlas 200I DK A2 边缘运行时
 
-本目录是 Atlas 200I DK A2（Ascend 310B4）的可部署工程。产品运行时由两个 systemd 进程组成：`yunshao-agent` 管理设备身份、MQTT、模型目录和 SQLite 事件队列；`yunshao-classroom-runtime` 管理视频解码、模型插件、逐帧推理、OSD 和告警规则。两者共享本机配置及模型目录，通过 `/run/yunshao/agent.sock` 传递命中事件。模型后端通过 `IAIModel` 插件接口装载，Atlas 实现使用 AscendCL/DVPP，不依赖 AX650 SDK。
+本目录是 MicroVisSpec 面向 Atlas 200I DK A2（Ascend 310B4）的可部署工程。C++ 源码命名空间使用 `microvis`。板端 systemd 单元、服务账号、配置路径、环境变量和命令目前沿用 `yunshao` 前缀，以兼容已部署设备；这些是运行接口标识，不是产品名称。产品运行时由两个 systemd 进程组成：`yunshao-agent` 管理设备身份、MQTT、模型目录和 SQLite 事件队列；`yunshao-classroom-runtime` 管理视频解码、模型插件、逐帧推理、OSD 和告警规则。两者共享本机配置及模型目录，通过 `/run/yunshao/agent.sock` 传递命中事件。模型后端通过 `IAIModel` 插件接口装载，Atlas 实现使用 AscendCL/DVPP，不依赖 AX650 SDK。
 
 ## 从 Demo 到产品运行时
 

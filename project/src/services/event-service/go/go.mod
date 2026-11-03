@@ -1,4 +1,4 @@
-module github.com/yunshao/event-service
+module github.com/milo-ally-open/MicroVisSpec/project/src/services/event-service/go
 
 go 1.27.0
 

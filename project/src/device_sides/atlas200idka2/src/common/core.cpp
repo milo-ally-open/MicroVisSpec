@@ -15,7 +15,7 @@
 #include <stdexcept>
 #include <system_error>
 
-namespace yunshao {
+namespace microvis {
 namespace {
 
 std::string random_suffix() {
@@ -307,4 +307,4 @@ Json ModelCatalog::status(const std::string& model_id) const {
 }
 
 
-}  // namespace yunshao
+}  // namespace microvis

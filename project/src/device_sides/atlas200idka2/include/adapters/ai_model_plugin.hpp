@@ -5,7 +5,7 @@
 #include <filesystem>
 #include <vector>
 
-namespace yunshao {
+namespace microvis {
 
 // Owns the platform dynamic-library boundary for one algorithm plugin.
 class AIModelPlugin {
@@ -28,4 +28,4 @@ private:
     IAIModel* model_ = nullptr;
 };
 
-}  // namespace yunshao
+}  // namespace microvis

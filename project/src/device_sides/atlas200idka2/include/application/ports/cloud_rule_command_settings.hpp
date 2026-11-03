@@ -2,7 +2,7 @@
 
 #include <nlohmann/json.hpp>
 
-namespace yunshao::application::ports {
+namespace microvis::application::ports {
 
 // Applies one already-decoded cloud rule command to the active local
 // configuration. Implementations must make the update atomic with respect to
@@ -13,4 +13,4 @@ public:
     virtual void apply(const nlohmann::json& command) = 0;
 };
 
-}  // namespace yunshao::application::ports
+}  // namespace microvis::application::ports

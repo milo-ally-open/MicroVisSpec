@@ -1,6 +1,6 @@
 #pragma once
 
-namespace yunshao::application::ports {
+namespace microvis::application::ports {
 
 class ActivationLeaseStatus {
 public:
@@ -8,4 +8,4 @@ public:
     virtual bool expired() const = 0;
 };
 
-}  // namespace yunshao::application::ports
+}  // namespace microvis::application::ports

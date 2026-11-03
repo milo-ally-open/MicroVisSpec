@@ -4,7 +4,7 @@
 
 #include <string>
 
-namespace yunshao::application::ports {
+namespace microvis::application::ports {
 
 struct HttpsRequest {
     const std::string& url;
@@ -36,4 +36,4 @@ public:
                                   SensitiveString& response_body) = 0;
 };
 
-}  // namespace yunshao::application::ports
+}  // namespace microvis::application::ports

@@ -2,7 +2,7 @@
 
 #include <algorithm>
 
-namespace yunshao {
+namespace microvis {
 namespace {
 std::string key(const std::string& model_id, const std::string& class_name) {
     return model_id + "\n" + class_name;
@@ -66,4 +66,4 @@ std::vector<AlarmTrigger> AlarmFilter::observe(const std::string& model_id,
     return triggers;
 }
 
-}  // namespace yunshao
+}  // namespace microvis

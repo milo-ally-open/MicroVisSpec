@@ -3,7 +3,7 @@
 #include <functional>
 #include <string>
 
-namespace yunshao::application::ports {
+namespace microvis::application::ports {
 
 struct MqttConnectionSettings {
     std::string host;
@@ -32,4 +32,4 @@ public:
     virtual std::string publish(const std::string& topic, const std::string& payload, int qos) = 0;
 };
 
-}  // namespace yunshao::application::ports
+}  // namespace microvis::application::ports

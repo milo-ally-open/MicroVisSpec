@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-namespace yunshao {
+namespace microvis {
 
 struct ModelManifest {
     std::string model_id;
@@ -46,4 +46,4 @@ private:
     Json status_one(const std::string& model_id) const;
 };
 
-}  // namespace yunshao
+}  // namespace microvis

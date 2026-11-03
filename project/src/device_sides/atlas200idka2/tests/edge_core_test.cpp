@@ -7,9 +7,9 @@
 #include <filesystem>
 #include <iostream>
 
-using yunshao::Json;
-using yunshao::adapters::SQLiteEventOutbox;
-using yunshao::ModelManifest;
+using microvis::Json;
+using microvis::adapters::SQLiteEventOutbox;
+using microvis::ModelManifest;
 
 int main() {
     ModelManifest manifest{"model_classroom_behavior_detection", "1.0.0", "om", "model.om", std::string(64, 'a'),

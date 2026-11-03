@@ -7,7 +7,7 @@
 #include <filesystem>
 #include <optional>
 
-namespace yunshao::adapters {
+namespace microvis::adapters {
 
 class AgentAppliedCloudRuleState final
     : public application::ports::AppliedCloudRuleState {
@@ -28,4 +28,4 @@ private:
     std::filesystem::path runtime_state_directory_;
 };
 
-}  // namespace yunshao::adapters
+}  // namespace microvis::adapters

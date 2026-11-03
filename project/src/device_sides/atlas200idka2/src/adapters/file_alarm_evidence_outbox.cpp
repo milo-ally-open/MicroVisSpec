@@ -6,7 +6,7 @@
 #include <stdexcept>
 #include <utility>
 
-namespace yunshao::adapters {
+namespace microvis::adapters {
 
 FileAlarmEvidenceOutbox::FileAlarmEvidenceOutbox(std::filesystem::path directory)
     : directory_(std::move(directory)) {}
@@ -39,4 +39,4 @@ void FileAlarmEvidenceOutbox::persist_best_effort(const std::string& event_id,
     }
 }
 
-}  // namespace yunshao::adapters
+}  // namespace microvis::adapters

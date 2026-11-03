@@ -2,7 +2,7 @@
 
 #include <utility>
 
-namespace yunshao::application {
+namespace microvis::application {
 
 AgentAppliedRuleAcknowledger::AgentAppliedRuleAcknowledger(
     ports::AppliedCloudRuleState& state,
@@ -20,4 +20,4 @@ void AgentAppliedRuleAcknowledger::acknowledge_if_ready() {
     acknowledged_command_id_ = command->at("command_id").get<std::string>();
 }
 
-}  // namespace yunshao::application
+}  // namespace microvis::application

@@ -4,7 +4,7 @@
 #include <utility>
 #include <vector>
 
-namespace yunshao {
+namespace microvis {
 // Retain codec configuration even while the on-demand RTSP output has no reader.
 class H264ParameterSets {
 public:

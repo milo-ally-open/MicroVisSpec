@@ -2,7 +2,7 @@
 
 #include <stdexcept>
 
-namespace yunshao {
+namespace microvis {
 
 InferenceManager::InferenceManager(std::size_t max_loaded_models, int npu_device_id,
                                    std::filesystem::path model_root,
@@ -36,4 +36,4 @@ bool InferenceManager::is_loaded(const std::string& model_id) const {
     return processors_.find(model_id) != processors_.end();
 }
 
-}  // namespace yunshao
+}  // namespace microvis

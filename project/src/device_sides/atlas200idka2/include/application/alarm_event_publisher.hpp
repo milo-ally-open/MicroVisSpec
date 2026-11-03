@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-namespace yunshao::application {
+namespace microvis::application {
 
 struct AlarmEventData {
     std::string device_id;
@@ -41,4 +41,4 @@ private:
     ports::EventMetadata& event_metadata_;
 };
 
-}  // namespace yunshao::application
+}  // namespace microvis::application

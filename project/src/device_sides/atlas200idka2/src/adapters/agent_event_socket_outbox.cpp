@@ -10,7 +10,7 @@
 #include <string>
 #include <utility>
 
-namespace yunshao::adapters {
+namespace microvis::adapters {
 namespace {
 
 class ScopedFd {
@@ -82,4 +82,4 @@ nlohmann::json AgentEventSocketOutbox::enqueue(const nlohmann::json& event) {
     return response;
 }
 
-}  // namespace yunshao::adapters
+}  // namespace microvis::adapters

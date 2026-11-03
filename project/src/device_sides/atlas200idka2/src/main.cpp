@@ -20,14 +20,14 @@
 
 namespace {
 
-using yunshao::AlarmTrigger;
-using yunshao::ConfigService;
-using yunshao::EdgeAppConfig;
-using yunshao::InferenceManager;
-using yunshao::Json;
-using yunshao::ModelCatalog;
-using yunshao::RtspServerConfig;
-using yunshao::VideoStreamManager;
+using microvis::AlarmTrigger;
+using microvis::ConfigService;
+using microvis::EdgeAppConfig;
+using microvis::InferenceManager;
+using microvis::Json;
+using microvis::ModelCatalog;
+using microvis::RtspServerConfig;
+using microvis::VideoStreamManager;
 
 std::string env(const char* name, const std::string& fallback = "") {
     const char* value = std::getenv(name);
@@ -125,9 +125,9 @@ int main(int argc, char** argv) {
             return 0;
         }
         const char* lease_file = std::getenv("YUNSHAO_ACTIVATION_LEASE_FILE");
-        yunshao::adapters::FileActivationLeaseStatus lease_status(
+        microvis::adapters::FileActivationLeaseStatus lease_status(
             lease_file && *lease_file ? lease_file : "/var/lib/yunshao/activation-lease.json");
-        yunshao::application::ActivationLeaseGate lease_gate(lease_status);
+        microvis::application::ActivationLeaseGate lease_gate(lease_status);
         lease_gate.wait_until_valid();
         const auto& model = config.require_model(stream.model_id);
         const std::string input_uri = env(stream.source_ref.c_str());
@@ -139,11 +139,11 @@ int main(int argc, char** argv) {
             throw std::runtime_error("active model is not ready: " + model_state.dump());
         }
         const std::string model_version = model_state.value("model_version", "unknown");
-        yunshao::adapters::AgentEventSocketOutbox event_outbox(options.socket_path);
-        yunshao::adapters::FileAlarmEvidenceOutbox evidence_outbox(
+        microvis::adapters::AgentEventSocketOutbox event_outbox(options.socket_path);
+        microvis::adapters::FileAlarmEvidenceOutbox evidence_outbox(
             std::filesystem::path(env("YUNSHAO_EVIDENCE_OUTBOX_DIR", "/var/lib/yunshao/evidence-outbox")));
-        yunshao::adapters::SystemEventMetadata event_metadata;
-        yunshao::application::AlarmEventPublisher alarm_event_publisher(
+        microvis::adapters::SystemEventMetadata event_metadata;
+        microvis::application::AlarmEventPublisher alarm_event_publisher(
             event_outbox, evidence_outbox, event_metadata);
         if (options.output.empty()) {
             if (!stream.rtsp_output.enabled) {
@@ -163,11 +163,11 @@ int main(int argc, char** argv) {
         }
         InferenceManager inference(config.max_loaded_models, config.npu_device_id,
                                    options.model_root, options.plugin_dir);
-        yunshao::adapters::AtlasEvidenceFrameEncoder evidence_frame_encoder;
-        yunshao::adapters::FileRuntimeRuleStateReader rule_state_reader(options.config_dir);
+        microvis::adapters::AtlasEvidenceFrameEncoder evidence_frame_encoder;
+        microvis::adapters::FileRuntimeRuleStateReader rule_state_reader(options.config_dir);
         VideoStreamManager stream_manager(config, inference,
             [&](const AlarmTrigger& trigger, const std::vector<unsigned char>& jpeg) {
-                yunshao::application::AlarmEventData event;
+                microvis::application::AlarmEventData event;
                 event.device_id = env("YUNSHAO_DEVICE_ID");
                 event.camera_id = stream.camera_id;
                 event.event_type = trigger.event_type;

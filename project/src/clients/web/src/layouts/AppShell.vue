@@ -22,7 +22,7 @@ const title = computed(() => {
   if (route.name === 'workspace') return '成员与设备授权'
   return ({
     overview: '运行总览', devices: '边缘设备', monitor: '实时监控', events: '异常事件', analytics: '数据分析', settings: '账号与通知',
-  } as Record<string, string>)[String(route.name)] ?? '云哨工作台'
+  } as Record<string, string>)[String(route.name)] ?? 'MicroVisSpec工作台'
 })
 
 async function signOut() {
@@ -78,7 +78,7 @@ const settingsRoute = computed(() => isMobile.value ? { name: 'mobile-settings' 
 <template>
   <div class="app-shell">
     <aside class="sidebar">
-      <RouterLink class="brand" :to="homeRoute" aria-label="云哨首页">
+      <RouterLink class="brand" :to="homeRoute" aria-label="MicroVisSpec首页">
         <BrandLockup inverse />
       </RouterLink>
 
@@ -105,7 +105,7 @@ const settingsRoute = computed(() => isMobile.value ? { name: 'mobile-settings' 
     <div class="main-column">
       <header class="topbar">
         <BrandLockup class="topbar-brand" compact />
-        <div class="breadcrumb"><span>云哨平台</span><span class="crumb-separator">/</span><strong>{{ title }}</strong></div>
+        <div class="breadcrumb"><span>MicroVisSpec平台</span><span class="crumb-separator">/</span><strong>{{ title }}</strong></div>
         <div class="topbar-right"><span class="topbar-status"><AppIcon name="shield" :size="16" />{{ isMobile ? '移动成员' : '个人工作空间' }}</span><span class="topbar-divider"></span><RouterLink class="topbar-settings" :to="settingsRoute"><span class="topbar-avatar">{{ authState.user?.username.slice(0, 1).toUpperCase() }}</span><span class="topbar-username">{{ authState.user?.username }}</span><AppIcon name="chevron" :size="14" /></RouterLink></div>
       </header>
       <main class="page-content"><div v-if="signOutError" class="notice notice--error" role="alert">{{ signOutError }}</div><RouterView /></main>

@@ -6,11 +6,11 @@
 #include <string>
 #include <vector>
 
-namespace yunshao {
+namespace microvis {
 struct EdgeAppConfig;
 }
 
-namespace yunshao::application::ports {
+namespace microvis::application::ports {
 
 // Application contract for durable local event storage and acknowledgement state.
 class DurableAgentEventOutbox {
@@ -27,4 +27,4 @@ public:
     virtual std::string event_state(const std::string& event_id) = 0;
 };
 
-}  // namespace yunshao::application::ports
+}  // namespace microvis::application::ports

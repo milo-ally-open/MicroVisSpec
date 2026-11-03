@@ -6,7 +6,7 @@
 #include <stdexcept>
 #include <utility>
 
-namespace yunshao::adapters {
+namespace microvis::adapters {
 
 MosquittoMqttTransport::~MosquittoMqttTransport() { stop(); }
 
@@ -99,4 +99,4 @@ void MosquittoMqttTransport::on_message(::mosquitto*, void* userdata,
     }
 }
 
-}  // namespace yunshao::adapters
+}  // namespace microvis::adapters

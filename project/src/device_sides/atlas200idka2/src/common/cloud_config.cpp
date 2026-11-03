@@ -4,7 +4,7 @@
 #include <limits>
 #include <stdexcept>
 
-namespace yunshao {
+namespace microvis {
 Json read_json_file(const std::filesystem::path& path) {
     std::ifstream input(path);
     if (!input) throw std::runtime_error("cannot read JSON document: " + path.string());

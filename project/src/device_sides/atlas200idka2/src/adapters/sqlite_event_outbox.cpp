@@ -10,7 +10,7 @@
 #include <stdexcept>
 #include <utility>
 
-namespace yunshao::adapters {
+namespace microvis::adapters {
 namespace {
 
 using Json = nlohmann::json;
@@ -237,4 +237,4 @@ Json SQLiteEventOutbox::counts() {
     return result;
 }
 
-}  // namespace yunshao::adapters
+}  // namespace microvis::adapters

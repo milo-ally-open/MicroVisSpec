@@ -15,7 +15,7 @@
 #include <utility>
 #include <vector>
 
-namespace yunshao {
+namespace microvis {
 namespace {
 
 struct LetterboxInfo { float scale; int left; int top; };
@@ -179,7 +179,7 @@ void VideoStreamManager::run(const StreamProfile& stream, const std::string& inp
                 pipeline.release_inference_frame(inference_frame);
                 ++frames;
                 if (frames % static_cast<std::size_t>(stream.output_fps) == 0) {
-                    yunshao::write_json_atomic(state_path, Json{{"model_id", stream.model_id}, {"frames", frames},
+                    microvis::write_json_atomic(state_path, Json{{"model_id", stream.model_id}, {"frames", frames},
                         {"updated_at_unix", std::time(nullptr)}, {"runtime_state", "running"},
                         {"cloud_command_id", command.value("command_id", "")},
                         {"rule_config_version", current_config.alarm_config_version}});
@@ -201,4 +201,4 @@ void VideoStreamManager::run(const StreamProfile& stream, const std::string& inp
     }
 }
 
-}  // namespace yunshao
+}  // namespace microvis

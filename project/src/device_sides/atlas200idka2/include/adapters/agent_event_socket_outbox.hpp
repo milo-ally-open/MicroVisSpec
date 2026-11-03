@@ -4,7 +4,7 @@
 
 #include <filesystem>
 
-namespace yunshao::adapters {
+namespace microvis::adapters {
 
 class AgentEventSocketOutbox final : public application::ports::AlarmEventSink {
 public:
@@ -16,4 +16,4 @@ private:
     std::filesystem::path socket_path_;
 };
 
-}  // namespace yunshao::adapters
+}  // namespace microvis::adapters

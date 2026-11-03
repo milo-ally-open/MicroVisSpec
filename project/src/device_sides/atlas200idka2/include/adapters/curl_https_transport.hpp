@@ -2,7 +2,7 @@
 
 #include "application/ports/https_transport.hpp"
 
-namespace yunshao::adapters {
+namespace microvis::adapters {
 
 class CurlHttpsTransport final : public application::ports::HttpsTransport {
 public:
@@ -11,4 +11,4 @@ public:
         application::SensitiveString& response_body) override;
 };
 
-}  // namespace yunshao::adapters
+}  // namespace microvis::adapters

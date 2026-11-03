@@ -11,7 +11,7 @@
 #include <unistd.h>
 #include <utility>
 
-namespace yunshao::adapters {
+namespace microvis::adapters {
 
 FileActivationLeaseWriter::FileActivationLeaseWriter(std::filesystem::path lease_path)
     : lease_path_(std::move(lease_path)) {}
@@ -60,4 +60,4 @@ void FileActivationLeaseWriter::write_expiry_unix(std::optional<std::int64_t> ex
     }
 }
 
-}  // namespace yunshao::adapters
+}  // namespace microvis::adapters

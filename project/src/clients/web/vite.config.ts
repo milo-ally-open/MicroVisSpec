@@ -13,8 +13,8 @@ export default defineConfig({
       includeAssets: ['apple-touch-icon.png'],
       manifest: {
         id: '/',
-        name: '云哨·边缘智枢',
-        short_name: '云哨',
+        name: 'MicroVisSpec·边缘智枢',
+        short_name: 'MicroVisSpec',
         description: '面向园区、工厂、企业和校园的云边端协同智能平台。',
         lang: 'zh-CN',
         start_url: '/',

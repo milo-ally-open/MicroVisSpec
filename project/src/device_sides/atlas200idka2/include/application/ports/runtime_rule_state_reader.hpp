@@ -2,7 +2,7 @@
 
 #include "common/config.hpp"
 
-namespace yunshao::application::ports {
+namespace microvis::application::ports {
 
 struct RuntimeRuleState {
     std::vector<AlarmRule> rules;
@@ -17,4 +17,4 @@ public:
     virtual RuntimeRuleState read() = 0;
 };
 
-}  // namespace yunshao::application::ports
+}  // namespace microvis::application::ports

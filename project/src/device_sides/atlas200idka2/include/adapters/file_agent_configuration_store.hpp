@@ -4,7 +4,7 @@
 
 #include <filesystem>
 
-namespace yunshao::adapters {
+namespace microvis::adapters {
 
 class FileAgentConfigurationStore final : public application::ports::AgentConfigurationStore {
 public:
@@ -21,4 +21,4 @@ private:
     std::filesystem::path activation_overlay_path_;
 };
 
-}  // namespace yunshao::adapters
+}  // namespace microvis::adapters

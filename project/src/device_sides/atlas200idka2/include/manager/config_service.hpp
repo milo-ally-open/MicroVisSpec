@@ -5,7 +5,7 @@
 #include <filesystem>
 #include <mutex>
 
-namespace yunshao {
+namespace microvis {
 
 class ConfigService {
 public:
@@ -19,4 +19,4 @@ private:
     EdgeAppConfig config_;
 };
 
-}  // namespace yunshao
+}  // namespace microvis

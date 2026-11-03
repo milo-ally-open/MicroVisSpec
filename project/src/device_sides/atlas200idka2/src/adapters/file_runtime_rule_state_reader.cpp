@@ -6,7 +6,7 @@
 #include <cstdint>
 #include <utility>
 
-namespace yunshao::adapters {
+namespace microvis::adapters {
 
 FileRuntimeRuleStateReader::FileRuntimeRuleStateReader(std::filesystem::path config_directory)
     : config_directory_(std::move(config_directory)) {}
@@ -28,4 +28,4 @@ application::ports::RuntimeRuleState FileRuntimeRuleStateReader::read() {
     return {config.alarm_rules, config.alarm_config_version, command, ready};
 }
 
-}  // namespace yunshao::adapters
+}  // namespace microvis::adapters

@@ -2,7 +2,7 @@
 
 #include <nlohmann/json.hpp>
 
-namespace yunshao::application::ports {
+namespace microvis::application::ports {
 
 // Narrow read-only facet used by local diagnostics and cloud heartbeats.
 class AgentStatusReader {
@@ -11,4 +11,4 @@ public:
     virtual nlohmann::json status() = 0;
 };
 
-}  // namespace yunshao::application::ports
+}  // namespace microvis::application::ports

@@ -5,7 +5,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace yunshao {
+namespace microvis {
 namespace {
 
 void close_library(void*& library) noexcept {
@@ -104,4 +104,4 @@ const char* AIModelPlugin::name() const noexcept {
     return model_ == nullptr ? "unloaded" : model_->name();
 }
 
-}  // namespace yunshao
+}  // namespace microvis

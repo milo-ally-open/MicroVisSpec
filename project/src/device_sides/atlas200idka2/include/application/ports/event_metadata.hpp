@@ -2,7 +2,7 @@
 
 #include <string>
 
-namespace yunshao::application::ports {
+namespace microvis::application::ports {
 
 class EventMetadata {
 public:
@@ -11,4 +11,4 @@ public:
     virtual std::string utc_timestamp() = 0;
 };
 
-}  // namespace yunshao::application::ports
+}  // namespace microvis::application::ports

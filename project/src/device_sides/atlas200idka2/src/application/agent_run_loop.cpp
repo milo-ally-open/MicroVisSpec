@@ -3,7 +3,7 @@
 #include <stdexcept>
 #include <utility>
 
-namespace yunshao::application {
+namespace microvis::application {
 
 AgentRunLoop::AgentRunLoop(AgentMqttSession& mqtt_session,
                            AgentCloudCycle& cloud_cycle,
@@ -33,4 +33,4 @@ bool AgentRunLoop::run() {
     return false;
 }
 
-}  // namespace yunshao::application
+}  // namespace microvis::application

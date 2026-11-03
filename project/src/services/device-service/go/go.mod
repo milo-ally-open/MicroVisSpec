@@ -1,4 +1,4 @@
-module github.com/yunshao/device-service
+module github.com/milo-ally-open/MicroVisSpec/project/src/services/device-service/go
 
 go 1.27.0
 

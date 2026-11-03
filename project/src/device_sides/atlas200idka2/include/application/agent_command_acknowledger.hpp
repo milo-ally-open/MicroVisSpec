@@ -5,7 +5,7 @@
 
 #include <string>
 
-namespace yunshao::application {
+namespace microvis::application {
 
 class AgentCommandAcknowledger {
 public:
@@ -23,4 +23,4 @@ private:
     ports::EventMetadata& metadata_;
 };
 
-}  // namespace yunshao::application
+}  // namespace microvis::application

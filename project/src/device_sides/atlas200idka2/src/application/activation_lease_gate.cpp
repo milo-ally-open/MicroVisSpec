@@ -4,7 +4,7 @@
 #include <iostream>
 #include <thread>
 
-namespace yunshao::application {
+namespace microvis::application {
 
 ActivationLeaseGate::ActivationLeaseGate(ports::ActivationLeaseStatus& lease_status)
     : lease_status_(lease_status) {}
@@ -18,4 +18,4 @@ void ActivationLeaseGate::wait_until_valid() const {
     }
 }
 
-}  // namespace yunshao::application
+}  // namespace microvis::application

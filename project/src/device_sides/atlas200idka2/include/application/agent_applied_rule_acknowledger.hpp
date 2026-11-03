@@ -6,7 +6,7 @@
 #include <mutex>
 #include <string>
 
-namespace yunshao::application {
+namespace microvis::application {
 
 class AgentAppliedRuleAcknowledger {
 public:
@@ -23,4 +23,4 @@ private:
     std::string acknowledged_command_id_;
 };
 
-}  // namespace yunshao::application
+}  // namespace microvis::application

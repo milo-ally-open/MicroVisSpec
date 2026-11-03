@@ -6,7 +6,7 @@
 #include <filesystem>
 #include <string>
 
-namespace yunshao::adapters {
+namespace microvis::adapters {
 
 struct HttpsEvidenceUploadSettings {
     std::string api_origin;
@@ -28,4 +28,4 @@ private:
     HttpsEvidenceUploadSettings settings_;
 };
 
-}  // namespace yunshao::adapters
+}  // namespace microvis::adapters

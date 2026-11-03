@@ -323,7 +323,7 @@ onBeforeUnmount(() => { stopActivationPolling(); stopProvisioningPolling() })
           <p class="activation-duration-note">本次设备授权：{{ durationSummary }}</p>
           <button class="button button--primary" :disabled="saving || provisioningInProgress || !sshHostKey || !sshHostKeyConfirmed || !sshUsername.trim() || !sshPassword" @click="startWebProvisioning">{{ provisioningInProgress ? '正在接入设备…' : saving ? '正在提交…' : '开始网页接入并激活' }} <span aria-hidden="true">→</span></button>
           <div v-if="provisioningJob" class="provisioning-status" :class="`provisioning-status--${provisioningJob.status}`" role="status"><strong>{{ provisioningJob.status === 'succeeded' ? '接入完成' : provisioningJob.status === 'failed' ? '接入未完成' : '正在处理' }}</strong><span>{{ provisioningJob.message }}</span></div>
-          <div class="activation-note"><span>✓</span>系统会自动安装或更新 Yunshao agent、配置安全证书并启动服务。设备身份和 MQTT 密钥保存在设备侧。</div>
+          <div class="activation-note"><span>✓</span>系统会自动安装或更新 MicroVisSpec agent、配置安全证书并启动服务。设备身份和 MQTT 密钥保存在设备侧。</div>
         </template>
         <template v-else>
           <p class="panel-intro">选择设备使用期限。到期后云端会停用设备业务访问、撤销 MQTT 权限；设备在线时会在后台自动领取续期，不需要操作 Atlas 终端。</p>

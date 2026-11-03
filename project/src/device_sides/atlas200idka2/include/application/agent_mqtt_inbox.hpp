@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-namespace yunshao::application {
+namespace microvis::application {
 
 class AgentMqttInbox {
 public:
@@ -23,4 +23,4 @@ private:
     std::vector<nlohmann::json> commands_;
 };
 
-}  // namespace yunshao::application
+}  // namespace microvis::application

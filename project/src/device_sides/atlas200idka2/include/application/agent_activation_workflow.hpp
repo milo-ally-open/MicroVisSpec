@@ -8,7 +8,7 @@
 #include <optional>
 #include <string>
 
-namespace yunshao::application {
+namespace microvis::application {
 
 struct AgentActivationGrant {
     std::string device_id;
@@ -46,4 +46,4 @@ private:
     ports::ActivationLeaseWriter& lease_writer_;
 };
 
-}  // namespace yunshao::application
+}  // namespace microvis::application

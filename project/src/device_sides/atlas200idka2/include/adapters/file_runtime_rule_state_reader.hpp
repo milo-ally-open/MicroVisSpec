@@ -4,7 +4,7 @@
 
 #include <filesystem>
 
-namespace yunshao::adapters {
+namespace microvis::adapters {
 
 class FileRuntimeRuleStateReader final : public application::ports::RuntimeRuleStateReader {
 public:
@@ -15,4 +15,4 @@ private:
     std::filesystem::path config_directory_;
 };
 
-}  // namespace yunshao::adapters
+}  // namespace microvis::adapters

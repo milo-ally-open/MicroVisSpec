@@ -1,6 +1,6 @@
 #pragma once
 
-namespace yunshao::application::ports {
+namespace microvis::application::ports {
 
 class AgentServiceLifecycle {
 public:
@@ -9,4 +9,4 @@ public:
     virtual void enable_and_restart_agent() = 0;
 };
 
-}  // namespace yunshao::application::ports
+}  // namespace microvis::application::ports

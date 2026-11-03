@@ -7,7 +7,7 @@
 #include <memory>
 #include <string>
 
-namespace yunshao {
+namespace microvis {
 
 class InferenceManager {
 public:
@@ -30,4 +30,4 @@ private:
     std::map<std::string, std::unique_ptr<AIProcessor>> processors_;
 };
 
-}  // namespace yunshao
+}  // namespace microvis

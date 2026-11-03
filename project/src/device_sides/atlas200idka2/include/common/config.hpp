@@ -8,7 +8,7 @@
 #include <utility>
 #include <vector>
 
-namespace yunshao {
+namespace microvis {
 
 using Json = nlohmann::json;
 
@@ -109,4 +109,4 @@ public:
     const AlarmRule* find_rule(const std::string& model_id, const std::string& class_name) const;
 };
 
-}  // namespace yunshao
+}  // namespace microvis

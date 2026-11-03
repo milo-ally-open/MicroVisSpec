@@ -18,7 +18,7 @@
 #include <utility>
 #include <vector>
 
-namespace yunshao::adapters {
+namespace microvis::adapters {
 namespace {
 
 using Environment = application::ports::AgentConfigurationStore::Environment;
@@ -229,4 +229,4 @@ void FileAgentConfigurationStore::remove_activation_overlay() {
         throw std::runtime_error("无法移除旧的激活凭据覆盖文件");
 }
 
-}  // namespace yunshao::adapters
+}  // namespace microvis::adapters

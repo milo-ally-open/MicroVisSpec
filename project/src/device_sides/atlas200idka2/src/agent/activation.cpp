@@ -30,11 +30,11 @@
 namespace {
 
 using Json = nlohmann::json;
-using yunshao::application::SensitiveString;
-using yunshao::application::ports::HttpsRequest;
-using yunshao::application::ports::HttpsTransportFailure;
-using yunshao::application::AgentActivationGrant;
-using yunshao::application::AgentActivationWorkflow;
+using microvis::application::SensitiveString;
+using microvis::application::ports::HttpsRequest;
+using microvis::application::ports::HttpsTransportFailure;
+using microvis::application::AgentActivationGrant;
+using microvis::application::AgentActivationWorkflow;
 
 void wipe(std::string& value);
 
@@ -55,7 +55,7 @@ void wipe(std::string& value) {
 class EnvironmentPasswordWiper {
 public:
     explicit EnvironmentPasswordWiper(
-        yunshao::application::ports::AgentConfigurationStore::Environment& environment)
+        microvis::application::ports::AgentConfigurationStore::Environment& environment)
         : environment_(environment) {}
 
     ~EnvironmentPasswordWiper() {
@@ -64,7 +64,7 @@ public:
     }
 
 private:
-    yunshao::application::ports::AgentConfigurationStore::Environment& environment_;
+    microvis::application::ports::AgentConfigurationStore::Environment& environment_;
 };
 
 bool valid_device_id(const std::string& value) {
@@ -188,15 +188,15 @@ std::string choose_ca(const std::string& explicit_path, const std::map<std::stri
     return "/etc/yunshao/mqtt-ca.pem";
 }
 
-yunshao::adapters::CurlHttpsTransport& activation_https_transport() {
-    static yunshao::adapters::CurlHttpsTransport transport;
+microvis::adapters::CurlHttpsTransport& activation_https_transport() {
+    static microvis::adapters::CurlHttpsTransport transport;
     return transport;
 }
 
 SensitiveString exchange_ticket(const ActivationOptions& options,
                                 const std::string& ca_path,
                                 const std::string& ticket,
-                                yunshao::application::ports::HttpsTransport& transport) {
+                                microvis::application::ports::HttpsTransport& transport) {
     SensitiveString response_body;
     SensitiveString request_body;
     Json payload = {{"device_id", options.device_id}, {"ticket", ticket}};
@@ -249,7 +249,7 @@ AgentActivationGrant activation_grant_from_json(Json& response,
 }  // namespace
 
 int activation_command(int argc, char** argv,
-                       yunshao::application::ports::AgentServiceLifecycle& service_lifecycle,
+                       microvis::application::ports::AgentServiceLifecycle& service_lifecycle,
                        AgentActivationWorkflow& activation_workflow) {
     try {
         if (::geteuid() != 0) throw std::runtime_error("请使用 sudo 运行激活命令");

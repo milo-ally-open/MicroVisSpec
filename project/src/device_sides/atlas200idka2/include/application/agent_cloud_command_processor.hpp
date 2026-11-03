@@ -4,7 +4,7 @@
 #include "application/agent_mqtt_inbox.hpp"
 #include "application/ports/cloud_rule_command_settings.hpp"
 
-namespace yunshao::application {
+namespace microvis::application {
 
 class AgentCloudCommandProcessor {
 public:
@@ -20,4 +20,4 @@ private:
     AgentCommandAcknowledger& acknowledger_;
 };
 
-}  // namespace yunshao::application
+}  // namespace microvis::application

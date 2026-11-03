@@ -6,7 +6,7 @@
 #include <chrono>
 #include <functional>
 
-namespace yunshao::application {
+namespace microvis::application {
 
 class AgentRunLoop {
 public:
@@ -30,4 +30,4 @@ private:
     Sleeper sleeper_;
 };
 
-}  // namespace yunshao::application
+}  // namespace microvis::application

@@ -5,7 +5,7 @@
 struct mosquitto;
 struct mosquitto_message;
 
-namespace yunshao::adapters {
+namespace microvis::adapters {
 
 class MosquittoMqttTransport final : public application::ports::MqttTransport {
 public:
@@ -31,4 +31,4 @@ private:
                            const ::mosquitto_message* message);
 };
 
-}  // namespace yunshao::adapters
+}  // namespace microvis::adapters

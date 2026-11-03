@@ -16,7 +16,7 @@
 #include <acl/acl.h>
 
 
-namespace yunshao {
+namespace microvis {
 namespace {
 
 void check_acl(aclError code, const char* operation) {
@@ -241,8 +241,8 @@ private:
 };
 
 }  // namespace
-}  // namespace yunshao
+}  // namespace microvis
 
-extern "C" yunshao::IAIModel* CreateAIModel() { return new yunshao::ModelClassroomBehaviorDetection(); }
-extern "C" void DestroyAIModel(yunshao::IAIModel* model) { delete model; }
-extern "C" int GetAIModelPluginApiVersion() noexcept { return yunshao::kAIModelPluginApiVersion; }
+extern "C" microvis::IAIModel* CreateAIModel() { return new microvis::ModelClassroomBehaviorDetection(); }
+extern "C" void DestroyAIModel(microvis::IAIModel* model) { delete model; }
+extern "C" int GetAIModelPluginApiVersion() noexcept { return microvis::kAIModelPluginApiVersion; }

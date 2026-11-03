@@ -9,7 +9,7 @@
 #include <stdexcept>
 #include <utility>
 
-namespace yunshao {
+namespace microvis {
 namespace {
 
 Json load_json(const std::filesystem::path& path) {
@@ -383,4 +383,4 @@ const AlarmRule* EdgeAppConfig::find_rule(const std::string& model_id, const std
     return nullptr;
 }
 
-}  // namespace yunshao
+}  // namespace microvis

@@ -4,7 +4,7 @@
 
 #include <utility>
 
-namespace yunshao::application {
+namespace microvis::application {
 
 AgentCloudCycle::AgentCloudCycle(
     std::string device_id,
@@ -26,11 +26,11 @@ void AgentCloudCycle::run_if_connected() {
     applied_rule_acknowledger_.acknowledge_if_ready();
     mqtt_session_.publish("state", status_reader_.status().dump(), 1);
     for (const auto& event : event_outbox_.due_events()) {
-        const std::string payload = yunshao::cloud_event_payload(event).dump();
+        const std::string payload = microvis::cloud_event_payload(event).dump();
         const std::string error = mqtt_session_.publish("events", payload, 1);
         event_outbox_.note_publish_attempt(event.at("event_id").get<std::string>(), error);
     }
     evidence_uploader_.upload_acknowledged(device_id_);
 }
 
-}  // namespace yunshao::application
+}  // namespace microvis::application

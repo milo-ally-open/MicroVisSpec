@@ -6,7 +6,7 @@
 
 #include <string>
 
-namespace yunshao::application::ports {
+namespace microvis::application::ports {
 
 struct EventEnqueueResult {
     bool accepted = false;
@@ -21,4 +21,4 @@ public:
     virtual EventEnqueueResult enqueue_event(const nlohmann::json& event) = 0;
 };
 
-}  // namespace yunshao::application::ports
+}  // namespace microvis::application::ports

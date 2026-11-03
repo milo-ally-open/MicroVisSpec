@@ -12,7 +12,7 @@
 #include <functional>
 #include <string>
 
-namespace yunshao {
+namespace microvis {
 
 class VideoStreamManager {
 public:
@@ -38,4 +38,4 @@ private:
     application::ports::RuntimeRuleStateReader& rule_state_reader_;
 };
 
-}  // namespace yunshao
+}  // namespace microvis

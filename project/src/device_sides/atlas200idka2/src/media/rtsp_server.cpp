@@ -8,7 +8,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace yunshao {
+namespace microvis {
 namespace {
 
 void require_element_factory(const char* name) {
@@ -239,4 +239,4 @@ void RtspServer::run_loop() {
     g_main_loop_run(loop_);
 }
 
-}  // namespace yunshao
+}  // namespace microvis

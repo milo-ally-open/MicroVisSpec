@@ -7,8 +7,8 @@
 
 namespace test_fixture {
 
-using yunshao::EdgeAppConfig;
-using yunshao::Json;
+using microvis::EdgeAppConfig;
+using microvis::Json;
 
 inline Json model_profile(const std::string& id, const std::string& algorithm_key,
                           Json classes, int width, int height) {

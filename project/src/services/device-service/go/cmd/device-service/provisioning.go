@@ -36,11 +36,11 @@ const (
 	provisioningJobTimeout = 30 * time.Minute
 	sshProbeTimeout        = 5 * time.Second
 	sshConnectTimeout      = 12 * time.Second
-	sshSudoPrompt          = "__YUNSHAO_SUDO_PASSWORD__"
-	sshArchiveInputMarker  = "__YUNSHAO_ARCHIVE_INPUT__"
-	sshCAInputMarker       = "__YUNSHAO_CA_INPUT__"
-	sshTicketInputMarker   = "__YUNSHAO_TICKET_INPUT__"
-	sshBootstrapDoneMarker = "__YUNSHAO_BOOTSTRAP_DONE__"
+	sshSudoPrompt          = "__MICROVISSPEC_SUDO_PASSWORD__"
+	sshArchiveInputMarker  = "__MICROVISSPEC_ARCHIVE_INPUT__"
+	sshCAInputMarker       = "__MICROVISSPEC_CA_INPUT__"
+	sshTicketInputMarker   = "__MICROVISSPEC_TICKET_INPUT__"
+	sshBootstrapDoneMarker = "__MICROVISSPEC_BOOTSTRAP_DONE__"
 )
 
 var linuxUsernamePattern = regexp.MustCompile(`^[a-z_][a-z0-9_-]{0,31}$`)
@@ -495,7 +495,7 @@ func (a *App) executeProvisioning(ctx context.Context, job ProvisioningJob, devi
 	if err != nil {
 		return errors.New("bootstrap_script_unavailable")
 	}
-	workDir := "/tmp/yunshao-bootstrap-" + uuid.NewString()
+	workDir := "/tmp/microvisspec-bootstrap-" + uuid.NewString()
 	command := buildAtlasBootstrapCommand(string(scriptBytes), device.ID.String(), a.config.AtlasActivationOrigin, workDir, len(bundle))
 	session, err := client.NewSession()
 	if err != nil {
@@ -548,30 +548,30 @@ func (a *App) executeProvisioning(ctx context.Context, job ProvisioningJob, devi
 	}
 	for {
 		marker, err = markers.wait(ctx,
-			"__YUNSHAO_STAGE:checking_board__",
-			"__YUNSHAO_STAGE:installing_agent__",
-			"__YUNSHAO_STAGE:configuring_tls__",
-			"__YUNSHAO_STAGE:activating__",
+			"__MICROVISSPEC_STAGE:checking_board__",
+			"__MICROVISSPEC_STAGE:installing_agent__",
+			"__MICROVISSPEC_STAGE:configuring_tls__",
+			"__MICROVISSPEC_STAGE:activating__",
 			sshCAInputMarker,
 			sshTicketInputMarker,
 			sshBootstrapDoneMarker,
-			"__YUNSHAO_ERROR:")
+			"__MICROVISSPEC_ERROR:")
 		if err != nil {
 			return provisioningWaitError(err, "remote_execution_failed")
 		}
 		switch {
-		case marker == "__YUNSHAO_STAGE:checking_board__":
+		case marker == "__MICROVISSPEC_STAGE:checking_board__":
 			_ = a.setProvisioningStage(job.ID, "checking", "正在检查 Atlas 与 CANN 环境")
-		case marker == "__YUNSHAO_STAGE:installing_agent__":
-			_ = a.setProvisioningStage(job.ID, "installing", "正在构建并安装 Yunshao agent")
-		case marker == "__YUNSHAO_STAGE:configuring_tls__":
+		case marker == "__MICROVISSPEC_STAGE:installing_agent__":
+			_ = a.setProvisioningStage(job.ID, "installing", "正在构建并安装 MicroVisSpec agent")
+		case marker == "__MICROVISSPEC_STAGE:configuring_tls__":
 			_ = a.setProvisioningStage(job.ID, "configuring", "正在配置设备安全证书")
 		case marker == sshCAInputMarker:
 			payload := base64.StdEncoding.EncodeToString(apiCA) + "\n" + base64.StdEncoding.EncodeToString(mqttCA) + "\n"
 			if _, err := io.WriteString(stdin, payload); err != nil {
 				return errors.New("remote_execution_failed")
 			}
-		case marker == "__YUNSHAO_STAGE:activating__":
+		case marker == "__MICROVISSPEC_STAGE:activating__":
 			_ = a.setProvisioningStage(job.ID, "activating", "正在签发设备身份并启动 agent")
 		case marker == sshTicketInputMarker:
 			if err := a.ensureDeviceStillProvisionable(ctx, job.AccountID, device.ID); err != nil {
@@ -594,7 +594,7 @@ func (a *App) executeProvisioning(ctx context.Context, job ProvisioningJob, devi
 				ticketBytes[i] = 0
 			}
 			for {
-				marker, err = markers.wait(ctx, sshBootstrapDoneMarker, "__YUNSHAO_ERROR:")
+				marker, err = markers.wait(ctx, sshBootstrapDoneMarker, "__MICROVISSPEC_ERROR:")
 				if err != nil {
 					a.revokeUnconsumedTicket(ticket.ID)
 					return provisioningWaitError(err, "activation_failed")
@@ -625,7 +625,7 @@ func (a *App) executeProvisioning(ctx context.Context, job ProvisioningJob, devi
 			}
 			_ = a.setProvisioningStage(job.ID, "completed", "设备接入完成，等待设备上线")
 			return nil
-		case marker == "__YUNSHAO_ERROR:":
+		case marker == "__MICROVISSPEC_ERROR:":
 			code, parseErr := readRemoteErrorMarker(ctx, markers)
 			if parseErr != nil {
 				return errors.New("remote_execution_failed")
@@ -732,11 +732,11 @@ func provisioningSafeError(err error) (string, string) {
 	case "build_dependencies_unavailable":
 		return code, "设备无法安装构建依赖，请检查园区软件源或网络后重试"
 	case "agent_build_failed":
-		return code, "Yunshao agent 构建失败，请检查设备 CANN 开发环境和系统依赖"
+		return code, "MicroVisSpec agent 构建失败，请检查设备 CANN 开发环境和系统依赖"
 	case "atlas_groups_missing":
 		return code, "Atlas 缺少 CANN 运行用户组，请联系管理员修复 CANN 安装"
 	case "agent_state_path_invalid":
-		return code, "设备的 Yunshao 状态目录路径异常，请联系管理员检查 /var/lib/yunshao"
+		return code, "设备的 MicroVisSpec 状态目录路径异常，请联系管理员检查 /var/lib/yunshao"
 	case "activation_failed":
 		return code, "设备身份签发或启动失败，请检查 Atlas 到云端 HTTPS 与 MQTT 网络后重试"
 	case "device_state_changed":
@@ -748,7 +748,7 @@ func provisioningSafeError(err error) (string, string) {
 	case "package_manager_unsupported":
 		return code, "设备缺少可用的软件包管理器，无法自动安装 agent 构建依赖"
 	case "systemd_unavailable":
-		return code, "设备未运行 systemd，无法自动启用 Yunshao agent 服务"
+		return code, "设备未运行 systemd，无法自动启用 MicroVisSpec agent 服务"
 	case "provisioning_timeout":
 		return code, "设备接入超过 30 分钟仍未完成，请检查设备网络、软件源和 CANN 环境后重试"
 	case "provisioning_cancelled":

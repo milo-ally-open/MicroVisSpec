@@ -6,7 +6,7 @@
 #include <atomic>
 #include <string>
 
-namespace yunshao::application {
+namespace microvis::application {
 
 class AgentMqttSession {
 public:
@@ -38,4 +38,4 @@ private:
     void handle_disconnected(int result);
 };
 
-}  // namespace yunshao::application
+}  // namespace microvis::application

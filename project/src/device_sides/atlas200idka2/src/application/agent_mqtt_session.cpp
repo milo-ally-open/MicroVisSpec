@@ -3,7 +3,7 @@
 #include <iostream>
 #include <utility>
 
-namespace yunshao::application {
+namespace microvis::application {
 
 AgentMqttSession::AgentMqttSession(ports::MqttTransport& transport,
                                    ports::MqttConnectionSettings settings,
@@ -75,4 +75,4 @@ void AgentMqttSession::handle_disconnected(int result) {
     }
 }
 
-}  // namespace yunshao::application
+}  // namespace microvis::application

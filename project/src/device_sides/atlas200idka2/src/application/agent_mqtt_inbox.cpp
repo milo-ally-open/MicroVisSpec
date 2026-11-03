@@ -3,7 +3,7 @@
 #include <iostream>
 #include <utility>
 
-namespace yunshao::application {
+namespace microvis::application {
 
 AgentMqttInbox::AgentMqttInbox(ports::DurableAgentEventOutbox& event_outbox,
                                std::string command_topic)
@@ -35,4 +35,4 @@ std::vector<nlohmann::json> AgentMqttInbox::take_commands() {
     return pending;
 }
 
-}  // namespace yunshao::application
+}  // namespace microvis::application

@@ -9,7 +9,7 @@
 
 #include <string>
 
-namespace yunshao::application {
+namespace microvis::application {
 
 class AgentCloudCycle {
 public:
@@ -33,4 +33,4 @@ private:
     ports::EvidenceUploader& evidence_uploader_;
 };
 
-}  // namespace yunshao::application
+}  // namespace microvis::application

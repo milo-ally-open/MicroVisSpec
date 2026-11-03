@@ -29,7 +29,7 @@ public:
     Impl(const std::string& input, const std::string& output, int output_fps,
          int infer_width, int infer_height, int output_width, int output_height,
          int input_timeout_ms, int output_bitrate_kbps, const std::string& rtsp_transport,
-         yunshao::RtspServer* rtsp_server)
+         microvis::RtspServer* rtsp_server)
         : infer_width_(infer_width), infer_height_(infer_height),
           output_width_(align16(output_width)), output_height_(align16(output_height)),
           fps_(output_fps), input_timeout_ms_(input_timeout_ms),
@@ -427,7 +427,7 @@ private:
     std::string rtsp_transport_ = "tcp";
     std::atomic<std::int64_t> input_deadline_ns_{0};
     std::ofstream output_;
-    yunshao::RtspServer* rtsp_server_ = nullptr;
+    microvis::RtspServer* rtsp_server_ = nullptr;
     size_t encoded_frames_ = 0;
     bool sys_initialized_ = false;
     bool group_created_ = false;
@@ -445,7 +445,7 @@ private:
 MediaPipeline::MediaPipeline(const std::string& input, const std::string& output, int output_fps,
                              int infer_width, int infer_height, int output_width, int output_height,
                              int input_timeout_ms, int output_bitrate_kbps, const std::string& rtsp_transport,
-                             yunshao::RtspServer* rtsp_server)
+                             microvis::RtspServer* rtsp_server)
     : impl_(std::make_unique<Impl>(input, output, output_fps, infer_width, infer_height,
                                    output_width, output_height, input_timeout_ms, output_bitrate_kbps,
                                    rtsp_transport, rtsp_server)) {}

@@ -28,9 +28,9 @@ serviceWorker.addEventListener('push', (event: PushEvent) => {
   const timeLabel = occurredAt && !Number.isNaN(Date.parse(occurredAt))
     ? new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' }).format(new Date(occurredAt))
     : ''
-  event.waitUntil(serviceWorker.registration.showNotification('云哨异常事件提醒', {
+  event.waitUntil(serviceWorker.registration.showNotification('MicroVisSpec异常事件提醒', {
     body: [location, severity, timeLabel].filter(Boolean).join(' · '),
-    tag: `yunshao-event-${eventId}`,
+    tag: `microvisspec-event-${eventId}`,
     data: { event_id: eventId },
     icon: '/pwa-192x192.png',
     badge: '/pwa-192x192.png',

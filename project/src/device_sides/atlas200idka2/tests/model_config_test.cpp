@@ -4,8 +4,8 @@
 #include <iostream>
 #include <stdexcept>
 
-using yunshao::EdgeAppConfig;
-using yunshao::Json;
+using microvis::EdgeAppConfig;
+using microvis::Json;
 
 int main() {
     const EdgeAppConfig config = test_fixture::config();

@@ -1,11 +1,11 @@
 cmake_minimum_required(VERSION 3.16)
-project(yunshao_atlas_edge LANGUAGES CXX)
+project(microvisspec_atlas_edge LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-option(YUNSHAO_AGENT_ONLY "Build the agent target for remote first-time provisioning" OFF)
+option(MICROVISSPEC_AGENT_ONLY "Build the agent target for remote first-time provisioning" OFF)
 
 set(YUNSHAO_CANN_ENV_FILE "/etc/yunshao/cann.env" CACHE FILEPATH
   "CANN runtime environment file shared with systemd services")
@@ -40,7 +40,7 @@ find_library(ASCEND_DVPP_LIBRARY acl_dvpp PATHS "${ASCEND_TOOLKIT_HOME}/aarch64-
 
 # Keep installed CLI/service binaries runnable without relying on an interactive
 # shell. Include the toolkit and driver paths supplied by the board's CANN setup.
-set(YUNSHAO_ASCEND_RUNTIME_LIB_DIRS
+set(MICROVISSPEC_ASCEND_RUNTIME_LIB_DIRS
   "${ASCEND_TOOLKIT_HOME}/aarch64-linux/lib64"
   "${ASCEND_TOOLKIT_HOME}/lib64")
 set(_cann_configured_ld_library_path "")
@@ -63,16 +63,16 @@ if(_ascend_env_library_dirs)
   foreach(_library_dir IN LISTS _ascend_env_library_dirs)
     string(FIND "${_library_dir}" "${ASCEND_TOOLKIT_HOME}/" _toolkit_path_position)
     if(_toolkit_path_position EQUAL 0 OR _library_dir MATCHES "/davinci/driver/lib64")
-      list(APPEND YUNSHAO_ASCEND_RUNTIME_LIB_DIRS "${_library_dir}")
+      list(APPEND MICROVISSPEC_ASCEND_RUNTIME_LIB_DIRS "${_library_dir}")
     endif()
   endforeach()
 endif()
-list(REMOVE_DUPLICATES YUNSHAO_ASCEND_RUNTIME_LIB_DIRS)
+list(REMOVE_DUPLICATES MICROVISSPEC_ASCEND_RUNTIME_LIB_DIRS)
 
 function(configure_ascend_runtime_rpath target_name)
   set_target_properties(${target_name} PROPERTIES
-    BUILD_RPATH "${YUNSHAO_ASCEND_RUNTIME_LIB_DIRS}"
-    INSTALL_RPATH "${YUNSHAO_ASCEND_RUNTIME_LIB_DIRS}"
+    BUILD_RPATH "${MICROVISSPEC_ASCEND_RUNTIME_LIB_DIRS}"
+    INSTALL_RPATH "${MICROVISSPEC_ASCEND_RUNTIME_LIB_DIRS}"
     INSTALL_RPATH_USE_LINK_PATH TRUE)
   target_link_options(${target_name} PRIVATE -Wl,--disable-new-dtags)
 endfunction()
@@ -124,7 +124,7 @@ configure_ascend_runtime_rpath(yunshao-agent)
 install(TARGETS yunshao-agent RUNTIME DESTINATION bin COMPONENT agent)
 install(FILES systemd/yunshao-agent.service DESTINATION lib/systemd/system COMPONENT agent)
 
-if(NOT YUNSHAO_AGENT_ONLY)
+if(NOT MICROVISSPEC_AGENT_ONLY)
   find_package(OpenCV 4 REQUIRED COMPONENTS core imgproc imgcodecs dnn)
   pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET libavformat libavcodec libavutil)
   pkg_check_modules(GSTREAMER REQUIRED IMPORTED_TARGET gstreamer-1.0 gstreamer-app-1.0 gstreamer-rtsp-server-1.0)
@@ -135,8 +135,8 @@ if(NOT YUNSHAO_AGENT_ONLY)
   target_compile_options(model_classroom_behavior_detection PRIVATE -O3 -Wall -Wextra -Wpedantic)
   set_target_properties(model_classroom_behavior_detection PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/plugins"
-    BUILD_RPATH "${YUNSHAO_ASCEND_RUNTIME_LIB_DIRS}"
-    INSTALL_RPATH "${YUNSHAO_ASCEND_RUNTIME_LIB_DIRS}"
+    BUILD_RPATH "${MICROVISSPEC_ASCEND_RUNTIME_LIB_DIRS}"
+    INSTALL_RPATH "${MICROVISSPEC_ASCEND_RUNTIME_LIB_DIRS}"
     INSTALL_RPATH_USE_LINK_PATH TRUE)
   target_link_options(model_classroom_behavior_detection PRIVATE -Wl,--disable-new-dtags)
 
@@ -173,7 +173,7 @@ if(NOT YUNSHAO_AGENT_ONLY)
 endif()
 
 include(CTest)
-if(BUILD_TESTING AND NOT YUNSHAO_AGENT_ONLY)
+if(BUILD_TESTING AND NOT MICROVISSPEC_AGENT_ONLY)
   add_executable(cloud_config_test tests/cloud_config_test.cpp)
   target_link_libraries(cloud_config_test PRIVATE edge_core)
   configure_ascend_runtime_rpath(cloud_config_test)

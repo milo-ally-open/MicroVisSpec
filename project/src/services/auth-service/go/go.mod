@@ -1,4 +1,4 @@
-module yunshao/auth-service
+module github.com/milo-ally-open/MicroVisSpec/project/src/services/auth-service/go
 
 go 1.25.0
 

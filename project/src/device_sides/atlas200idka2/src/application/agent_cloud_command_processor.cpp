@@ -2,7 +2,7 @@
 
 #include <exception>
 
-namespace yunshao::application {
+namespace microvis::application {
 
 AgentCloudCommandProcessor::AgentCloudCommandProcessor(
     AgentMqttInbox& inbox,
@@ -20,4 +20,4 @@ void AgentCloudCommandProcessor::process_pending() {
     }
 }
 
-}  // namespace yunshao::application
+}  // namespace microvis::application

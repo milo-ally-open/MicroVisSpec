@@ -15,7 +15,7 @@ from server import CLASSES, Harness, handler_for, validate_input
 
 class HarnessTests(unittest.TestCase):
     def setUp(self):
-        self.temporary = tempfile.TemporaryDirectory(prefix="yunshao-push-test-")
+        self.temporary = tempfile.TemporaryDirectory(prefix="microvisspec-push-test-")
         self.config = Path(self.temporary.name) / "config.local.json"
         self.config.write_text(json.dumps({"platform_origin": "https://localhost", "profiles": [{"id": "a", "label": "Test A", "username": "test", "password": "test-only"}]}), encoding="utf-8")
         self.harness = Harness(self.config)

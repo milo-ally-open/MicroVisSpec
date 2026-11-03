@@ -4,7 +4,7 @@
 
 #include <mutex>
 
-namespace yunshao::adapters {
+namespace microvis::adapters {
 namespace {
 
 size_t append_response(char* data, size_t size, size_t count, void* context) {
@@ -82,4 +82,4 @@ application::ports::HttpsResponse CurlHttpsTransport::perform(
     return {application::ports::HttpsTransportFailure::none, status};
 }
 
-}  // namespace yunshao::adapters
+}  // namespace microvis::adapters

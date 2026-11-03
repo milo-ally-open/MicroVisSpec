@@ -2,7 +2,7 @@
 
 #include "application/ports/evidence_frame_encoder.hpp"
 
-namespace yunshao::adapters {
+namespace microvis::adapters {
 
 class AtlasEvidenceFrameEncoder final : public application::ports::EvidenceFrameEncoder {
 public:
@@ -11,4 +11,4 @@ public:
         const std::vector<Detection>& detections) override;
 };
 
-}  // namespace yunshao::adapters
+}  // namespace microvis::adapters

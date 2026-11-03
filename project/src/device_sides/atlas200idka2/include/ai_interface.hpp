@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-namespace yunshao {
+namespace microvis {
 
 // Bump only when the plugin ABI below changes incompatibly. The runtime and
 // plugin are installed as a matched pair and the loader rejects other versions.
@@ -53,8 +53,8 @@ using CreateAIModelFn = IAIModel* (*)();
 using DestroyAIModelFn = void (*)(IAIModel*);
 using GetAIModelPluginApiVersionFn = int (*)() noexcept;
 
-}  // namespace yunshao
+}  // namespace microvis
 
 extern "C" int GetAIModelPluginApiVersion() noexcept;
-extern "C" yunshao::IAIModel* CreateAIModel();
-extern "C" void DestroyAIModel(yunshao::IAIModel* model);
+extern "C" microvis::IAIModel* CreateAIModel();
+extern "C" void DestroyAIModel(microvis::IAIModel* model);

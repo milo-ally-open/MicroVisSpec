@@ -4,7 +4,7 @@
 
 #include <filesystem>
 
-namespace yunshao::adapters {
+namespace microvis::adapters {
 
 class FileAlarmEvidenceOutbox final : public application::ports::AlarmEvidenceOutbox {
 public:
@@ -17,4 +17,4 @@ private:
     std::filesystem::path directory_;
 };
 
-}  // namespace yunshao::adapters
+}  // namespace microvis::adapters

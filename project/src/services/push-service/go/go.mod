@@ -1,4 +1,4 @@
-module github.com/yunshao/push-service
+module github.com/milo-ally-open/MicroVisSpec/project/src/services/push-service/go
 
 go 1.27.0
 

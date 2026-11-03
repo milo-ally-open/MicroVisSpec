@@ -6,7 +6,7 @@ import BrandLockup from './BrandLockup.vue'
 
 <template>
   <section class="auth-aside">
-    <RouterLink class="brand brand--light" to="/" aria-label="云哨首页">
+    <RouterLink class="brand brand--light" to="/" aria-label="MicroVisSpec首页">
       <BrandLockup inverse />
     </RouterLink>
     <div class="auth-aside__copy">

@@ -2,7 +2,7 @@
 
 #include <stdexcept>
 
-namespace yunshao::application {
+namespace microvis::application {
 
 AlarmEventPublisher::AlarmEventPublisher(ports::AlarmEventSink& event_outbox,
                                          ports::AlarmEvidenceOutbox& evidence_outbox,
@@ -32,4 +32,4 @@ nlohmann::json AlarmEventPublisher::publish(const AlarmEventData& data,
     return event_outbox_.enqueue(event);
 }
 
-}  // namespace yunshao::application
+}  // namespace microvis::application

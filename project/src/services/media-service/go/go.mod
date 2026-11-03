@@ -1,4 +1,4 @@
-module github.com/yunshao/media-service
+module github.com/milo-ally-open/MicroVisSpec/project/src/services/media-service/go
 
 go 1.27.0
 

@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-namespace yunshao {
+namespace microvis {
 
 class AIProcessor {
 public:
@@ -30,4 +30,4 @@ private:
     mutable std::mutex mutex_;
 };
 
-}  // namespace yunshao
+}  // namespace microvis

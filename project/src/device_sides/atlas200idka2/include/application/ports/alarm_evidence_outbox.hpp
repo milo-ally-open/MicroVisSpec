@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-namespace yunshao::application::ports {
+namespace microvis::application::ports {
 
 // Best-effort persistence port for local alarm evidence before agent upload.
 class AlarmEvidenceOutbox {
@@ -13,4 +13,4 @@ public:
                                      const std::vector<unsigned char>& jpeg) = 0;
 };
 
-}  // namespace yunshao::application::ports
+}  // namespace microvis::application::ports

@@ -1,7 +1,7 @@
 #pragma once
 #include "common/config.hpp"
 
-namespace yunshao {
+namespace microvis {
 Json read_json_file(const std::filesystem::path& path);
 void write_json_atomic(const std::filesystem::path& path, const Json& value);
 Json cloud_rule_parameters(const EdgeAppConfig& config, const std::string& model_id);

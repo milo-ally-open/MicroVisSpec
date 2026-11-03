@@ -1,5 +1,5 @@
 [Unit]
-Description=Yunshao Atlas 200I DK A2 agent
+Description=MicroVisSpec Atlas 200I DK A2 agent
 After=network-online.target
 Wants=network-online.target
 

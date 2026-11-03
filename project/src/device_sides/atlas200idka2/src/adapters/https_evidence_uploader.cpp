@@ -9,7 +9,7 @@
 #include <stdexcept>
 #include <utility>
 
-namespace yunshao::adapters {
+namespace microvis::adapters {
 namespace {
 
 std::size_t discard_response(char*, std::size_t size, std::size_t count, void*) {
@@ -97,4 +97,4 @@ void HttpsEvidenceUploader::upload_acknowledged(const std::string& device_id) {
     }
 }
 
-}  // namespace yunshao::adapters
+}  // namespace microvis::adapters

@@ -4,7 +4,7 @@
 #include <string>
 #include <utility>
 
-namespace yunshao::application {
+namespace microvis::application {
 
 class SensitiveString {
 public:
@@ -37,4 +37,4 @@ private:
     }
 };
 
-}  // namespace yunshao::application
+}  // namespace microvis::application

@@ -13,13 +13,13 @@ int main(int argc, char** argv) {
     void* library = dlopen(argv[1], RTLD_NOW | RTLD_LOCAL);
     if (library == nullptr) throw std::runtime_error(std::string("cannot load model plugin: ") + dlerror());
 
-    auto create = reinterpret_cast<yunshao::CreateAIModelFn>(dlsym(library, "CreateAIModel"));
-    auto destroy = reinterpret_cast<yunshao::DestroyAIModelFn>(dlsym(library, "DestroyAIModel"));
+    auto create = reinterpret_cast<microvis::CreateAIModelFn>(dlsym(library, "CreateAIModel"));
+    auto destroy = reinterpret_cast<microvis::DestroyAIModelFn>(dlsym(library, "DestroyAIModel"));
     if (create == nullptr || destroy == nullptr) {
         dlclose(library);
         throw std::runtime_error("model plugin factory ABI is incomplete");
     }
-    yunshao::IAIModel* model = create();
+    microvis::IAIModel* model = create();
     try {
         if (model == nullptr || model->name() == nullptr ||
             std::string(model->name()) != "model_classroom_behavior_detection") {
@@ -29,7 +29,7 @@ int main(int argc, char** argv) {
             if (std::string(argv[2]) != "--load") {
                 throw std::invalid_argument("expected --load before the model file");
             }
-            const auto config = yunshao::EdgeAppConfig::load(argv[4]);
+            const auto config = microvis::EdgeAppConfig::load(argv[4]);
             const auto& profile = config.require_model(model->name());
             model->initialize(profile, config.npu_device_id, argv[3]);
             model->deinitialize();

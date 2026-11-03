@@ -7,7 +7,7 @@
 #include <unistd.h>
 #include <vector>
 
-namespace yunshao::adapters {
+namespace microvis::adapters {
 namespace {
 
 void run_systemctl(const std::vector<std::string>& arguments) {
@@ -40,4 +40,4 @@ void SystemdAgentServiceLifecycle::enable_and_restart_agent() {
     run_systemctl({"restart", "yunshao-agent.service"});
 }
 
-}  // namespace yunshao::adapters
+}  // namespace microvis::adapters

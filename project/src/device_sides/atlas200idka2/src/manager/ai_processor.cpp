@@ -2,7 +2,7 @@
 
 #include <stdexcept>
 
-namespace yunshao {
+namespace microvis {
 
 AIProcessor::AIProcessor(const ModelProfile& profile, int npu_device_id,
                          const std::filesystem::path& model_path,
@@ -24,4 +24,4 @@ void AIProcessor::infer(const InferenceFrame& frame, double confidence_threshold
 
 const char* AIProcessor::name() const noexcept { return plugin_ ? plugin_->name() : "unloaded"; }
 
-}  // namespace yunshao
+}  // namespace microvis

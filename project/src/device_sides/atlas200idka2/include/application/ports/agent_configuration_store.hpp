@@ -3,7 +3,7 @@
 #include <map>
 #include <string>
 
-namespace yunshao::application::ports {
+namespace microvis::application::ports {
 
 class AgentConfigurationStore {
 public:
@@ -17,4 +17,4 @@ public:
     virtual void remove_activation_overlay() = 0;
 };
 
-}  // namespace yunshao::application::ports
+}  // namespace microvis::application::ports
