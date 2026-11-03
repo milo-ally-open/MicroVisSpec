@@ -24,7 +24,7 @@ python -m venv .venv
 "observer": {
   "container": "your-local-postgres-container",
   "user": "your-local-read-authorized-role",
-  "database": "yunshao"
+  "database": "microvisspec"
 }
 ```
 

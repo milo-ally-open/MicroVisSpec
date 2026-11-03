@@ -736,7 +736,7 @@ func provisioningSafeError(err error) (string, string) {
 	case "atlas_groups_missing":
 		return code, "Atlas 缺少 CANN 运行用户组，请联系管理员修复 CANN 安装"
 	case "agent_state_path_invalid":
-		return code, "设备的 MicroVisSpec 状态目录路径异常，请联系管理员检查 /var/lib/yunshao"
+		return code, "MicroVisSpec agent 状态目录不可用，请联系管理员检查设备配置"
 	case "activation_failed":
 		return code, "设备身份签发或启动失败，请检查 Atlas 到云端 HTTPS 与 MQTT 网络后重试"
 	case "device_state_changed":
