@@ -101,7 +101,7 @@ func mediaRequest(handler http.Handler, method, path string, accountID uuid.UUID
 
 func mediaAuthorizationRequest(handler http.Handler, forgedAccountID uuid.UUID, originalURI, internalToken, originalMethod string) *httptest.ResponseRecorder {
 	request := httptest.NewRequest(http.MethodGet, "/internal/v1/media/authorize-playback", nil)
-	request.Header.Set("Cookie", "yunshao_session=opaque-session-cookie")
+	request.Header.Set("Cookie", "microvisspec_session=opaque-session-cookie")
 	request.Header.Set("X-CSRF-Token", "csrf-it")
 	request.Header.Set("X-Original-Method", originalMethod)
 	request.Header.Set("X-Original-Origin", "https://app.example.test")
@@ -284,7 +284,7 @@ func TestPlaybackLeaseEnforcesQuotaAuthorizationAndRelease(t *testing.T) {
 		if r.Method != http.MethodGet || r.URL.Path != "/internal/v1/sessions/validate" || r.Header.Get("X-Internal-Service-Token") != "auth-internal-token" {
 			t.Errorf("unexpected auth-service request: %s %s", r.Method, r.URL.Path)
 		}
-		if r.Header.Get("Cookie") != "yunshao_session=opaque-session-cookie" || r.Header.Get("X-Original-Origin") != "https://app.example.test" {
+		if r.Header.Get("Cookie") != "microvisspec_session=opaque-session-cookie" || r.Header.Get("X-Original-Origin") != "https://app.example.test" {
 			t.Errorf("original browser session metadata was not forwarded")
 		}
 		if r.Header.Get("X-Account-ID") != "" || r.Header.Get("X-Session-ID") != "" {

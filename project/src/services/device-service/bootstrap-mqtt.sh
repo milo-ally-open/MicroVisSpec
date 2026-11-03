@@ -3,7 +3,7 @@ set -eu
 
 options="${MOSQUITTO_CTRL_OPTIONS_FILE:-/etc/microvisspec/mosquitto-ctrl.options}"
 run_ctrl() {
-	mosquitto_ctrl -o "$options" -i yunshao-broker-bootstrap dynsec "$@"
+	mosquitto_ctrl -o "$options" -i microvisspec-broker-bootstrap dynsec "$@"
 }
 
 field_equals() {
@@ -93,18 +93,18 @@ ensure_service_client() {
 	fi
 }
 
-ensure_role yunshao-device-service
-ensure_acl yunshao-device-service subscribePattern 'devices/+/state'
-ensure_acl yunshao-device-service publishClientReceive 'devices/+/state'
-ensure_acl yunshao-device-service subscribePattern 'devices/+/command-acks'
-ensure_acl yunshao-device-service publishClientReceive 'devices/+/command-acks'
-ensure_acl yunshao-device-service publishClientSend 'devices/+/commands'
-ensure_service_client yunshao-device-service yunshao-device-service "${MQTT_DEVICE_SERVICE_PASSWORD_FILE:-/etc/microvisspec/mqtt-device-service-password}" yunshao-device-service
+ensure_role microvisspec-device-service
+ensure_acl microvisspec-device-service subscribePattern 'devices/+/state'
+ensure_acl microvisspec-device-service publishClientReceive 'devices/+/state'
+ensure_acl microvisspec-device-service subscribePattern 'devices/+/command-acks'
+ensure_acl microvisspec-device-service publishClientReceive 'devices/+/command-acks'
+ensure_acl microvisspec-device-service publishClientSend 'devices/+/commands'
+ensure_service_client microvisspec-device-service microvisspec-device-service "${MQTT_DEVICE_SERVICE_PASSWORD_FILE:-/etc/microvisspec/mqtt-device-service-password}" microvisspec-device-service
 
-ensure_role yunshao-event-service
-ensure_acl yunshao-event-service subscribePattern 'devices/+/events'
-ensure_acl yunshao-event-service publishClientReceive 'devices/+/events'
-ensure_acl yunshao-event-service publishClientSend 'devices/+/event-acks'
-ensure_service_client yunshao-event-service yunshao-event-service "${MQTT_EVENT_SERVICE_PASSWORD_FILE:-/etc/microvisspec/mqtt-event-service-password}" yunshao-event-service
+ensure_role microvisspec-event-service
+ensure_acl microvisspec-event-service subscribePattern 'devices/+/events'
+ensure_acl microvisspec-event-service publishClientReceive 'devices/+/events'
+ensure_acl microvisspec-event-service publishClientSend 'devices/+/event-acks'
+ensure_service_client microvisspec-event-service microvisspec-event-service "${MQTT_EVENT_SERVICE_PASSWORD_FILE:-/etc/microvisspec/mqtt-event-service-password}" microvisspec-event-service
 
 echo "Mosquitto Dynamic Security service identities are ready"

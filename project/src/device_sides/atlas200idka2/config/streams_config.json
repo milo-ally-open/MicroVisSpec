@@ -7,7 +7,7 @@
     {
       "stream_id": "classroom-demo",
       "camera_id": "classroom-demo-camera",
-      "source_ref": "YUNSHAO_CAMERA_CLASSROOM_DEMO_URL",
+      "source_ref": "MICROVIS_CAMERA_CLASSROOM_DEMO_URL",
       "model_id": "model_classroom_behavior_detection",
       "enabled": false,
       "enable_ai": false,

@@ -591,7 +591,7 @@ func TestDynamicSecuritySeparatesDeviceTopicPermissions(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	manager := &DynamicSecurityBroker{url: brokerURL, username: adminUsername, password: adminPassword, clientID: "yunshao-dynsec-it-" + uuid.NewString(), timeout: 5 * time.Second}
+	manager := &DynamicSecurityBroker{url: brokerURL, username: adminUsername, password: adminPassword, clientID: "microvisspec-dynsec-it-" + uuid.NewString(), timeout: 5 * time.Second}
 	deviceA, deviceB := uuid.New(), uuid.New()
 	usernameA, clientIDA, passwordA := brokerUsername(deviceA), brokerClientID(deviceA), "integration-device-secret-a"
 	usernameB, clientIDB, passwordB := brokerUsername(deviceB), brokerClientID(deviceB), "integration-device-secret-b"
@@ -603,7 +603,7 @@ func TestDynamicSecuritySeparatesDeviceTopicPermissions(t *testing.T) {
 	}
 
 	observed := make(chan string, 8)
-	observerOptions := mqtt.NewClientOptions().AddBroker(brokerURL).SetClientID("yunshao-observer-it-" + uuid.NewString()).
+	observerOptions := mqtt.NewClientOptions().AddBroker(brokerURL).SetClientID("microvisspec-observer-it-" + uuid.NewString()).
 		SetUsername(adminUsername).SetPassword(adminPassword).SetProtocolVersion(4).SetConnectTimeout(3 * time.Second)
 	observerOptions.SetDefaultPublishHandler(func(_ mqtt.Client, message mqtt.Message) {
 		select {

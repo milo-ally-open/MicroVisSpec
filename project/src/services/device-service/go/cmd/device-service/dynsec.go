@@ -137,7 +137,7 @@ func isMissingDynsecObject(err error, object string) bool {
 }
 
 func deviceRoleName(deviceID uuid.UUID) string {
-	return "yunshao-role-" + strings.ReplaceAll(deviceID.String(), "-", "")
+	return "microvisspec-role-" + strings.ReplaceAll(deviceID.String(), "-", "")
 }
 
 func deviceACLs(deviceID uuid.UUID) []map[string]any {

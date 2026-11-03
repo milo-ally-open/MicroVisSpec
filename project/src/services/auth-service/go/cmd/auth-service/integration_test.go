@@ -31,7 +31,7 @@ func TestAuthSessionLifecycleIntegration(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = sqlDB.Close() })
 
-	config := Config{PublicOrigin: "https://yunshao.test", CookieName: "test_session", InternalToken: "integration-internal-token",
+	config := Config{PublicOrigin: "https://microvisspec.test", CookieName: "test_session", InternalToken: "integration-internal-token",
 		MediaServiceToken: "integration-media-token", RateLimitPerMinute: 1000}
 	handler := NewHandler(config, db)
 	username := "itest_" + uuid.NewString()[:8]
@@ -256,7 +256,7 @@ func TestWorkspaceOwnerCanRenameWorkspaceAndCreatesAuditRecord(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = sqlDB.Close() })
-	config := Config{PublicOrigin: "https://yunshao.test", CookieName: "test_session", InternalToken: "integration-internal-token",
+	config := Config{PublicOrigin: "https://microvisspec.test", CookieName: "test_session", InternalToken: "integration-internal-token",
 		MediaServiceToken: "integration-media-token", RateLimitPerMinute: 1000}
 	handler := NewHandler(config, db)
 	now := time.Now().UTC()

@@ -1,4 +1,4 @@
-# 实施任务：云哨 Spec 工作流 Skill
+# 实施任务：MicroVisSpec Spec 工作流 Skill
 
 > 关联规格：[spec.md](spec.md)；关联设计：[design.md](design.md)<br>
 > 执行状态以本文件 checkbox 与备注为准。

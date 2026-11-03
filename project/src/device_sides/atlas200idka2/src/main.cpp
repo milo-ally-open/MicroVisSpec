@@ -16,6 +16,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace {
@@ -31,15 +32,24 @@ using microvis::VideoStreamManager;
 
 std::string env(const char* name, const std::string& fallback = "") {
     const char* value = std::getenv(name);
+    std::string alternate_name;
+    if (!value || !*value) {
+        const std::string_view key(name);
+        if (key.compare(0, 9, "MICROVIS_") == 0)
+            alternate_name = "YUNSHAO_" + std::string(key.substr(9));
+        else if (key.compare(0, 8, "YUNSHAO_") == 0)
+            alternate_name = "MICROVIS_" + std::string(key.substr(8));
+        if (!alternate_name.empty()) value = std::getenv(alternate_name.c_str());
+    }
     return value && *value ? value : fallback;
 }
 
 struct Options {
-    std::filesystem::path config_dir = env("YUNSHAO_AGENT_CONFIG_DIR", "/etc/yunshao");
-    std::filesystem::path model_root = env("YUNSHAO_MODEL_ROOT", "/var/lib/yunshao/models");
-    std::filesystem::path plugin_dir = env("YUNSHAO_PLUGIN_DIR", "/usr/local/lib/yunshao/plugins");
-    std::filesystem::path socket_path = env("YUNSHAO_AGENT_SOCKET", "/run/yunshao/agent.sock");
-    std::string stream_id = env("YUNSHAO_STREAM_ID");
+    std::filesystem::path config_dir = env("MICROVIS_AGENT_CONFIG_DIR", "/etc/yunshao");
+    std::filesystem::path model_root = env("MICROVIS_MODEL_ROOT", "/var/lib/yunshao/models");
+    std::filesystem::path plugin_dir = env("MICROVIS_PLUGIN_DIR", "/usr/local/lib/yunshao/plugins");
+    std::filesystem::path socket_path = env("MICROVIS_AGENT_SOCKET", "/run/yunshao/agent.sock");
+    std::string stream_id = env("MICROVIS_STREAM_ID");
     std::filesystem::path output;
     bool check_config = false;
 };
@@ -59,7 +69,7 @@ Options parse_options(int argc, char** argv) {
         else if (argument == "--output") options.output = next("--output");
         else if (argument == "--check-config") options.check_config = true;
         else if (argument == "--help" || argument == "-h") {
-            std::cout << "Usage: yunshao-classroom-runtime [--config-dir DIR] [--stream-id ID] [--model-root DIR] [--plugin-dir DIR] [--output FILE] [--check-config]\n";
+            std::cout << "Usage: microvisspec-classroom-runtime [--config-dir DIR] [--stream-id ID] [--model-root DIR] [--plugin-dir DIR] [--output FILE] [--check-config]\n";
             std::exit(0);
         } else throw std::invalid_argument("unknown option: " + argument);
     }
@@ -124,9 +134,9 @@ int main(int argc, char** argv) {
             std::cout << "Stream " << stream.stream_id << " is disabled.\n";
             return 0;
         }
-        const char* lease_file = std::getenv("YUNSHAO_ACTIVATION_LEASE_FILE");
+        const std::string lease_file = env("MICROVIS_ACTIVATION_LEASE_FILE");
         microvis::adapters::FileActivationLeaseStatus lease_status(
-            lease_file && *lease_file ? lease_file : "/var/lib/yunshao/activation-lease.json");
+            lease_file.empty() ? "/var/lib/yunshao/activation-lease.json" : lease_file);
         microvis::application::ActivationLeaseGate lease_gate(lease_status);
         lease_gate.wait_until_valid();
         const auto& model = config.require_model(stream.model_id);
@@ -141,7 +151,7 @@ int main(int argc, char** argv) {
         const std::string model_version = model_state.value("model_version", "unknown");
         microvis::adapters::AgentEventSocketOutbox event_outbox(options.socket_path);
         microvis::adapters::FileAlarmEvidenceOutbox evidence_outbox(
-            std::filesystem::path(env("YUNSHAO_EVIDENCE_OUTBOX_DIR", "/var/lib/yunshao/evidence-outbox")));
+            std::filesystem::path(env("MICROVIS_EVIDENCE_OUTBOX_DIR", "/var/lib/yunshao/evidence-outbox")));
         microvis::adapters::SystemEventMetadata event_metadata;
         microvis::application::AlarmEventPublisher alarm_event_publisher(
             event_outbox, evidence_outbox, event_metadata);
@@ -168,7 +178,7 @@ int main(int argc, char** argv) {
         VideoStreamManager stream_manager(config, inference,
             [&](const AlarmTrigger& trigger, const std::vector<unsigned char>& jpeg) {
                 microvis::application::AlarmEventData event;
-                event.device_id = env("YUNSHAO_DEVICE_ID");
+                event.device_id = env("MICROVIS_DEVICE_ID");
                 event.camera_id = stream.camera_id;
                 event.event_type = trigger.event_type;
                 event.severity = trigger.severity;

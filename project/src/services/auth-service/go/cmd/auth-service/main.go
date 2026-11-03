@@ -70,7 +70,7 @@ func LoadConfig() (Config, error) {
 		DatabaseURL:         read("DATABASE_URL"),
 		ListenAddress:       env("AUTH_LISTEN_ADDRESS", ":8080"),
 		PublicOrigin:        strings.TrimRight(os.Getenv("PUBLIC_ORIGIN"), "/"),
-		CookieName:          env("AUTH_COOKIE_NAME", "yunshao_session"),
+		CookieName:          env("AUTH_COOKIE_NAME", "microvisspec_session"),
 		CookieSecure:        envBool("AUTH_COOKIE_SECURE", true),
 		InternalToken:       read("AUTH_INTERNAL_SERVICE_TOKEN"),
 		DeviceServiceURL:    strings.TrimRight(os.Getenv("AUTH_DEVICE_SERVICE_URL"), "/"),

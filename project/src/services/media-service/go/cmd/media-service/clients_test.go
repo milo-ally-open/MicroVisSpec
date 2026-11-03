@@ -16,7 +16,7 @@ func TestAuthSessionClientForwardsBrowserContextAndUsesTrustedIdentity(t *testin
 		if r.Method != http.MethodGet || r.URL.Path != "/internal/v1/sessions/validate" {
 			t.Errorf("unexpected auth request: %s %s", r.Method, r.URL.Path)
 		}
-		if r.Header.Get("X-Internal-Service-Token") != "auth-token" || r.Header.Get("X-Internal-Service") != "media-service" || r.Header.Get("Cookie") != "yunshao_session=browser-cookie" {
+		if r.Header.Get("X-Internal-Service-Token") != "auth-token" || r.Header.Get("X-Internal-Service") != "media-service" || r.Header.Get("Cookie") != "microvisspec_session=browser-cookie" {
 			t.Errorf("auth token or browser cookie missing")
 		}
 		if r.Header.Get("X-CSRF-Token") != "csrf-token" || r.Header.Get("X-Original-Method") != http.MethodPost || r.Header.Get("X-Original-Origin") != "https://app.example.test" {
@@ -31,7 +31,7 @@ func TestAuthSessionClientForwardsBrowserContextAndUsesTrustedIdentity(t *testin
 	}))
 	defer server.Close()
 	client := NewAuthSessionClient(Config{AuthServiceInternalURL: server.URL, InternalAuthToken: "auth-token"})
-	identity, err := client.ValidateSession(context.Background(), "yunshao_session=browser-cookie", "csrf-token", http.MethodPost,
+	identity, err := client.ValidateSession(context.Background(), "microvisspec_session=browser-cookie", "csrf-token", http.MethodPost,
 		"https://app.example.test", "request-123")
 	if err != nil || identity.AccountID != wantAccountID || identity.SessionID != "trusted-session" {
 		t.Fatalf("unexpected validated identity: %+v err=%v", identity, err)
@@ -58,7 +58,7 @@ func TestAuthSessionClientRejectsInvalidSessionsAndMalformedIdentity(t *testing.
 			}))
 			defer server.Close()
 			client := NewAuthSessionClient(Config{AuthServiceInternalURL: server.URL, InternalAuthToken: "auth-token"})
-			_, err := client.ValidateSession(context.Background(), "yunshao_session=cookie", "", http.MethodGet, "", "request-456")
+			_, err := client.ValidateSession(context.Background(), "microvisspec_session=cookie", "", http.MethodGet, "", "request-456")
 			if test.wantErr != nil && err != test.wantErr {
 				t.Fatalf("got error %v, want %v", err, test.wantErr)
 			}

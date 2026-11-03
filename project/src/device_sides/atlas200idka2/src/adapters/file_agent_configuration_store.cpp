@@ -39,12 +39,19 @@ std::string_view environment_key(const std::string& line) {
     return std::string_view(line.data() + first, last - first + 1);
 }
 
+std::string canonical_environment_key(std::string key) {
+    constexpr std::string_view legacy_prefix = "YUNSHAO_";
+    if (key.compare(0, legacy_prefix.size(), legacy_prefix) == 0)
+        key.replace(0, legacy_prefix.size(), "MICROVIS_");
+    return key;
+}
+
 bool is_mqtt_password(const std::string& line) {
-    return environment_key(line) == "YUNSHAO_MQTT_PASSWORD";
+    return canonical_environment_key(std::string(environment_key(line))) == "MICROVIS_MQTT_PASSWORD";
 }
 
 void wipe_mqtt_password(Environment& environment) {
-    const auto found = environment.find("YUNSHAO_MQTT_PASSWORD");
+    const auto found = environment.find("MICROVIS_MQTT_PASSWORD");
     if (found != environment.end()) wipe(found->second);
 }
 
@@ -118,7 +125,8 @@ FileAgentConfigurationStore::read_agent_environment() {
         const auto separator = line.value.find('=');
         if (separator == std::string::npos) continue;
         auto key = trim_range(line.value, 0, separator);
-        if (key == "YUNSHAO_MQTT_PASSWORD") {
+        key = canonical_environment_key(std::move(key));
+        if (key == "MICROVIS_MQTT_PASSWORD") {
             application::SensitiveString password(
                 trim_range(line.value, separator + 1, line.value.size()));
             values[std::move(key)] = std::move(password.value);
@@ -148,7 +156,7 @@ void FileAgentConfigurationStore::write_agent_environment(Environment updates) {
         if (separator == std::string::npos) {
             lines.push_back(line.value);
         } else {
-            const auto key = trim_range(line.value, 0, separator);
+            const auto key = canonical_environment_key(trim_range(line.value, 0, separator));
             const auto found = updates.find(key);
             if (found == updates.end()) {
                 lines.push_back(line.value);
@@ -196,9 +204,9 @@ void FileAgentConfigurationStore::write_agent_environment(Environment updates) {
 void FileAgentConfigurationStore::write_activation_overlay(Environment values) {
     EnvironmentPasswordGuard values_password_guard(values);
     constexpr const char* keys[] = {
-        "YUNSHAO_DEVICE_ID", "YUNSHAO_EDGE_API_ORIGIN", "YUNSHAO_MQTT_HOST",
-        "YUNSHAO_MQTT_PORT", "YUNSHAO_MQTT_CLIENT_ID", "YUNSHAO_MQTT_USERNAME",
-        "YUNSHAO_MQTT_PASSWORD", "YUNSHAO_MQTT_CA"};
+        "MICROVIS_DEVICE_ID", "MICROVIS_EDGE_API_ORIGIN", "MICROVIS_MQTT_HOST",
+        "MICROVIS_MQTT_PORT", "MICROVIS_MQTT_CLIENT_ID", "MICROVIS_MQTT_USERNAME",
+        "MICROVIS_MQTT_PASSWORD", "MICROVIS_MQTT_CA"};
     application::SensitiveString contents;
     for (const auto* key : keys) {
         contents.value.append(key);

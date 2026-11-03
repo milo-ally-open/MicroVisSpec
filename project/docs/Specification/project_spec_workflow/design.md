@@ -1,4 +1,4 @@
-# 技术设计：云哨 Spec 工作流 Skill
+# 技术设计：MicroVisSpec Spec 工作流 Skill
 
 > 关联规格：[spec.md](spec.md)<br>
 > 本文档组状态见 [proposal.md](proposal.md)。

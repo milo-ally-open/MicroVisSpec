@@ -35,6 +35,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <thread>
 
 int activation_command(int argc, char** argv,
@@ -55,6 +56,15 @@ std::atomic_bool stopping{false};
 
 std::string env(const char* name, const std::string& fallback = "") {
     const char* value = std::getenv(name);
+    std::string alternate_name;
+    if (!value || !*value) {
+        const std::string_view key(name);
+        if (key.compare(0, 9, "MICROVIS_") == 0)
+            alternate_name = "YUNSHAO_" + std::string(key.substr(9));
+        else if (key.compare(0, 8, "YUNSHAO_") == 0)
+            alternate_name = "MICROVIS_" + std::string(key.substr(8));
+        if (!alternate_name.empty()) value = std::getenv(alternate_name.c_str());
+    }
     return value && *value ? value : fallback;
 }
 
@@ -66,7 +76,7 @@ std::string trim(std::string value) {
 }
 
 void load_cann_environment() {
-    const std::string path = env("YUNSHAO_CANN_ENV_FILE", "/etc/yunshao/cann.env");
+    const std::string path = env("MICROVIS_CANN_ENV_FILE", "/etc/yunshao/cann.env");
     std::ifstream input(path);
     if (!input) throw std::runtime_error("cannot open CANN environment file: " + path);
 
@@ -193,10 +203,10 @@ public:
         microvis::application::AgentRunLoop run_loop(
             mqtt_session_, cloud_cycle_,
             [this] {
-                return poll_activation_once(device_id_, env("YUNSHAO_EDGE_API_ORIGIN"),
-                    env("YUNSHAO_MQTT_USERNAME"), env("YUNSHAO_MQTT_PASSWORD"),
-                    env("YUNSHAO_EDGE_API_CA", env("YUNSHAO_MQTT_CA")),
-                    env("YUNSHAO_MQTT_CA"), activation_workflow_);
+                return poll_activation_once(device_id_, env("MICROVIS_EDGE_API_ORIGIN"),
+                    env("MICROVIS_MQTT_USERNAME"), env("MICROVIS_MQTT_PASSWORD"),
+                    env("MICROVIS_EDGE_API_CA", env("MICROVIS_MQTT_CA")),
+                    env("MICROVIS_MQTT_CA"), activation_workflow_);
             },
             [] { return stopping.load(); },
             [](std::chrono::seconds duration) { std::this_thread::sleep_for(duration); });
@@ -221,9 +231,9 @@ private:
     microvis::application::AgentAppliedRuleAcknowledger applied_rule_acknowledger_;
     microvis::application::AgentCloudCycle cloud_cycle_;
 
-    std::filesystem::path config_directory() const { return env("YUNSHAO_AGENT_CONFIG_DIR", "/etc/yunshao"); }
+    std::filesystem::path config_directory() const { return env("MICROVIS_AGENT_CONFIG_DIR", "/etc/yunshao"); }
     std::filesystem::path runtime_state_directory() const {
-        return env("YUNSHAO_RUNTIME_STATE_DIR", "/run/yunshao/runtime");
+        return env("MICROVIS_RUNTIME_STATE_DIR", "/run/yunshao/runtime");
     }
     Json runtime_state(const microvis::StreamProfile& stream) const {
         return microvis::fresh_runtime_state(
@@ -232,8 +242,8 @@ private:
 };
 
 int model_command(int argc, char** argv) {
-    const std::filesystem::path root = env("YUNSHAO_MODEL_ROOT", "/var/lib/yunshao/models");
-    const auto config_dir = env("YUNSHAO_AGENT_CONFIG_DIR", "/etc/yunshao");
+    const std::filesystem::path root = env("MICROVIS_MODEL_ROOT", "/var/lib/yunshao/models");
+    const auto config_dir = env("MICROVIS_AGENT_CONFIG_DIR", "/etc/yunshao");
     const EdgeAppConfig config = EdgeAppConfig::load(config_dir);
     ModelCatalog catalog(root, config);
     if (argc >= 3 && std::string(argv[2]) == "status") {
@@ -250,7 +260,7 @@ int model_command(int argc, char** argv) {
         std::cout << catalog.status().dump(2) << '\n';
         return 0;
     }
-    std::cerr << "Usage: yunshao-agent model install --manifest manifest.json --model model.om | status [model_id] | rollback <model_id>\n";
+    std::cerr << "Usage: microvisspec-agent model install --manifest manifest.json --model model.om | status [model_id] | rollback <model_id>\n";
     return 2;
 }
 
@@ -261,7 +271,7 @@ int main(int argc, char** argv) {
         if (argc >= 2 && std::string(argv[1]) == "activate") {
             microvis::adapters::SystemdAgentServiceLifecycle service_lifecycle;
             microvis::adapters::FileActivationLeaseWriter lease_writer(
-                env("YUNSHAO_ACTIVATION_LEASE_FILE", "/var/lib/yunshao/activation-lease.json"));
+                env("MICROVIS_ACTIVATION_LEASE_FILE", "/var/lib/yunshao/activation-lease.json"));
             microvis::adapters::FileAgentConfigurationStore configuration_store(
                 "/etc/yunshao/agent.env", "/var/lib/yunshao/activation.env");
             microvis::application::AgentActivationWorkflow activation_workflow(configuration_store, lease_writer);
@@ -271,34 +281,34 @@ int main(int argc, char** argv) {
             load_cann_environment();
             return model_command(argc, argv);
         }
-        const std::string device_id = env("YUNSHAO_DEVICE_ID");
-        const std::filesystem::path db_path = env("YUNSHAO_AGENT_DB", "/var/lib/yunshao/agent.db");
-        const std::filesystem::path model_root = env("YUNSHAO_MODEL_ROOT", "/var/lib/yunshao/models");
-        const std::filesystem::path config_dir = env("YUNSHAO_AGENT_CONFIG_DIR", "/etc/yunshao");
-        const std::filesystem::path socket_path = env("YUNSHAO_AGENT_SOCKET", "/run/yunshao/agent.sock");
+        const std::string device_id = env("MICROVIS_DEVICE_ID");
+        const std::filesystem::path db_path = env("MICROVIS_AGENT_DB", "/var/lib/yunshao/agent.db");
+        const std::filesystem::path model_root = env("MICROVIS_MODEL_ROOT", "/var/lib/yunshao/models");
+        const std::filesystem::path config_dir = env("MICROVIS_AGENT_CONFIG_DIR", "/etc/yunshao");
+        const std::filesystem::path socket_path = env("MICROVIS_AGENT_SOCKET", "/run/yunshao/agent.sock");
         microvis::adapters::FileActivationLeaseWriter activation_lease_writer(
-            env("YUNSHAO_ACTIVATION_LEASE_FILE", "/var/lib/yunshao/activation-lease.json"));
+            env("MICROVIS_ACTIVATION_LEASE_FILE", "/var/lib/yunshao/activation-lease.json"));
         microvis::adapters::FileAgentConfigurationStore agent_configuration_store(
             "/etc/yunshao/agent.env", "/var/lib/yunshao/activation.env");
         microvis::application::AgentActivationWorkflow activation_workflow(
             agent_configuration_store, activation_lease_writer);
-        if (device_id.empty()) throw std::runtime_error("YUNSHAO_DEVICE_ID is required");
+        if (device_id.empty()) throw std::runtime_error("MICROVIS_DEVICE_ID is required");
         microvis::application::ports::MqttConnectionSettings mqtt_settings;
-        mqtt_settings.host = env("YUNSHAO_MQTT_HOST");
-        mqtt_settings.client_id = env("YUNSHAO_MQTT_CLIENT_ID");
-        mqtt_settings.username = env("YUNSHAO_MQTT_USERNAME");
-        mqtt_settings.password = env("YUNSHAO_MQTT_PASSWORD");
-        mqtt_settings.ca_path = env("YUNSHAO_MQTT_CA");
-        if (!mqtt_settings.host.empty()) mqtt_settings.port = std::stoi(env("YUNSHAO_MQTT_PORT", "8883"));
+        mqtt_settings.host = env("MICROVIS_MQTT_HOST");
+        mqtt_settings.client_id = env("MICROVIS_MQTT_CLIENT_ID");
+        mqtt_settings.username = env("MICROVIS_MQTT_USERNAME");
+        mqtt_settings.password = env("MICROVIS_MQTT_PASSWORD");
+        mqtt_settings.ca_path = env("MICROVIS_MQTT_CA");
+        if (!mqtt_settings.host.empty()) mqtt_settings.port = std::stoi(env("MICROVIS_MQTT_PORT", "8883"));
         const EdgeAppConfig config = EdgeAppConfig::load(config_dir);
         microvis::adapters::MosquittoMqttTransport mqtt_transport;
         microvis::adapters::SQLiteEventOutbox event_outbox(db_path, device_id, config);
         microvis::adapters::HttpsEvidenceUploader evidence_uploader(event_outbox, {
-            env("YUNSHAO_EDGE_API_ORIGIN"),
-            std::filesystem::path(env("YUNSHAO_EVIDENCE_OUTBOX_DIR", "/var/lib/yunshao/evidence-outbox")),
-            env("YUNSHAO_MQTT_USERNAME"),
-            env("YUNSHAO_MQTT_PASSWORD"),
-            std::filesystem::path(env("YUNSHAO_EDGE_API_CA", env("YUNSHAO_MQTT_CA")))});
+            env("MICROVIS_EDGE_API_ORIGIN"),
+            std::filesystem::path(env("MICROVIS_EVIDENCE_OUTBOX_DIR", "/var/lib/yunshao/evidence-outbox")),
+            env("MICROVIS_MQTT_USERNAME"),
+            env("MICROVIS_MQTT_PASSWORD"),
+            std::filesystem::path(env("MICROVIS_EDGE_API_CA", env("MICROVIS_MQTT_CA")))});
         microvis::adapters::SystemEventMetadata event_metadata;
         Agent agent(device_id, event_outbox, evidence_uploader, mqtt_transport,
                     std::move(mqtt_settings), model_root, config, event_metadata,

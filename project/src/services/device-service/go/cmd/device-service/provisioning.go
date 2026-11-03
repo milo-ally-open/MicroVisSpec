@@ -236,7 +236,7 @@ func probeSSHHostKey(device Device) (fingerprint string, err error) {
 	defer conn.Close()
 	_ = conn.SetDeadline(time.Now().Add(sshProbeTimeout))
 	config := &ssh.ClientConfig{
-		User:    "yunshao-host-key-probe",
+		User:    "microvisspec-host-key-probe",
 		Timeout: sshProbeTimeout,
 		HostKeyCallback: func(_ string, _ net.Addr, key ssh.PublicKey) error {
 			fingerprint = ssh.FingerprintSHA256(key)

@@ -1,4 +1,4 @@
-# 行为规格：云哨 Spec 工作流 Skill
+# 行为规格：MicroVisSpec Spec 工作流 Skill
 
 > 关联提案：[proposal.md](proposal.md)<br>
 > 来源：仓库现有 Specification 文档组与用户确立的 Git 历史约定

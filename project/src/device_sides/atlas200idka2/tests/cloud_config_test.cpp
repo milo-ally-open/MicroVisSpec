@@ -15,7 +15,7 @@ int main() {
     const std::vector<std::uint8_t> later_idr{0,0,1,0x65,0x22};
     headers.observe(later_idr.data(), later_idr.size());
     assert(headers.prefix() == retained); // A late RTSP reader receives SPS/PPS before this IDR.
-    const auto root = std::filesystem::temp_directory_path() / ("yunshao-cloud-test-" +
+    const auto root = std::filesystem::temp_directory_path() / ("microvisspec-cloud-test-" +
         std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     write_json_atomic(root / "models.json", test_fixture::models());
     write_json_atomic(root / "streams_config.json", test_fixture::streams());

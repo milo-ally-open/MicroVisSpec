@@ -12,7 +12,7 @@
 
 ## 方案
 
-采用两个 systemd 管理的 C++ 进程：`yunshao-agent` 负责设备身份、MQTT/TLS、配置版本、健康状态、本地持久队列和系统生命周期；`yunshao-classroom-runtime` 负责摄像头解码、AscendCL 推理、告警规则、检测叠加和视频输出。runtime 沿用参考项目的职责模式：硬件无关 AI plugin ABI、AscendCL 模型插件、AI processor/inference/stream/config/alarm managers、Atlas DVPP/FFmpeg pipeline 和分层 JSON。AX650 的 AX Engine/AX SYS/IVPS 实现不可直接复用；Atlas 插件及媒体 pipeline 使用 CANN/AscendCL。两者的生产代码均位于 `project/src/device_sides/atlas200idka2/`；`preparation/` 保留模型转换/验证资料。agent 与 runtime 通过权限受限 Unix domain socket 交换版本化 JSON 命令、状态与命中的事件。agent 可重启而不卸载模型；推理进程失败由 systemd 恢复，待传事件存在 SQLite，不依赖进程内存。
+采用两个 systemd 管理的 C++ 进程：`microvisspec-agent` 负责设备身份、MQTT/TLS、配置版本、健康状态、本地持久队列和系统生命周期；`microvisspec-classroom-runtime` 负责摄像头解码、AscendCL 推理、告警规则、检测叠加和视频输出。Atlas 上的 systemd unit 文件名继续使用 `yunshao-agent.service` 和 `yunshao-classroom-runtime.service`，以便原位替换已安装 unit；其 ExecStart、服务描述和构建目标使用新名称。runtime 沿用参考项目的职责模式：硬件无关 AI plugin ABI、AscendCL 模型插件、AI processor/inference/stream/config/alarm managers、Atlas DVPP/FFmpeg pipeline 和分层 JSON。AX650 的 AX Engine/AX SYS/IVPS 实现不可直接复用；Atlas 插件及媒体 pipeline 使用 CANN/AscendCL。两者的生产代码均位于 `project/src/device_sides/atlas200idka2/`；`preparation/` 保留模型转换/验证资料。agent 与 runtime 通过权限受限 Unix domain socket 交换版本化 JSON 命令、状态与命中的事件。agent 可重启而不卸载模型；推理进程失败由 systemd 恢复，待传事件存在 SQLite，不依赖进程内存。
 
 ```mermaid
 sequenceDiagram
@@ -34,7 +34,7 @@ sequenceDiagram
 
 设备身份、HTTPS Origin/CA 和初始 MQTT 凭据在部署时由管理员预置。日常激活/续期由网页创建不含秘密值的请求；agent 通过现有设备身份轮询 HTTPS 路由，服务端轮换 MQTT 凭据，agent 安全写入 systemd credential overlay 并自动重启。用户浏览器和命令行不接触新 MQTT 密码。agent 必须原样使用服务端返回的 `client_id`，不得自行从 device_id 推导，否则会与 Mosquitto Dynamic Security 登记的固定 client ID 不匹配。后续 MQTT 使用每设备凭据和 `devices/{deviceId}/...` topic ACL。凭据轮换、停用或到期时撤销。配置是带单调版本的完整快照，runtime ACK 后才报告已生效。期望态与实报态始终分开。
 
-激活 transport、HTTP/JSON 转换、CLI 参数、日志和 systemd 生命周期仍位于 `activation.cpp`/组合根。`AgentActivationWorkflow` application service 负责 MQTT grant 校验、broker URL/授权期限解析、配置环境项组装、租期写入，以及 CLI 激活与后台轮询路径的顺序；`activation.cpp` 负责取得网页票据/HTTPS 响应并将响应转换为 grant。配置文件边界通过 `AgentConfigurationStore` port 注入。`FileAgentConfigurationStore` 负责读取并保留 `agent.env` 中未更新的键、按 root:`yunshao`/0640 原子替换该文件，以及按固定键序原子写入或删除激活凭据覆盖文件。密码以可清理的值传入/传出，adapter 在完成持久化后擦除拥有的密码缓冲区；激活流程在调用方负责擦除读取到的旧密码。此边界不改变现有激活 API、文件路径、格式或重启顺序。
+激活 transport、HTTP/JSON 转换、CLI 参数、日志和 systemd 生命周期仍位于 `activation.cpp`/组合根。`AgentActivationWorkflow` application service 负责 MQTT grant 校验、broker URL/授权期限解析、配置环境项组装、租期写入，以及 CLI 激活与后台轮询路径的顺序；`activation.cpp` 负责取得网页票据/HTTPS 响应并将响应转换为 grant。配置文件边界通过 `AgentConfigurationStore` port 注入。`FileAgentConfigurationStore` 负责读取并保留 `agent.env` 中未更新的键、按 root:`yunshao`/0640 原子替换该文件，以及按固定键序原子写入或删除激活凭据覆盖文件。新配置键使用 `MICROVIS_*`；读取器会把既有 `YUNSHAO_*` 键映射为新键，避免覆盖旧设备环境配置。密码以可清理的值传入/传出，adapter 在完成持久化后擦除拥有的密码缓冲区；激活流程在调用方负责擦除读取到的旧密码。此边界不改变现有激活 API、文件路径、格式或重启顺序。
 
 实时流事件证据编码由 `EvidenceFrameEncoder` port 提供；port 仅接收 NV21 设备平面指针、尺寸/步长和检测结果，不暴露 ACL/OpenCV 类型。`AtlasEvidenceFrameEncoder` adapter 负责 ACL device-to-host 拷贝、NV21 转 BGR、事件框绘制和 JPEG 编码。帧的取得、编码和释放仍由 `VideoStreamManager` 按原顺序完成：证据编码在 `MediaPipeline::release_output_frame` 之前同步执行；事件、截图格式、图像质量和失败时继续发布空证据的行为保持不变。
 
@@ -88,7 +88,7 @@ The layout mirrors the reference project’s plugin/manager/config responsibilit
 - MQTT aarch64 TLS client library 需由边缘构建打包提供；板端当前未发现 `libmosquitto` pkg-config，因此依赖交付为先决条件，不能用明文 MQTT 替代。
 - TLS 证书/凭据由激活/部署流程安全注入；设备服务重置不重新使用泄露或撤销身份。
 - 两个 systemd 单元均强制加载 `/etc/yunshao/cann.env`。该权限受限文件由运维基于板上 `/usr/local/Ascend/ascend-toolkit/set_env.sh` 准备，至少包含 `LD_LIBRARY_PATH` 及 CANN 算子/运行环境变量；服务不得依赖登录 shell、Conda 或运行时手工 `source`。
-- CANN 启动路径同样适用于直接调用的模型目录 CLI：CMake 从 `/etc/yunshao/cann.env` 读取 toolkit 与驱动库路径，为安装目标写入传递式 ELF `DT_RPATH`，以覆盖 AscendCL 的间接共享库依赖；`yunshao-agent model` 在 ACL 操作前加载同一环境文件。CMake 将产品 JSON 安装到程序默认读取的 `/etc/yunshao`，systemd 仍通过 `EnvironmentFile` 加载服务环境，不要求调用者在 shell 中拼接环境变量。
+- CANN 启动路径同样适用于直接调用的模型目录 CLI：CMake 从 `/etc/yunshao/cann.env` 读取 toolkit 与驱动库路径，为安装目标写入传递式 ELF `DT_RPATH`，以覆盖 AscendCL 的间接共享库依赖；`microvisspec-agent model` 在 ACL 操作前加载同一环境文件。CMake 将产品 JSON 安装到程序默认读取的 `/etc/yunshao`，systemd 仍通过 `EnvironmentFile` 加载服务环境，不要求调用者在 shell 中拼接环境变量。此处保留的目录为既有设备接口。
 - 两个 systemd 单元以 `yunshao` 非 root 身份运行，并显式加入 `video`、`HwHiAiUser`、`HwBaseUser` 设备组。产品 udev 规则将 `/dev/rgn` 授权给 `HwHiAiUser`，MODE 为 `0660`；不得放宽为任何用户可访问。该节点由设备驱动重建，部署须重新加载 udev 规则并对现有节点触发规则。
 - Atlas 310B4 实测表明 CANN/ACL 初始化依赖进程可见的主机文件系统与共享临时目录：在正式 runtime 的 systemd unit 中启用 `ProtectHome`、`PrivateTmp`、`ProtectSystem=full/strict` 或 `ReadWritePaths` 会导致 `aclInit` 返回 507008；保留 `NoNewPrivileges=true`、非 root 用户及硬件组，同时移除这些文件系统隔离设置后，service 成功处理固定 H.264 视频 75/75 帧。正式 runtime unit 不使用上述未兼容选项；未来若 CANN/驱动版本改变，需先在目标板验证再调整。
 - 2026-10-20 的 30 分钟 Atlas systemd 合成实时 UDP 测试保持 runtime active、0 次重启、RSS 约 375 MiB；来源发送端到时退出后，runtime 仍挂起等待。该结果证明长时进程 RSS 稳定，但暴露实时源读超时/服务恢复缺口；AC-05.2 要求为修复门禁。

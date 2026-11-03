@@ -59,7 +59,7 @@ public:
         : environment_(environment) {}
 
     ~EnvironmentPasswordWiper() {
-        const auto found = environment_.find("YUNSHAO_MQTT_PASSWORD");
+        const auto found = environment_.find("MICROVIS_MQTT_PASSWORD");
         if (found != environment_.end()) wipe(found->second);
     }
 
@@ -103,7 +103,7 @@ ActivationOptions parse_options(int argc, char** argv) {
     for (int index = 2; index < argc; ++index) {
         const std::string key = argv[index];
         if (key == "--help" || key == "-h") {
-            std::cout << "用法：sudo yunshao-agent activate --server https://<Atlas可达的云端地址> --device-id <UUID> [--api-ca <CA文件>] [--mqtt-ca <CA文件>] [--ticket-stdin]\n"
+            std::cout << "用法：sudo microvisspec-agent activate --server https://<Atlas可达的云端地址> --device-id <UUID> [--api-ca <CA文件>] [--mqtt-ca <CA文件>] [--ticket-stdin]\n"
                       << "默认从终端隐藏读取票据；--ticket-stdin 从标准输入读取，供受控的远程部署流程使用。\n";
             std::exit(0);
         }
@@ -181,8 +181,8 @@ std::string choose_ca(const std::string& explicit_path, const std::map<std::stri
     if (!explicit_path.empty()) return explicit_path;
     const auto found = existing.find(variable);
     if (found != existing.end() && !found->second.empty()) return found->second;
-    if (variable == "YUNSHAO_EDGE_API_CA") {
-        const auto mqtt = existing.find("YUNSHAO_MQTT_CA");
+    if (variable == "MICROVIS_EDGE_API_CA") {
+        const auto mqtt = existing.find("MICROVIS_MQTT_CA");
         if (mqtt != existing.end() && !mqtt->second.empty()) return mqtt->second;
     }
     return "/etc/yunshao/mqtt-ca.pem";
@@ -256,8 +256,8 @@ int activation_command(int argc, char** argv,
         const ActivationOptions options = parse_options(argc, argv);
         auto existing = activation_workflow.read_agent_environment();
         EnvironmentPasswordWiper existing_password_wiper(existing);
-        const std::string api_ca = choose_ca(options.api_ca, existing, "YUNSHAO_EDGE_API_CA");
-        const std::string mqtt_ca = choose_ca(options.mqtt_ca, existing, "YUNSHAO_MQTT_CA");
+        const std::string api_ca = choose_ca(options.api_ca, existing, "MICROVIS_EDGE_API_CA");
+        const std::string mqtt_ca = choose_ca(options.mqtt_ca, existing, "MICROVIS_MQTT_CA");
         if (::access(api_ca.c_str(), R_OK) != 0 || ::access(mqtt_ca.c_str(), R_OK) != 0) {
             throw std::runtime_error("找不到 TLS CA 文件；请先将受信任 CA 安装到 /etc/yunshao/mqtt-ca.pem，或通过参数指定");
         }

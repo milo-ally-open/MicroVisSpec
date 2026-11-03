@@ -7,10 +7,10 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(MICROVISSPEC_AGENT_ONLY "Build the agent target for remote first-time provisioning" OFF)
 
-set(YUNSHAO_CANN_ENV_FILE "/etc/yunshao/cann.env" CACHE FILEPATH
+set(MICROVIS_CANN_ENV_FILE "/etc/yunshao/cann.env" CACHE FILEPATH
   "CANN runtime environment file shared with systemd services")
-if(NOT DEFINED ASCEND_TOOLKIT_HOME AND EXISTS "${YUNSHAO_CANN_ENV_FILE}")
-  file(STRINGS "${YUNSHAO_CANN_ENV_FILE}" _cann_toolkit_home_line
+if(NOT DEFINED ASCEND_TOOLKIT_HOME AND EXISTS "${MICROVIS_CANN_ENV_FILE}")
+  file(STRINGS "${MICROVIS_CANN_ENV_FILE}" _cann_toolkit_home_line
     REGEX "^ASCEND_TOOLKIT_HOME=")
   if(_cann_toolkit_home_line)
     string(REGEX REPLACE "^ASCEND_TOOLKIT_HOME=" "" ASCEND_TOOLKIT_HOME
@@ -44,8 +44,8 @@ set(MICROVISSPEC_ASCEND_RUNTIME_LIB_DIRS
   "${ASCEND_TOOLKIT_HOME}/aarch64-linux/lib64"
   "${ASCEND_TOOLKIT_HOME}/lib64")
 set(_cann_configured_ld_library_path "")
-if(EXISTS "${YUNSHAO_CANN_ENV_FILE}")
-  file(STRINGS "${YUNSHAO_CANN_ENV_FILE}" _cann_ld_library_path_line
+if(EXISTS "${MICROVIS_CANN_ENV_FILE}")
+  file(STRINGS "${MICROVIS_CANN_ENV_FILE}" _cann_ld_library_path_line
     REGEX "^LD_LIBRARY_PATH=")
   if(_cann_ld_library_path_line)
     string(REGEX REPLACE "^LD_LIBRARY_PATH=" "" _cann_configured_ld_library_path
@@ -95,7 +95,7 @@ target_include_directories(edge_mqtt_transport_adapter PUBLIC include)
 target_link_libraries(edge_mqtt_transport_adapter PUBLIC PkgConfig::MOSQUITTO)
 target_compile_options(edge_mqtt_transport_adapter PRIVATE -Wall -Wextra -Wpedantic)
 
-add_executable(yunshao-agent
+add_executable(microvisspec-agent
   src/agent/agent.cpp
   src/agent/activation.cpp
   src/application/agent_activation_workflow.cpp
@@ -116,12 +116,12 @@ add_executable(yunshao-agent
   src/adapters/systemd_agent_service_lifecycle.cpp
   src/adapters/unix_agent_control_server.cpp)
 find_package(CURL REQUIRED)
-target_include_directories(yunshao-agent PRIVATE include "${NLOHMANN_JSON_INCLUDE_DIR}" "${ACL_INCLUDE_DIR}")
-target_link_libraries(yunshao-agent PRIVATE edge_core edge_event_outbox_adapter edge_mqtt_transport_adapter CURL::libcurl)
-target_compile_options(yunshao-agent PRIVATE -Wall -Wextra -Wpedantic)
-configure_ascend_runtime_rpath(yunshao-agent)
+target_include_directories(microvisspec-agent PRIVATE include "${NLOHMANN_JSON_INCLUDE_DIR}" "${ACL_INCLUDE_DIR}")
+target_link_libraries(microvisspec-agent PRIVATE edge_core edge_event_outbox_adapter edge_mqtt_transport_adapter CURL::libcurl)
+target_compile_options(microvisspec-agent PRIVATE -Wall -Wextra -Wpedantic)
+configure_ascend_runtime_rpath(microvisspec-agent)
 
-install(TARGETS yunshao-agent RUNTIME DESTINATION bin COMPONENT agent)
+install(TARGETS microvisspec-agent RUNTIME DESTINATION bin COMPONENT agent)
 install(FILES systemd/yunshao-agent.service DESTINATION lib/systemd/system COMPONENT agent)
 
 if(NOT MICROVISSPEC_AGENT_ONLY)
@@ -140,7 +140,7 @@ if(NOT MICROVISSPEC_AGENT_ONLY)
     INSTALL_RPATH_USE_LINK_PATH TRUE)
   target_link_options(model_classroom_behavior_detection PRIVATE -Wl,--disable-new-dtags)
 
-  add_executable(yunshao-classroom-runtime
+  add_executable(microvisspec-classroom-runtime
     src/main.cpp
     src/application/activation_lease_gate.cpp
     src/application/alarm_event_publisher.cpp
@@ -159,17 +159,17 @@ if(NOT MICROVISSPEC_AGENT_ONLY)
     src/media/media_pipeline.cpp
     src/media/rtsp_server.cpp
     src/media/region_osd.cpp)
-  target_include_directories(yunshao-classroom-runtime PRIVATE include "${NLOHMANN_JSON_INCLUDE_DIR}" "${ACL_INCLUDE_DIR}" "${ACL_DVPP_INCLUDE_DIR}" "${ACL_MEDIA_INCLUDE_DIR}" ${OpenCV_INCLUDE_DIRS})
-  target_compile_definitions(yunshao-classroom-runtime PRIVATE ENABLE_DVPP_INTERFACE)
-  target_link_libraries(yunshao-classroom-runtime PRIVATE edge_core dl pthread "${ASCENDCL_LIBRARY}" "${ASCEND_DVPP_MPI_LIBRARY}" "${ASCEND_VPSS_MPI_LIBRARY}" "${ASCEND_DVPP_LIBRARY}" ${OpenCV_LIBS} PkgConfig::FFMPEG PkgConfig::GSTREAMER)
-  target_compile_options(yunshao-classroom-runtime PRIVATE -O3 -Wall -Wextra -Wpedantic)
-  configure_ascend_runtime_rpath(yunshao-classroom-runtime)
+  target_include_directories(microvisspec-classroom-runtime PRIVATE include "${NLOHMANN_JSON_INCLUDE_DIR}" "${ACL_INCLUDE_DIR}" "${ACL_DVPP_INCLUDE_DIR}" "${ACL_MEDIA_INCLUDE_DIR}" ${OpenCV_INCLUDE_DIRS})
+  target_compile_definitions(microvisspec-classroom-runtime PRIVATE ENABLE_DVPP_INTERFACE)
+  target_link_libraries(microvisspec-classroom-runtime PRIVATE edge_core dl pthread "${ASCENDCL_LIBRARY}" "${ASCEND_DVPP_MPI_LIBRARY}" "${ASCEND_VPSS_MPI_LIBRARY}" "${ASCEND_DVPP_LIBRARY}" ${OpenCV_LIBS} PkgConfig::FFMPEG PkgConfig::GSTREAMER)
+  target_compile_options(microvisspec-classroom-runtime PRIVATE -O3 -Wall -Wextra -Wpedantic)
+  configure_ascend_runtime_rpath(microvisspec-classroom-runtime)
 
-  install(TARGETS yunshao-classroom-runtime RUNTIME DESTINATION bin COMPONENT runtime)
+  install(TARGETS microvisspec-classroom-runtime RUNTIME DESTINATION bin COMPONENT runtime)
   install(TARGETS model_classroom_behavior_detection LIBRARY DESTINATION lib/yunshao/plugins COMPONENT runtime)
   install(DIRECTORY config/ DESTINATION /etc/yunshao COMPONENT config)
   install(FILES systemd/yunshao-classroom-runtime.service DESTINATION lib/systemd/system COMPONENT runtime)
-  install(FILES udev/99-yunshao-rgn.rules DESTINATION /etc/udev/rules.d COMPONENT runtime)
+  install(FILES udev/99-microvisspec-rgn.rules DESTINATION /etc/udev/rules.d COMPONENT runtime)
 endif()
 
 include(CTest)

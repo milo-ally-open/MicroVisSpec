@@ -1,6 +1,6 @@
 # MicroVisSpec Atlas 200I DK A2 边缘运行时
 
-本目录是 MicroVisSpec 面向 Atlas 200I DK A2（Ascend 310B4）的可部署工程。C++ 源码命名空间使用 `microvis`。板端 systemd 单元、服务账号、配置路径、环境变量和命令目前沿用 `yunshao` 前缀，以兼容已部署设备；这些是运行接口标识，不是产品名称。产品运行时由两个 systemd 进程组成：`yunshao-agent` 管理设备身份、MQTT、模型目录和 SQLite 事件队列；`yunshao-classroom-runtime` 管理视频解码、模型插件、逐帧推理、OSD 和告警规则。两者共享本机配置及模型目录，通过 `/run/yunshao/agent.sock` 传递命中事件。模型后端通过 `IAIModel` 插件接口装载，Atlas 实现使用 AscendCL/DVPP，不依赖 AX650 SDK。
+本目录是 MicroVisSpec 面向 Atlas 200I DK A2（Ascend 310B4）的可部署工程。C++ 源码使用 `microvis` 命名空间，构建产物为 `microvisspec-agent` 和 `microvisspec-classroom-runtime`，systemd unit 的产品描述和 udev 规则使用 `MicroVisSpec` 名称。unit 文件名 `yunshao-agent.service`、`yunshao-classroom-runtime.service` 是为兼容已安装设备保留的系统接口。服务账号/组 `yunshao`、`/etc/yunshao` 与 `/var/lib/yunshao` 路径也暂时保留；新的 `MICROVIS_*` 环境变量优先读取，旧 `YUNSHAO_*` 变量继续作为回退。两进程共享本机配置及模型目录，通过 `/run/yunshao/agent.sock` 传递命中事件。模型后端通过 `IAIModel` 插件接口装载，Atlas 实现使用 AscendCL/DVPP，不依赖 AX650 SDK。
 
 ## 从 Demo 到产品运行时
 
@@ -75,13 +75,13 @@ Atlas RTSP 输出地址需由 media-service 所在网络实际可达。以板卡
 将清单和对应 OM 复制到 Atlas 后，以 `yunshao` 服务账号执行：
 
 ```bash
-sudo -u yunshao /usr/local/bin/yunshao-agent model install --manifest /path/to/model_classroom_behavior_detection.manifest.json --model /path/to/yolo11n_classroom_behavior_best.om
-sudo -u yunshao /usr/local/bin/yunshao-agent model status model_classroom_behavior_detection
+sudo -u yunshao /usr/local/bin/microvisspec-agent model install --manifest /path/to/model_classroom_behavior_detection.manifest.json --model /path/to/yolo11n_classroom_behavior_best.om
+sudo -u yunshao /usr/local/bin/microvisspec-agent model status model_classroom_behavior_detection
 ```
 
-`yunshao-agent model` 会自动读取 `/etc/yunshao/cann.env`；CMake 配置也从该文件取得 toolkit 与运行库路径。安装后的 ELF RPATH 解决进程启动前的共享库查找，因此无需在交互终端 `source set_env.sh` 或手动传递 `LD_LIBRARY_PATH`。systemd 服务仍通过各自的 `EnvironmentFile` 加载完整 CANN 环境。
+`microvisspec-agent model` 会自动读取 `/etc/yunshao/cann.env`；CMake 配置也从该文件取得 toolkit 与运行库路径。安装后的 ELF RPATH 解决进程启动前的共享库查找，因此无需在交互终端 `source set_env.sh` 或手动传递 `LD_LIBRARY_PATH`。systemd 服务仍通过各自的 `EnvironmentFile` 加载完整 CANN 环境。此 CANN 文件路径是旧设备安装接口，为保证现有设备可升级而保留。
 
-安装器核对 JSON、SHA-256、profile 类别顺序、输入尺寸、OM 格式和 SoC；再用 AscendCL 在目标设备试加载。通过后写入 `/var/lib/yunshao/models/models/{model_id}/{version}/`，最后原子切换 `active/{model_id}`。失败时保留原活动版本。回滚使用 `yunshao-agent model rollback <model_id>`。
+安装器核对 JSON、SHA-256、profile 类别顺序、输入尺寸、OM 格式和 SoC；再用 AscendCL 在目标设备试加载。通过后写入 `/var/lib/yunshao/models/models/{model_id}/{version}/`，最后原子切换 `active/{model_id}`。失败时保留原活动版本。回滚使用 `microvisspec-agent model rollback <model_id>`。
 
 ### 5. 构建和验证
 
@@ -94,7 +94,7 @@ cmake --build build -j2
 ctest --test-dir build --output-on-failure
 ```
 
-先用 `yunshao-classroom-runtime --check-config` 验证三份配置，再以授权 H.264 样例源运行指定 `--stream-id`。开启 `rtsp_output` 后，用 `ffprobe` 匿名读取 `rtsp://<atlas-ip>:<port>/<mount>` 并确认画面可解码，再由 media-service 使用单一 RTSP 地址注册为 MediaMTX 按需来源；未接入真实相机和云端播放前不得宣称端到端验收完成。模型文件大小/哈希和 Atlas 是否能加载可以由安装结果确认；完整 ONNX/OM 测试集精度对比按需运行 `03_model_val/`，不作为模型注册的前置步骤。
+先用 `microvisspec-classroom-runtime --check-config` 验证三份配置，再以授权 H.264 样例源运行指定 `--stream-id`。开启 `rtsp_output` 后，用 `ffprobe` 匿名读取 `rtsp://<atlas-ip>:<port>/<mount>` 并确认画面可解码，再由 media-service 使用单一 RTSP 地址注册为 MediaMTX 按需来源；未接入真实相机和云端播放前不得宣称端到端验收完成。模型文件大小/哈希和 Atlas 是否能加载可以由安装结果确认；完整 ONNX/OM 测试集精度对比按需运行 `03_model_val/`，不作为模型注册的前置步骤。
 
 开发依赖包（Debian/Ubuntu）包括 `libgstreamer1.0-dev`、`libgstreamer-plugins-base1.0-dev`、`libgstrtspserver-1.0-dev` 和 `gstreamer1.0-plugins-good`。运行镜像/板卡至少需提供 GStreamer core、app、RTSP server 库以及 `appsrc`、`rtph264pay` 插件。
 
@@ -107,7 +107,7 @@ ctest --test-dir build --output-on-failure
 - Atlas 已安装 CANN、运行依赖，且课堂模型已入库；检查命令应显示模型已安装并有活动版本：
 
   ```bash
-  sudo -u yunshao /usr/local/bin/yunshao-agent model status model_classroom_behavior_detection
+  sudo -u yunshao /usr/local/bin/microvisspec-agent model status model_classroom_behavior_detection
   ```
 
 - Windows 已安装 FFmpeg，`ffmpeg`、`ffplay` 可在终端直接运行；测试视频在仓库根目录 `video/classroom_behavior.mp4`。
@@ -142,7 +142,7 @@ sudo systemctl enable yunshao-agent.service
 编辑 `/etc/yunshao/classroom-runtime.env`，只加入本次测试的输入来源地址：
 
 ```text
-YUNSHAO_CAMERA_CLASSROOM_DEMO_URL=udp://0.0.0.0:5000
+MICROVIS_CAMERA_CLASSROOM_DEMO_URL=udp://0.0.0.0:5000
 ```
 
 保存后，在板端启动服务并检查日志：
@@ -184,15 +184,15 @@ ffmpeg -re -stream_loop -1 -i video/classroom_behavior.mp4 -map 0:v:0 -vf "scale
 
 使用云端创建的 `camera_id` UUID 填写 stream 的 `camera_id`，将登记时的稳定键填写为 `camera_key`。agent 用稳定键更新摄像头状态，事件用 UUID 关联云端资产。两者不能互相替代。
 
-网页下发告警配置时，agent 校验设备、算法、模型版本、规则字段及配置版本，并原子更新 `alarm_rules.json`。runtime 每秒检查配置，在实际处理视频帧后写入带时间的运行状态；agent 确认当前配置已被活动流加载，再发送应用回执。活动状态超过 10 秒未刷新时，不继续宣称算法正在运行。板端配置目录必须允许 `yunshao` 用户写入，例如复制三份 JSON 到 `/var/lib/yunshao/config` 并将两个服务环境中的 `YUNSHAO_AGENT_CONFIG_DIR` 都设为该目录。
+网页下发告警配置时，agent 校验设备、算法、模型版本、规则字段及配置版本，并原子更新 `alarm_rules.json`。runtime 每秒检查配置，在实际处理视频帧后写入带时间的运行状态；agent 确认当前配置已被活动流加载，再发送应用回执。活动状态超过 10 秒未刷新时，不继续宣称算法正在运行。板端配置目录必须允许 `yunshao` 用户写入，例如复制三份 JSON 到 `/var/lib/yunshao/config` 并将两个服务环境中的 `MICROVIS_AGENT_CONFIG_DIR` 都设为该目录。
 
-告警事件在 SQLite outbox 中保留本机路由信息，上报 MQTT 时转换为后端接受的事件字段。截图从触发告警的处理帧生成 JPEG，先保存在 `/var/lib/yunshao/evidence-outbox`；收到事件应用 ACK 后，通过 HTTPS PUT 上传截图，成功后删除本地待上传副本。JPEG 单张不超过 4 MiB，待上传目录限制 100 MiB。上传端点由 agent 环境变量 `YUNSHAO_EDGE_API_ORIGIN` 指定，例如 `https://172.20.10.4:19080`；沿用独立设备凭据校验 HTTPS；证书优先使用 `YUNSHAO_EDGE_API_CA`，未设置时回退到 `YUNSHAO_MQTT_CA`，不关闭证书校验。未设置 API Origin 时不尝试上传。
+告警事件在 SQLite outbox 中保留本机路由信息，上报 MQTT 时转换为后端接受的事件字段。截图从触发告警的处理帧生成 JPEG，先保存在 `/var/lib/yunshao/evidence-outbox`；收到事件应用 ACK 后，通过 HTTPS PUT 上传截图，成功后删除本地待上传副本。JPEG 单张不超过 4 MiB，待上传目录限制 100 MiB。上传端点由 agent 环境变量 `MICROVIS_EDGE_API_ORIGIN` 指定，例如 `https://172.20.10.4:19080`；沿用独立设备凭据校验 HTTPS；证书优先使用 `MICROVIS_EDGE_API_CA`，未设置时回退到 `MICROVIS_MQTT_CA`，不关闭证书校验。未设置 API Origin 时不尝试上传。
 
 构建截图上传需要 `libcurl4-openssl-dev` 和 OpenCV `imgcodecs`。边缘 CTest 在 Release 构建中保持断言启用，覆盖云端命令校验、重试幂等、失败时保留原配置，以及内部事件到上报合同的转换。
 
 RTSP 输出会在无人观看时保留 H.264 SPS/PPS，并在后续 IDR 前附带参数集。网页或其他播放器可以在推理已经运行后加入，无需重新推送整个测试视频。
 
-- systemd 单元在 `systemd/`；CANN 运行库与算子路径由必需的 `/etc/yunshao/cann.env` 提供，主机身份、MQTT TLS 参数、HTTPS API Origin 和视频源 URL 分别由 `/etc/yunshao/agent.env`、`/etc/yunshao/classroom-runtime.env` 注入；用户激活/续期由网页发起，agent 以 `YUNSHAO_EDGE_API_ORIGIN` 和当前设备凭据轮询领取新租期及 MQTT 凭据，无需用户登录板端。轮换凭据保存在 `/var/lib/yunshao/activation.env`，由 systemd 后置 EnvironmentFile 加载；该文件不进入浏览器或 Git。首次接入时，园区用户可在设备详情页输入管理员提供的 SSH 用户名和密码；device-service 通过登记 IP 执行固定的 agent-only 部署及网页激活，任务结束后不会保存 SSH 密码。设备需预先安装 Atlas 驱动/CANN、开启 SSH 和 systemd，并能连通云端 HTTPS/MQTT。`cann.env` 必须从目标板已安装的 CANN 环境生成，权限设为 `root:yunshao 0640`；CMake 从此文件读取 toolkit 与运行库路径，安装二进制写入对应 RPATH；`yunshao-agent model` 在执行 ACL 操作前也会读取该文件。不要依赖登录 shell、Conda 或手工导出环境变量。CMake 安装会更新 `/etc/yunshao` 中的工程 JSON 配置，但不覆盖环境文件；保留板上对 JSON 的本地定制时，应在升级前备份并在安装后合并。Atlas CANN/ACL 当前不能与 runtime unit 的 `ProtectHome`、`PrivateTmp`、`ProtectSystem`、`ReadWritePaths` 文件系统隔离选项共同工作；这些选项须先在目标板通过 CANN 初始化及固定视频处理验收。unit 仍以非 root `yunshao` 运行，保留 `NoNewPrivileges=true` 并加入 `video`、`HwHiAiUser`、`HwBaseUser` 组。安装包提供 `udev/99-yunshao-rgn.rules`，将 `/dev/rgn` 设为 `root:HwHiAiUser 0660`；安装后重载 udev 规则并触发现有 `rgn` 节点，然后重启服务。`agent.env` 中的 `YUNSHAO_MQTT_CLIENT_ID` 必须使用 device-service 激活响应的原值，不能从 device_id 本地派生；MQTT 用户名、密码和 CA 同样来自激活/部署流程。Atlas 的 RTSP 输出不使用这些 MQTT 凭据，也无需额外配置用户名或密码。
+- systemd 单元在 `systemd/`；CANN 运行库与算子路径由必需的 `/etc/yunshao/cann.env` 提供，主机身份、MQTT TLS 参数、HTTPS API Origin 和视频源 URL 分别由 `/etc/yunshao/agent.env`、`/etc/yunshao/classroom-runtime.env` 注入；用户激活/续期由网页发起，agent 以 `MICROVIS_EDGE_API_ORIGIN` 和当前设备凭据轮询领取新租期及 MQTT 凭据，无需用户登录板端。轮换凭据保存在 `/var/lib/yunshao/activation.env`，由 systemd 后置 EnvironmentFile 加载；该文件不进入浏览器或 Git。首次接入时，园区用户可在设备详情页输入管理员提供的 SSH 用户名和密码；device-service 通过登记 IP 执行固定的 agent-only 部署及网页激活，任务结束后不会保存 SSH 密码。设备需预先安装 Atlas 驱动/CANN、开启 SSH 和 systemd，并能连通云端 HTTPS/MQTT。`cann.env` 必须从目标板已安装的 CANN 环境生成，权限设为 `root:yunshao 0640`；CMake 从此文件读取 toolkit 与运行库路径，安装二进制写入对应 RPATH；`microvisspec-agent model` 在执行 ACL 操作前也会读取该文件。不要依赖登录 shell、Conda 或手工导出环境变量。CMake 安装会更新 `/etc/yunshao` 中的工程 JSON 配置，但不覆盖环境文件；保留板上对 JSON 的本地定制时，应在升级前备份并在安装后合并。Atlas CANN/ACL 当前不能与 runtime unit 的 `ProtectHome`、`PrivateTmp`、`ProtectSystem`、`ReadWritePaths` 文件系统隔离选项共同工作；这些选项须先在目标板通过 CANN 初始化及固定视频处理验收。unit 仍以非 root `yunshao` 运行，保留 `NoNewPrivileges=true` 并加入 `video`、`HwHiAiUser`、`HwBaseUser` 组。安装包提供 `udev/99-microvisspec-rgn.rules`，将 `/dev/rgn` 设为 `root:HwHiAiUser 0660`；安装后重载 udev 规则并触发现有 `rgn` 节点，然后重启服务。`agent.env` 中的 `MICROVIS_MQTT_CLIENT_ID` 必须使用 device-service 激活响应的原值，不能从 device_id 本地派生；MQTT 用户名、密码和 CA 同样来自激活/部署流程。Atlas 的 RTSP 输出不使用这些 MQTT 凭据，也无需额外配置用户名或密码。
 - 模型 profile、流绑定、告警规则分别维护在 `config/models.json`、`config/streams_config.json`、`config/alarm_rules.json`。secret 不写入这些 JSON。
 - `max_loaded_models` 默认 1。只有目标板多模型驻留、内存、延迟和稳定性验证通过后，才提高上限。
 - 关键验证见 [Atlas 边缘运行时 Spec](../../docs/Specification/atlas_edge_runtime/spec.md) 与 [课堂行为检测 Spec](../../docs/Specification/classroom_behavior_detection/spec.md)。

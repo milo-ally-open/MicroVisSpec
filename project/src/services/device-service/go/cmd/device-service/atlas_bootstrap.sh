@@ -76,7 +76,7 @@ ensure_service_user() {
   install -D -m 0644 "$source_dir/systemd/yunshao-agent.service" /usr/local/lib/systemd/system/yunshao-agent.service
 }
 
-if [ ! -x /usr/local/bin/yunshao-agent ] || ! /usr/local/bin/yunshao-agent activate --help 2>&1 | grep -q -- '--ticket-stdin'; then
+if [ ! -x /usr/local/bin/microvisspec-agent ] || ! /usr/local/bin/microvisspec-agent activate --help 2>&1 | grep -q -- '--ticket-stdin'; then
   printf '__MICROVISSPEC_STAGE:installing_agent__\n'
   if ! command -v apt-get >/dev/null 2>&1; then
     printf '__MICROVISSPEC_ERROR:package_manager_unsupported__\n'
@@ -88,7 +88,7 @@ if [ ! -x /usr/local/bin/yunshao-agent ] || ! /usr/local/bin/yunshao-agent activ
     exit 37
   fi
   if ! cmake -S "$source_dir" -B "$build_dir" -DCMAKE_BUILD_TYPE=Release -DMICROVISSPEC_AGENT_ONLY=ON -DBUILD_TESTING=OFF >/dev/null 2>&1 ||
-     ! cmake --build "$build_dir" --target yunshao-agent -j2 >/dev/null 2>&1 ||
+     ! cmake --build "$build_dir" --target microvisspec-agent -j2 >/dev/null 2>&1 ||
      ! cmake --install "$build_dir" --prefix /usr/local --component agent >/dev/null 2>&1; then
     printf '__MICROVISSPEC_ERROR:agent_build_failed__\n'
     exit 38
@@ -121,7 +121,7 @@ mv -f "$work_dir/mqtt-ca.pem.install" /etc/yunshao/mqtt-ca.pem
 printf '__MICROVISSPEC_STAGE:activating__\n'
 printf '__MICROVISSPEC_TICKET_INPUT__\n'
 IFS= read -r activation_ticket || { printf '__MICROVISSPEC_ERROR:activation_ticket_missing__\n'; exit 43; }
-if ! printf '%s\n' "$activation_ticket" | /usr/local/bin/yunshao-agent activate \
+if ! printf '%s\n' "$activation_ticket" | /usr/local/bin/microvisspec-agent activate \
   --server "$server_origin" \
   --device-id "$device_id" \
   --api-ca /etc/yunshao/api-ca.pem \

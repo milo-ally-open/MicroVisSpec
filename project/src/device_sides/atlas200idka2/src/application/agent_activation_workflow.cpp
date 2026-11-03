@@ -91,7 +91,7 @@ public:
     explicit EnvironmentPasswordWiper(ports::AgentConfigurationStore::Environment& environment)
         : environment_(environment) {}
     ~EnvironmentPasswordWiper() {
-        const auto found = environment_.find("YUNSHAO_MQTT_PASSWORD");
+        const auto found = environment_.find("MICROVIS_MQTT_PASSWORD");
         if (found != environment_.end()) wipe(found->second);
     }
 
@@ -117,16 +117,16 @@ void AgentActivationWorkflow::apply_cli_grant(AgentActivationGrant grant, const 
 
     ports::AgentConfigurationStore::Environment updates;
     EnvironmentPasswordWiper password_wiper(updates);
-    updates.emplace("YUNSHAO_DEVICE_ID", grant.device_id);
-    updates.emplace("YUNSHAO_EDGE_API_ORIGIN", grant.server_origin);
-    updates.emplace("YUNSHAO_MQTT_HOST", endpoint.host);
-    updates.emplace("YUNSHAO_MQTT_PORT", endpoint.port);
-    updates.emplace("YUNSHAO_MQTT_CLIENT_ID", grant.mqtt_client_id);
-    updates.emplace("YUNSHAO_MQTT_USERNAME", grant.mqtt_username);
-    updates.emplace("YUNSHAO_MQTT_PASSWORD", grant.mqtt_password.value);
-    updates.emplace("YUNSHAO_EDGE_API_CA", api_ca_path);
-    updates.emplace("YUNSHAO_MQTT_CA", grant.mqtt_ca_path);
-    updates.emplace("YUNSHAO_ACTIVATION_EXPIRES_AT",
+    updates.emplace("MICROVIS_DEVICE_ID", grant.device_id);
+    updates.emplace("MICROVIS_EDGE_API_ORIGIN", grant.server_origin);
+    updates.emplace("MICROVIS_MQTT_HOST", endpoint.host);
+    updates.emplace("MICROVIS_MQTT_PORT", endpoint.port);
+    updates.emplace("MICROVIS_MQTT_CLIENT_ID", grant.mqtt_client_id);
+    updates.emplace("MICROVIS_MQTT_USERNAME", grant.mqtt_username);
+    updates.emplace("MICROVIS_MQTT_PASSWORD", grant.mqtt_password.value);
+    updates.emplace("MICROVIS_EDGE_API_CA", api_ca_path);
+    updates.emplace("MICROVIS_MQTT_CA", grant.mqtt_ca_path);
+    updates.emplace("MICROVIS_ACTIVATION_EXPIRES_AT",
                      grant.activation_expires_at.value_or(std::string{}));
 
     configuration_store_.write_agent_environment(std::move(updates));
@@ -141,14 +141,14 @@ AgentActivationResult AgentActivationWorkflow::apply_polled_grant(AgentActivatio
 
     ports::AgentConfigurationStore::Environment overlay;
     EnvironmentPasswordWiper password_wiper(overlay);
-    overlay.emplace("YUNSHAO_DEVICE_ID", grant.device_id);
-    overlay.emplace("YUNSHAO_EDGE_API_ORIGIN", grant.server_origin);
-    overlay.emplace("YUNSHAO_MQTT_HOST", endpoint.host);
-    overlay.emplace("YUNSHAO_MQTT_PORT", endpoint.port);
-    overlay.emplace("YUNSHAO_MQTT_CLIENT_ID", grant.mqtt_client_id);
-    overlay.emplace("YUNSHAO_MQTT_USERNAME", grant.mqtt_username);
-    overlay.emplace("YUNSHAO_MQTT_PASSWORD", grant.mqtt_password.value);
-    overlay.emplace("YUNSHAO_MQTT_CA", grant.mqtt_ca_path);
+    overlay.emplace("MICROVIS_DEVICE_ID", grant.device_id);
+    overlay.emplace("MICROVIS_EDGE_API_ORIGIN", grant.server_origin);
+    overlay.emplace("MICROVIS_MQTT_HOST", endpoint.host);
+    overlay.emplace("MICROVIS_MQTT_PORT", endpoint.port);
+    overlay.emplace("MICROVIS_MQTT_CLIENT_ID", grant.mqtt_client_id);
+    overlay.emplace("MICROVIS_MQTT_USERNAME", grant.mqtt_username);
+    overlay.emplace("MICROVIS_MQTT_PASSWORD", grant.mqtt_password.value);
+    overlay.emplace("MICROVIS_MQTT_CA", grant.mqtt_ca_path);
     configuration_store_.write_activation_overlay(std::move(overlay));
 
     try {
@@ -180,8 +180,8 @@ void AgentActivationWorkflow::validate_grant(const AgentActivationGrant& grant,
             return std::isalnum(ch) || ch == '-' || ch == '_';
         });
     if (!grant.tls_required || grant.protocol_version != "3.1.1" ||
-        grant.mqtt_client_id != "yunshao-edge-" + compact_id ||
-        grant.mqtt_username != "yunshao-device-" + compact_id || !valid_password) {
+        grant.mqtt_client_id != "microvisspec-edge-" + compact_id ||
+        grant.mqtt_username != "microvisspec-device-" + compact_id || !valid_password) {
         throw std::runtime_error(error_message);
     }
 }

@@ -47,11 +47,11 @@ func LoadConfig() (Config, error) {
 	c := Config{
 		DatabaseURL:          read("DATABASE_URL"),
 		ListenAddress:        env("EVENT_LISTEN_ADDRESS", ":8080"),
-		EvidenceDir:          env("EVENT_EVIDENCE_DIR", "/var/lib/yunshao/evidence"),
+		EvidenceDir:          env("EVENT_EVIDENCE_DIR", "/var/lib/microvisspec/evidence"),
 		BrokerURL:            env("MQTT_BROKER_URL", "ssl://mosquitto:8883"),
 		BrokerUsername:       read("MQTT_EVENT_SERVICE_USERNAME"),
 		BrokerPassword:       read("MQTT_EVENT_SERVICE_PASSWORD"),
-		BrokerClientID:       env("MQTT_EVENT_SERVICE_CLIENT_ID", "yunshao-event-service"),
+		BrokerClientID:       env("MQTT_EVENT_SERVICE_CLIENT_ID", "microvisspec-event-service"),
 		BrokerCAFile:         os.Getenv("MQTT_CA_FILE"),
 		BrokerClientCertFile: os.Getenv("MQTT_CLIENT_CERT_FILE"),
 		BrokerClientKeyFile:  os.Getenv("MQTT_CLIENT_KEY_FILE"),

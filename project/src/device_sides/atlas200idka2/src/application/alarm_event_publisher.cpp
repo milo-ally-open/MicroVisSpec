@@ -13,7 +13,7 @@ AlarmEventPublisher::AlarmEventPublisher(ports::AlarmEventSink& event_outbox,
 nlohmann::json AlarmEventPublisher::publish(const AlarmEventData& data,
                                             const std::vector<unsigned char>& jpeg) {
     if (data.device_id.empty()) {
-        throw std::runtime_error("YUNSHAO_DEVICE_ID is required before enabling any alarm rule");
+        throw std::runtime_error("MICROVIS_DEVICE_ID is required before enabling any alarm rule");
     }
 
     const std::string event_id = event_metadata_.new_event_id();

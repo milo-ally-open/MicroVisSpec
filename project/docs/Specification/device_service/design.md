@@ -49,7 +49,7 @@ device schema 由本服务独占；激活票据一次性；MQTT ACL 按设备隔
 
 - **决定**：设备详情页先获取登记设备 SSH 主机指纹并要求用户确认，再由 device-service 通过 SSH 执行固定 bootstrap 流程。只允许设备自身记录中的私网 IP、TCP/22 和部署 allowlist；不提供任意主机、命令或端口。
 - **认证与秘密处理**：浏览器通过同源 HTTPS 传递 SSH 用户名/密码；device-service 不写请求体日志、不持久化密码，SSH 密码只作为 SSH password authentication 内存参数。激活票据只进入 SSH 标准输入；API/MQTT CA 来源于部署机密。任务表仅保存阶段和安全结果。SSH host key 首次成功认证后固定到设备记录，后续变化默认拒绝。
-- **安装策略**：device-service 镜像随附 Atlas 目录的源码包。目标板若没有 agent，在 Atlas CANN 已安装且配置完整的前提下，远程安装必要的 agent 构建依赖并构建 `YUNSHAO_AGENT_ONLY` target；不覆盖既有 `/etc/yunshao` 配置。若缺少不可由包管理器提供的 CANN SDK，任务失败并指出需修复板端 CANN 环境。
+- **安装策略**：device-service 镜像随附 Atlas 目录的源码包。目标板若没有 agent，在 Atlas CANN 已安装且配置完整的前提下，远程安装必要的 agent 构建依赖并构建 `MICROVISSPEC_AGENT_ONLY` target，安装 `microvisspec-agent`；不覆盖既有 `/etc/yunshao` 配置。若缺少不可由包管理器提供的 CANN SDK，任务失败并指出需修复板端 CANN 环境。
 - **任务与恢复**：使用只含非敏感字段的持久任务行跟踪异步步骤；每台设备同一时间仅有一个任务。阶段错误采用固定错误码，不存储任意 SSH stderr。远端压缩包/CA 临时文件经 trap 清理；任务失败保留已安装 agent，允许重新提交并签发新票据。
 - **部署影响**：device-service 发布为单个 Go 二进制，由 systemd 管理；需要配置 Atlas HTTPS activation Origin、允许的 SSH CIDR、Web HTTPS CA 文件和 MQTT CA 文件。首次接入按已登记 IP 连接固定 TCP/22；业务用户只提供管理员给的设备登录密码，服务端不保存密码。
 

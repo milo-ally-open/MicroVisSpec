@@ -79,7 +79,7 @@ func hashOpaque(value string) string {
 
 func activationPassword(key string, deviceID, ticketID uuid.UUID) string {
 	mac := hmac.New(sha256.New, []byte(key))
-	_, _ = mac.Write([]byte("yunshao-edge-activation-v1\x00" + deviceID.String() + "\x00" + ticketID.String()))
+	_, _ = mac.Write([]byte("microvisspec-edge-activation-v1\x00" + deviceID.String() + "\x00" + ticketID.String()))
 	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 }
 
@@ -576,10 +576,10 @@ var (
 )
 
 func brokerUsername(deviceID uuid.UUID) string {
-	return "yunshao-device-" + strings.ReplaceAll(deviceID.String(), "-", "")
+	return "microvisspec-device-" + strings.ReplaceAll(deviceID.String(), "-", "")
 }
 func brokerClientID(deviceID uuid.UUID) string {
-	return "yunshao-edge-" + strings.ReplaceAll(deviceID.String(), "-", "")
+	return "microvisspec-edge-" + strings.ReplaceAll(deviceID.String(), "-", "")
 }
 
 func marshalJSON(value any) json.RawMessage {

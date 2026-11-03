@@ -11,6 +11,7 @@
 #include <iostream>
 #include <memory>
 #include <stdexcept>
+#include <string_view>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -19,6 +20,17 @@ namespace microvis {
 namespace {
 
 struct LetterboxInfo { float scale; int left; int top; };
+
+const char* environment_value(const char* name) {
+    const char* value = std::getenv(name);
+    if (value && *value) return value;
+    constexpr std::string_view prefix = "MICROVIS_";
+    if (std::string_view(name).compare(0, prefix.size(), prefix) == 0) {
+        const auto legacy_name = "YUNSHAO_" + std::string(name).substr(prefix.size());
+        value = std::getenv(legacy_name.c_str());
+    }
+    return value;
+}
 
 LetterboxInfo letterbox_for(int width, int height, int target_width, int target_height) {
     const float scale = std::min(static_cast<float>(target_width) / width,
@@ -51,7 +63,7 @@ void VideoStreamManager::run(const StreamProfile& stream, const std::string& inp
     Json command = Json::object();
     auto next_refresh = std::chrono::steady_clock::time_point{};
     bool rules_ready = true;
-    const char* state_env = std::getenv("YUNSHAO_RUNTIME_STATE_DIR");
+    const char* state_env = environment_value("MICROVIS_RUNTIME_STATE_DIR");
     const auto state_path = std::filesystem::path(state_env && *state_env ? state_env : "/run/yunshao/runtime") / (stream.stream_id + ".json");
     inference_.load(model_profile);
     const double confidence_threshold = stream.confidence_threshold.value_or(model_profile.confidence_threshold);

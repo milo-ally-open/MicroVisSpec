@@ -40,7 +40,7 @@ int main() {
     ModelManifest::validate_against_profile(non_classroom, config.require_model("model_room_occupancy_detection"));
 
     const auto root = std::filesystem::temp_directory_path() /
-        ("yunshao-agent-test-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+        ("microvisspec-agent-test-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     std::filesystem::create_directories(root);
     const auto db_path = root / "agent.db";
     SQLiteEventOutbox outbox(db_path, "device-test", config);
