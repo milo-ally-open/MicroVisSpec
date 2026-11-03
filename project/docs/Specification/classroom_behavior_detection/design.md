@@ -4,9 +4,9 @@
 
 ## 当前实现与目标
 
-- 模型准备目录 `project/preparation/model_classroom_behavior/` 保存 YOLO11n/640 训练/导出资料、PT、ONNX、Ascend 310B4 OM 及模型清单。`model_deployment/` 另提供独立 C++/AscendCL 视频验收 demo；它复用车辆/仓储流程的 VDEC、VPSS、AIPP、ACL、Region OSD 和 VENC 路径，不管理产品模型 catalog。OM SHA-256 已与运行时清单核对并安装到 Atlas；正式非 root runtime 已对合成 H.264 完成 75/75 帧推理/OSD/编码；课堂模型 demo 源码恢复后的板端重新构建与真实课堂流仍待验收。
+- 模型准备目录 `project/preparation/model_classroom_behavior/` 保存 YOLO11n/640 训练/导出资料、PT、ONNX、Ascend 310B4 OM 及模型清单。`04_model_demo/` 另提供独立 C++/AscendCL 视频验收 demo；它复用车辆/仓储流程的 VDEC、VPSS、AIPP、ACL、Region OSD 和 VENC 路径，不管理产品模型 catalog。OM SHA-256 已与运行时清单核对并安装到 Atlas；正式非 root runtime 已对合成 H.264 完成 75/75 帧推理/OSD/编码；课堂模型 demo 源码恢复后的板端重新构建与真实课堂流仍待验收。
 - 正式边缘代码 `project/src/device_sides/atlas200idka2/` 已包含 agent、模型包校验/outbox、课堂推理 runtime、`ModelClassroomBehaviorDetection` 插件及媒体 pipeline；Atlas 交叉编译和现有配置/插件身份 CTest 已通过。
-- 目标为同一 Atlas 工程树内包含可构建的 `agent`、`classroom-runtime`、共享 model catalog 和持久事件缓存。组织方式借鉴 [device_side_ax650](https://gitee.com/milo-ally-intern/manhole-cover-detection/tree/master/model_deployment/device_side_ax650)：稳定模型插件 ABI、manager/pipeline、逐流模型绑定和独立告警 JSON；AX650 的 AX Engine/AX SYS/视频接口不得复制，Atlas 插件和媒体 pipeline 使用 AscendCL/DVPP。模型包目录、校验、按 model_id 独立激活和回滚沿用 [Atlas 边缘运行时设计](../atlas_edge_runtime/design.md)。
+- 目标为同一 Atlas 工程树内包含可构建的 `agent`、`classroom-runtime`、共享 model catalog 和持久事件缓存。组织方式借鉴 [device_side_ax650](https://gitee.com/milo-ally-intern/manhole-cover-detection/tree/master/04_model_demo/device_side_ax650)：稳定模型插件 ABI、manager/pipeline、逐流模型绑定和独立告警 JSON；AX650 的 AX Engine/AX SYS/视频接口不得复制，Atlas 插件和媒体 pipeline 使用 AscendCL/DVPP。模型包目录、校验、按 model_id 独立激活和回滚沿用 [Atlas 边缘运行时设计](../atlas_edge_runtime/design.md)。
 
 ## 方案
 
@@ -30,7 +30,7 @@ flowchart LR
 
 ### preparation 独立验收 demo
 
-`model_classroom_behavior/model_deployment/` 保留独立 CLI 工程：`src/main.cpp` 负责 OM 加载、YOLO 输出解码、按 labels 类别数校验和帧循环；`src/include/media_pipeline.hpp` 负责 H.264 demux、Atlas VDEC/VPSS、静态 NV21 AIPP 输入路径和 H.264 VENC 输出；`src/include/region_osd.hpp` 负责 VPSS Region 叠加。`classes.txt` 的行顺序必须与模型训练类别顺序一致。其输入/输出和阈值由 CLI 指定，结果只用于模型部署调试，不发布业务事件、不读取 active model symlink，也不替代 systemd `classroom-runtime`。训练、导出、转换、构建、烟测和评估 SOP 分别保存在各模型对应阶段目录的 README.md。
+`model_classroom_behavior/04_model_demo/` 保留独立 CLI 工程：`src/main.cpp` 负责 OM 加载、YOLO 输出解码、按 labels 类别数校验和帧循环；`src/include/media_pipeline.hpp` 负责 H.264 demux、Atlas VDEC/VPSS、静态 NV21 AIPP 输入路径和 H.264 VENC 输出；`src/include/region_osd.hpp` 负责 VPSS Region 叠加。`classes.txt` 的行顺序必须与模型训练类别顺序一致。其输入/输出和阈值由 CLI 指定，结果只用于模型部署调试，不发布业务事件、不读取 active model symlink，也不替代 systemd `classroom-runtime`。训练、导出、转换、构建、烟测和评估 SOP 分别保存在各模型对应阶段目录的 README.md。
 
 ## 接口和数据
 
@@ -61,7 +61,7 @@ flowchart LR
 
 - MQTT C/C++ 库可用性及加密配置方式：Atlas 上核验。
 - Atlas 的实时输入/叠加视频 RTSP 发布目标与性能：实机原型确认。
-- `[待验收]` 获取真实授权课堂视频/RTSP 并验证摄像头重连、MediaMTX 发布和持续资源；现有 model-only 与 synthetic media pipeline 基准见 `model_val/reports/release_20261019/` 和 `release_20261020/atlas_runtime_smoke.json`。完整测试集精度对比不作为当前运行时集成的前置要求。
+- `[待验收]` 获取真实授权课堂视频/RTSP 并验证摄像头重连、MediaMTX 发布和持续资源；现有 model-only 与 synthetic media pipeline 基准见 `03_model_val/reports/release_20261019/` 和 `release_20261020/atlas_runtime_smoke.json`。完整测试集精度对比不作为当前运行时集成的前置要求。
 
 ## 变更记录
 

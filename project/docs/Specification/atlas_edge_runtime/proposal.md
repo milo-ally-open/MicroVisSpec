@@ -7,7 +7,7 @@
 
 ## 背景与问题
 
-设备侧目录 `project/src/device_sides/atlas200idka2/` 只有占位；现有课堂 C++/AscendCL Demo 位于 `project/preparation/model_classroom_behavior/model_deployment/`，其 CLI 处理视频并输出检测叠加，但没有常驻服务生命周期、云端身份、配置同步或事件断网重传。首发需将 Atlas 200I DK A2 接入云端 device/event/media/push 服务，同时保持用户控制告警类别、初始全部关闭。
+设备侧目录 `project/src/device_sides/atlas200idka2/` 只有占位；现有课堂 C++/AscendCL Demo 位于 `project/preparation/model_classroom_behavior/04_model_demo/`，其 CLI 处理视频并输出检测叠加，但没有常驻服务生命周期、云端身份、配置同步或事件断网重传。首发需将 Atlas 200I DK A2 接入云端 device/event/media/push 服务，同时保持用户控制告警类别、初始全部关闭。
 
 ## 目标与成功观察
 
@@ -24,7 +24,7 @@
 - Atlas 设备激活、独立凭据、心跳、命令/配置版本 ACK、健康状态和安全日志。
 - 本地模型目录、清单、哈希校验、暂存安装、活动版本切换与回滚；模型行为及课堂规则详见课堂检测组。
 - 将 AscendCL classroom-runtime、YOLO 后处理与 Atlas 视频/OSD 处理代码并入 `src/device_sides/atlas200idka2/` 正式边缘工程；从 `preparation/` 迁入后按模块组织，准备目录只保留实验/转换和验收工具。
-- 参考 [device_side_ax650](https://gitee.com/milo-ally-intern/manhole-cover-detection/tree/master/model_deployment/device_side_ax650) 的插件式 AI 接口、manager 分层、按视频流配置模型和独立告警规则组织边缘应用；硬件后端使用 Atlas/CANN/AscendCL，不复用 AX650 的芯片 API。
+- 参考 [device_side_ax650](https://gitee.com/milo-ally-intern/manhole-cover-detection/tree/master/04_model_demo/device_side_ax650) 的插件式 AI 接口、manager 分层、按视频流配置模型和独立告警规则组织边缘应用；硬件后端使用 Atlas/CANN/AscendCL，不复用 AX650 的芯片 API。
 - 多模型 `config/models.json` profiles、`config/streams_config.json` 流绑定及 `config/alarm_rules.json` 规则配置；按 model_id 隔离模型版本及推理参数。初始只配置已定首发的课堂 YOLO11n，所有告警规则关闭。
 - agent 与本机 AscendCL 推理进程通过受限 IPC 通信；两个设备进程均由 systemd 管理，支持独立重启与状态检查。
 - MQTT QoS 1 事件传输、应用 ACK、磁盘持久队列、重连补传和证据 HTTPS 上传。

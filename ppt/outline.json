@@ -60,7 +60,7 @@
       "lead": "首发以教室行为验证边缘运行时",
       "body": "举手、阅读、书写三类行为\n\n既有板端合成流测试：\n短测 75 / 75 帧\n长测 8997 / 9000 帧\n\n真实摄像头、完整媒体链路\n与精度仍待验收",
       "caption": "场景示意图；板端数据来自既有验收记录，非本轮实测",
-      "source": "project/docs/Specification/classroom_behavior_detection/tasks.md；project/preparation/model_classroom_behavior/model_val/reports/release_20261020/atlas_runtime_smoke.json；atlas_runtime_sustained.json；readme/assets/classroom-behavior-detection.png"
+      "source": "project/docs/Specification/classroom_behavior_detection/tasks.md；project/preparation/model_classroom_behavior/03_model_val/reports/release_20261020/atlas_runtime_smoke.json；atlas_runtime_sustained.json；readme/assets/classroom-behavior-detection.png"
     },
     {
       "title": "异常事件查询",

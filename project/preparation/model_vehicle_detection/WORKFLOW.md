@@ -1,11 +1,10 @@
-# 车辆检测阶段索引
+# 车辆检测研发工作流
+本模型遵循[单模型标准研发流程](../README.md)，目录按 01 到 04 四阶段组织。
 
-本文件只用于定位各阶段 SOP。复现命令、输入、产物与验收记录以阶段目录内的 README.md 为准；模型根目录不设置总 README。
+本模型按统一的四阶段研发目录组织。复现命令、输入、产物与验收记录以各阶段 README 为准。
+- 数据分析、训练与 PyTorch 验证：[01_model_train/README.md](01_model_train/README.md)
+- ONNX 导出与 Atlas ATC 转换：[02_model_convert/README.md](02_model_convert/README.md)（导出细节见 [EXPORT.md](02_model_convert/EXPORT.md)）
+- ONNX/OM 精度、性能和内存评估：[03_model_val/README.md](03_model_val/README.md)
+- Atlas H.264 最小视频 Demo：[04_model_demo/README.md](04_model_demo/README.md)
 
-- 数据下载、分析、训练和 PyTorch 验证：[model_train/README.md](model_train/README.md)
-- 固定输入 ONNX 导出：[model_export/README.md](model_export/README.md)
-- Atlas 310B4 ATC 转换：[model_convert/README.md](model_convert/README.md)
-- ONNX/OM 精度、性能、内存评估：[model_val/README.md](model_val/README.md)
-- Atlas H.264 部署验收 demo：[model_deployment/README.md](model_deployment/README.md)
-
-固定数据来源、硬件约束、环境和完整追溯要求见对应阶段 SOP；已有历史指标不是本次重新评估结果。
+固定数据来源、硬件约束、环境和追溯要求见对应阶段 SOP；已有历史指标不代表本次重新评估结果。

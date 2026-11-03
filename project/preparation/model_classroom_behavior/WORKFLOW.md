@@ -1,4 +1,6 @@
 # 课堂行为检测模型工作流
+本模型遵循[单模型标准研发流程](../README.md)，目录按 01 到 04 四阶段组织。
+
 
 本目录负责课堂行为检测模型。首版任务为单模型、多类别目标检测：识别 `hand-raising`、`reading`、`writing`。模型只输出行为类别、边界框和置信度，不推断学生身份、成绩或“专注度”。
 
@@ -31,43 +33,43 @@ WSL 无法联网时可使用本目录的 [`WINDOWS_GPU_SETUP.md`](WINDOWS_GPU_SE
 ```powershell
 $env:ROBOFLOW_API_KEY = [Environment]::GetEnvironmentVariable('ROBOFLOW_API_KEY', 'User')
 if (-not $env:ROBOFLOW_API_KEY) { throw 'Set ROBOFLOW_API_KEY in the Windows user environment first.' }
-.venv\Scripts\python.exe model_train\1-download-dataset.py
+.venv\Scripts\python.exe 01_model_train\1-download-dataset.py
 Remove-Item Env:\ROBOFLOW_API_KEY
 ```
 
-数据写入 `model_train/datasets/classroom_behavior/`，不提交到 Git。
+数据写入 `01_model_train/datasets/classroom_behavior/`，不提交到 Git。
 
 ### 2. 核验并分析数据
 
 ```bash
-python model_train/2-analyse-dataset.py
+python 01_model_train/2-analyse-dataset.py
 ```
 
-检查 `model_train/dataset_analysis/classroom_behavior/` 中的类别统计、划分统计、框分布、样例、`image_issues.csv` 和 `cross_split_exact_duplicates.csv`。检查损坏图片；核对缺失标签是否确实是有意保留的空图；清理跨划分完全重复的图像；再确认类别名称与映射。SHA-256 重复检查只能发现字节完全相同的图片；还须查看样例，排查同一课堂/视频的近邻帧或重新编码图像跨训练、验证、测试集。发现问题时先清理或重新划分数据，不用训练指标掩盖数据泄漏。
+检查 `01_model_train/dataset_analysis/classroom_behavior/` 中的类别统计、划分统计、框分布、样例、`image_issues.csv` 和 `cross_split_exact_duplicates.csv`。检查损坏图片；核对缺失标签是否确实是有意保留的空图；清理跨划分完全重复的图像；再确认类别名称与映射。SHA-256 重复检查只能发现字节完全相同的图片；还须查看样例，排查同一课堂/视频的近邻帧或重新编码图像跨训练、验证、测试集。发现问题时先清理或重新划分数据，不用训练指标掩盖数据泄漏。
 
 ### 3. 训练 YOLO11n
 
 ```bash
-python model_train/3-train-models.py --datasets classroom_behavior --epochs 100 --imgsz 640 --batch 8 --device 0 --workers 4 --seed 42 --deterministic --name yolo11n
+python 01_model_train/3-train-models.py --datasets classroom_behavior --epochs 100 --imgsz 640 --batch 8 --device 0 --workers 4 --seed 42 --deterministic --name yolo11n
 ```
 
-训练运行写入 `model_train/runs/train/yolo11n_classroom_behavior/`。若显存不足，降低 batch 并在报告中记录实际参数。模型权重固定复制到 `model_train/train_result/yolo11n_classroom_behavior_best.pt`。
+训练运行写入 `01_model_train/runs/train/yolo11n_classroom_behavior/`。若显存不足，降低 batch 并在报告中记录实际参数。模型权重固定复制到 `01_model_train/train_result/yolo11n_classroom_behavior_best.pt`。
 
 ### 4. 独立测试集评估
 
 ```bash
-python model_train/4-validate-model.py --datasets classroom_behavior --split test --checkpoint best --imgsz 640 --batch 8 --device 0
+python 01_model_train/4-validate-model.py --datasets classroom_behavior --split test --checkpoint best --imgsz 640 --batch 8 --device 0
 ```
 
-报告写入 `model_train/runs/validation/`。报告总体和逐类别 Precision、Recall、mAP、推理耗时与权重 SHA-256。`reading` 和 `writing` 的视觉语义可能相近，要重点检查混淆矩阵和远景误检/漏检。第三方模型页面的指标不是本模型的评估结果。
+报告写入 `01_model_train/runs/validation/`。报告总体和逐类别 Precision、Recall、mAP、推理耗时与权重 SHA-256。`reading` 和 `writing` 的视觉语义可能相近，要重点检查混淆矩阵和远景误检/漏检。第三方模型页面的指标不是本模型的评估结果。
 
 ### 5. 导出 ONNX
 
 ```bash
-python model_export/export_onnx.py --datasets classroom_behavior --checkpoint best --imgsz 640 --device cpu --opset 17
+python 02_model_convert/export_onnx.py --datasets classroom_behavior --checkpoint best --imgsz 640 --device cpu --opset 17
 ```
 
-ONNX 与来源清单写入 `model_export/artifacts/`。
+ONNX 与来源清单写入 `02_model_convert/artifacts/`。
 
 ### 6. Atlas 200I DK A2 端侧验证
 

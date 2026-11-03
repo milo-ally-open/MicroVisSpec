@@ -5,7 +5,7 @@
 ## G0 场景立项
 
 - [ ] 场景 id 已确认：`model_<snake_case>`
-- [ ] 五阶段目录齐套：`model_train` / `model_export` / `model_convert` / `model_val` / `model_deployment`
+- [ ] 四阶段目录齐套：`01_model_train` / `02_model_convert` / `02_model_convert` / `03_model_val` / `04_model_demo`
 - [ ] `WORKFLOW.md` 只做阶段索引，根部没有总 README
 - [ ] `environment.yml`、`.gitignore` 就位
 - [ ] 目标物体与类别序已写进场景档案

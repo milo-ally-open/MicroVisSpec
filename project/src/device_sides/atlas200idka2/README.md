@@ -25,14 +25,14 @@
 
 ### 1. 准备模型产物
 
-按 `project/preparation/model_classroom_behavior/WORKFLOW.md` 训练/取得权重并导出 ONNX；Atlas 推理使用面向 Ascend 310B4 的 OM。课堂模型转换入口为 `project/preparation/model_classroom_behavior/model_convert/convert_atc.sh`，输入 640×640 ONNX 并应用 `aipp_nv21.cfg`。转换后的 ONNX、OM、评估报告和数据集留在 `preparation/`，不放进产品源码或 Docker 镜像。
+按 `project/preparation/model_classroom_behavior/WORKFLOW.md` 训练/取得权重并导出 ONNX；Atlas 推理使用面向 Ascend 310B4 的 OM。课堂模型转换入口为 `project/preparation/model_classroom_behavior/02_model_convert/convert_atc.sh`，输入 640×640 ONNX 并应用 `aipp_nv21.cfg`。转换后的 ONNX、OM、评估报告和数据集留在 `preparation/`，不放进产品源码或 Docker 镜像。
 
 课堂示例使用已有文件：
 
-- PT：`project/preparation/model_classroom_behavior/model_train/train_result/yolo11n_classroom_behavior_best.pt`
-- ONNX：`project/preparation/model_classroom_behavior/model_export/artifacts/yolo11n_classroom_behavior_best.onnx`
-- OM：`project/preparation/model_classroom_behavior/model_deployment/yolo11n_classroom_behavior_best.om`
-- 当前 OM 清单：`project/preparation/model_classroom_behavior/model_deployment/model_classroom_behavior_detection.manifest.json`
+- PT：`project/preparation/model_classroom_behavior/01_model_train/train_result/yolo11n_classroom_behavior_best.pt`
+- ONNX：`project/preparation/model_classroom_behavior/02_model_convert/artifacts/yolo11n_classroom_behavior_best.onnx`
+- OM：`project/preparation/model_classroom_behavior/04_model_demo/yolo11n_classroom_behavior_best.om`
+- 当前 OM 清单：`project/preparation/model_classroom_behavior/04_model_demo/model_classroom_behavior_detection.manifest.json`
 
 课堂模型 ID 为 `model_classroom_behavior_detection`，类别顺序必须与训练/导出数据一致：`hand-raising`、`reading`、`writing`。新模型先确认 OM 输入布局、输出 decoder 与类别顺序；不匹配的模型不能复用课堂插件。
 
@@ -94,7 +94,7 @@ cmake --build build -j2
 ctest --test-dir build --output-on-failure
 ```
 
-先用 `yunshao-classroom-runtime --check-config` 验证三份配置，再以授权 H.264 样例源运行指定 `--stream-id`。开启 `rtsp_output` 后，用 `ffprobe` 匿名读取 `rtsp://<atlas-ip>:<port>/<mount>` 并确认画面可解码，再由 media-service 使用单一 RTSP 地址注册为 MediaMTX 按需来源；未接入真实相机和云端播放前不得宣称端到端验收完成。模型文件大小/哈希和 Atlas 是否能加载可以由安装结果确认；完整 ONNX/OM 测试集精度对比按需运行 `model_val/`，不作为模型注册的前置步骤。
+先用 `yunshao-classroom-runtime --check-config` 验证三份配置，再以授权 H.264 样例源运行指定 `--stream-id`。开启 `rtsp_output` 后，用 `ffprobe` 匿名读取 `rtsp://<atlas-ip>:<port>/<mount>` 并确认画面可解码，再由 media-service 使用单一 RTSP 地址注册为 MediaMTX 按需来源；未接入真实相机和云端播放前不得宣称端到端验收完成。模型文件大小/哈希和 Atlas 是否能加载可以由安装结果确认；完整 ONNX/OM 测试集精度对比按需运行 `03_model_val/`，不作为模型注册的前置步骤。
 
 开发依赖包（Debian/Ubuntu）包括 `libgstreamer1.0-dev`、`libgstreamer-plugins-base1.0-dev`、`libgstrtspserver-1.0-dev` 和 `gstreamer1.0-plugins-good`。运行镜像/板卡至少需提供 GStreamer core、app、RTSP server 库以及 `appsrc`、`rtph264pay` 插件。
 

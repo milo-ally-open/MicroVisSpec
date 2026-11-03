@@ -18,7 +18,7 @@ $env:CLASSROOM_DATA_ROOT = Read-Host '输入仓库外的数据目录路径'
 
 ```powershell
 .venv\Scripts\python.exe `
-  model_train\19-prepare-target-classroom-videos.py `
+  01_model_train\19-prepare-target-classroom-videos.py `
   --input-dir (Join-Path $env:CLASSROOM_DATA_ROOT 'target_videos') `
   --output-dir (Join-Path $env:CLASSROOM_DATA_ROOT 'target_frames') `
   --interval-seconds 2
@@ -70,7 +70,7 @@ source_video_id,split
 
 ```powershell
 .venv\Scripts\python.exe `
-  model_train\37-prepare-target-classroom-dataset.py `
+  01_model_train\37-prepare-target-classroom-dataset.py `
   --frames-dir (Join-Path $env:CLASSROOM_DATA_ROOT 'target_frames') `
   --labels-dir (Join-Path $env:CLASSROOM_DATA_ROOT 'target_annotations') `
   --source-splits (Join-Path $env:CLASSROOM_DATA_ROOT 'source_video_splits.csv') `

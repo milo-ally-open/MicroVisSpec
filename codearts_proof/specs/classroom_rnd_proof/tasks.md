@@ -1,6 +1,6 @@
 # 云韶课堂行为检测模型研发复刻与证据采集——实施任务清单（tasks.md）
 
-> 上游输入：[spec.md](./spec.md)（8 个功能模块 / 42 条 EARS 业务规则 / 20 个异常场景 / 6 类 DFX 约束）、[design.md](./design.md)（I0–I7 接口方案、G1–G6 阶段门禁、D1–D15 决策点、14 个截图采集点明细）、`C:\Users\miligting\Desktop\SKILL.md`（yunshao-classroom-model-rnd Skill）、仓库 SOP（WORKFLOW.md 及五阶段 README）。
+> 上游输入：[spec.md](./spec.md)（8 个功能模块 / 42 条 EARS 业务规则 / 20 个异常场景 / 6 类 DFX 约束）、[design.md](./design.md)（I0–I7 接口方案、G1–G6 阶段门禁、D1–D15 决策点、14 个截图采集点明细）、`C:\Users\miligting\Desktop\SKILL.md`（yunshao-classroom-model-rnd Skill）、仓库 SOP（WORKFLOW.md 及四阶段 README）。
 > 状态：待执行。
 > 变更记录：2026-10-22 依据用户指示，最终成果发布目标由"main+dev 双分支"调整为"仅远程 dev 分支"（路径 `codearts_proof/images/`，不再提交 main 分支）；任务 1.2、8.4、8.5、9.3 及附录 A 相应修订，spec.md / design.md 已同步修订。
 > 安全声明：本清单不含任何凭据。`ROBOFLOW_API_KEY` 与 `SSHPASS` 仅经进程级临时环境注入，不落盘、不入命令历史、不进日志与截图。
@@ -34,7 +34,7 @@
 ## 1. 研发准备与基线建立（I0）
 
 ### 1.1 核对 SOP 文档齐套与 Skill 上下文
-- [ ] 逐一确认以下文件存在并完成读取：`C:\Users\miligting\Desktop\SKILL.md`、`project/preparation/model_classroom_behavior/WORKFLOW.md`、五阶段 README（model_train / model_export / model_convert / model_val / model_deployment）、`project/preparation/model_classroom_behavior/environment.yml`、`project/docs/Specification/classroom_behavior_detection/spec.md`
+- [ ] 逐一确认以下文件存在并完成读取：`C:\Users\miligting\Desktop\SKILL.md`、`project/preparation/model_classroom_behavior/WORKFLOW.md`、四阶段 README（01_model_train / 02_model_convert / 03_model_val / 04_model_demo）、`project/preparation/model_classroom_behavior/environment.yml`、`project/docs/Specification/classroom_behavior_detection/spec.md`
 - [ ] 核对 WORKFLOW.md 阶段顺序与 Skill 七步流程一致，无相互矛盾
 - **执行目录**：`C:\Users\miligting\Desktop\Yunshao`
 - **预期产物**：8 个 SOP 文件齐套核对结论（记入台账草稿）
@@ -49,7 +49,7 @@ git remote -v && git branch --show-current && git status --short
 git fetch origin
 ```
 - [ ] 核对 `origin = https://atomgit.com/milo-ally-stu/Yunshao.git`，确认远程 `dev` 分支存在（本轮唯一发布目标分支，不提交 main）
-- [ ] 确认用户未提交改动（`D codearts_proof/skills/yunshao-classroom-model-rnd/SKILL.md`、未跟踪 `.arts/`、`model_train/yolo11n.pt`、`yolo26n.pt`）保持原样，不暂存、不混入
+- [ ] 确认用户未提交改动（`D codearts_proof/skills/yunshao-classroom-model-rnd/SKILL.md`、未跟踪 `.arts/`、`01_model_train/yolo11n.pt`、`yolo26n.pt`）保持原样，不暂存、不混入
 - [ ] 从最新 dev 更新基线并创建唯一临时分支（2026-10-22 修订：基线由 main 改为 dev）：
 ```bash
 git checkout dev && git merge --ff-only origin/dev
@@ -62,7 +62,7 @@ git checkout -b proof/classroom_rnd_proof_$RUN
 - **规则追溯**：spec 5.1 R4/R5、4.5 R2、异常 5.1.3-3
 
 ### 1.3 WSL yunshao Conda 环境准备与一致性确认
-- [ ] 在 WSL 内按 environment.yml 创建/更新环境并激活（SOP 原文，model_train/README L13–L17）：
+- [ ] 在 WSL 内按 environment.yml 创建/更新环境并激活（SOP 原文，01_model_train/README L13–L17）：
 ```bash
 cd <WSL仓库根>/project/preparation/model_classroom_behavior
 conda env update -n yunshao -f environment.yml
@@ -91,25 +91,25 @@ conda activate yunshao
 ## 2. 数据集固定与校验复刻（阶段一，I1 → 门禁 G1）
 
 ### 2.1 注入凭据并下载固定版本数据集
-- [ ] 在 WSL 模型目录以进程级环境变量注入凭据（前缀空格规避命令历史），执行 SOP 原文下载命令（model_train/README L30）：
+- [ ] 在 WSL 模型目录以进程级环境变量注入凭据（前缀空格规避命令历史），执行 SOP 原文下载命令（01_model_train/README L30）：
 ```bash
 export ROBOFLOW_API_KEY=<运维安全注入>
-python model_train/1-download-dataset.py
+python 01_model_train/1-download-dataset.py
 ```
 - [ ] 核对产物来源固定：Roboflow workspace `main-vdoys` / project `student-dataset-demo` / version `1`，类别顺序 hand-raising、reading、writing
 - [ ] 计算 `data.yaml` 与图像/标签清单 SHA-256 登记台账；检查下载产物、日志、终端输出无凭据明文
 - **执行目录**：WSL `…/project/preparation/model_classroom_behavior`
-- **预期产物**：`model_train/datasets/classroom_behavior/`（data.yaml、图像、YOLO labels）+ 来源与哈希记录
+- **预期产物**：`01_model_train/datasets/classroom_behavior/`（data.yaml、图像、YOLO labels）+ 来源与哈希记录
 - **对应门禁**：G1 前置输入
 - **失败处理**：下载失败（凭据缺失/网络错误/Roboflow 返回失败）→ 停止并报告原因，保留失败现场，本阶段标"待补/失败"，不生成"通过"截图
 - **规则追溯**：spec 5.2 R1/R2、4.3 R5、异常 5.2.3-1
 
 ### 2.2 生成数据质量分析摘要
-- [ ] 执行 SOP 原文分析命令（model_train/README L36）：
+- [ ] 执行 SOP 原文分析命令（01_model_train/README L36）：
 ```bash
-python model_train/2-analyse-dataset.py
+python 01_model_train/2-analyse-dataset.py
 ```
-- [ ] 确认 `model_train/dataset_analysis/classroom_behavior/dataset_summary.json` 与图表生成
+- [ ] 确认 `01_model_train/dataset_analysis/classroom_behavior/dataset_summary.json` 与图表生成
 - **执行目录**：WSL `…/project/preparation/model_classroom_behavior`
 - **预期产物**：`dataset_summary.json` 及分析图表
 - **对应门禁**：G1 判定输入
@@ -141,12 +141,12 @@ python model_train/2-analyse-dataset.py
 ## 3. 训练与 test 留出集验证复刻（阶段二，I2 → 门禁 G2）
 
 ### 3.1 固定超参训练 YOLO11n/640（唯一 run-name）
-- [ ] 在 WSL `yunshao` 环境执行 SOP 原文训练命令（model_train/README L44，run-name 为隔离参数；固定参数逐字不变）：
+- [ ] 在 WSL `yunshao` 环境执行 SOP 原文训练命令（01_model_train/README L44，run-name 为隔离参数；固定参数逐字不变）：
 ```bash
-python model_train/3-train-model.py --epochs 100 --imgsz 640 --batch 8 --device 0 --workers 4 --seed 42 --run-name yolo11n_classroom_behavior_$RUN
+python 01_model_train/3-train-model.py --epochs 100 --imgsz 640 --batch 8 --device 0 --workers 4 --seed 42 --run-name yolo11n_classroom_behavior_$RUN
 ```
 - [ ] 训练启动回显出现后立即采集 `02_train_01.png`（见 3.4 清单，不等训练完成）
-- [ ] 训练完成后核对 `model_train/runs/train/yolo11n_classroom_behavior_$RUN/` 与 `model_train/train_result/yolo11n_classroom_behavior_$RUN/`（best/last checkpoint、training.json）落盘，并计算 best/last checkpoint SHA-256
+- [ ] 训练完成后核对 `01_model_train/runs/train/yolo11n_classroom_behavior_$RUN/` 与 `01_model_train/train_result/yolo11n_classroom_behavior_$RUN/`（best/last checkpoint、training.json）落盘，并计算 best/last checkpoint SHA-256
 - **执行目录**：WSL `…/project/preparation/model_classroom_behavior`
 - **预期产物**：`runs/train/<run-name>/`（Ultralytics 曲线、日志、原始 checkpoint）+ `train_result/<run-name>/`（`yolo11n_classroom_behavior_best.pt`、`_last.pt`、`training.json`）
 - **对应门禁**：G2 输入
@@ -154,13 +154,13 @@ python model_train/3-train-model.py --epochs 100 --imgsz 640 --batch 8 --device 
 - **规则追溯**：spec 5.3 R1/R2/R3、异常 5.3.3-1
 
 ### 3.2 test 留出集验证 best checkpoint
-- [ ] 执行 SOP 原文验证命令（model_train/README L52）：
+- [ ] 执行 SOP 原文验证命令（01_model_train/README L52）：
 ```bash
-python model_train/4-validate-model.py --datasets classroom_behavior --split test --checkpoint best --imgsz 640 --batch 8 --device 0
+python 01_model_train/4-validate-model.py --datasets classroom_behavior --split test --checkpoint best --imgsz 640 --batch 8 --device 0
 ```
 - [ ] 确认仅 `--split test` 的结果记录为留出集结果，训练日志 val 指标不得替代
 - **执行目录**：WSL `…/project/preparation/model_classroom_behavior`
-- **预期产物**：`model_train/runs/validation/` 下 timestamped 目录、`evaluation.json`、`report.csv`、逐类指标
+- **预期产物**：`01_model_train/runs/validation/` 下 timestamped 目录、`evaluation.json`、`report.csv`、逐类指标
 - **对应门禁**：G2 输入
 - **失败处理**：脚本异常 → 保留输出诊断后重试；test 指标不达标且绝对门禁已定义 → 以新 run-name 返回训练，test 集保持封存用于模型选择；门禁未定义 → 如实报告测量值标"未定义"（D14）
 - **规则追溯**：spec 5.3 R4、异常 5.3.3-2
@@ -189,13 +189,13 @@ python model_train/4-validate-model.py --datasets classroom_behavior --split tes
 ## 4. ONNX 固定参数导出复刻（阶段三，I3 → 门禁 G3）
 
 ### 4.1 记录存量产物哈希并导出 ONNX
-- [ ] 导出前记录 `model_export/artifacts/` 内存量 ONNX 与 `export_manifest.json` 的 SHA-256（防无记录覆盖）
-- [ ] 在 WSL `yunshao` 环境执行 SOP 原文导出命令（model_export/README L21，附 README 明示的 `--weights-root` 重试参数指向本轮 run 目录）：
+- [ ] 导出前记录 `02_model_convert/artifacts/` 内存量 ONNX 与 `export_manifest.json` 的 SHA-256（防无记录覆盖）
+- [ ] 在 WSL `yunshao` 环境执行 SOP 原文导出命令（02_model_convert/README L21，附 README 明示的 `--weights-root` 重试参数指向本轮 run 目录）：
 ```bash
-python model_export/export_onnx.py --model-name yolo11n --datasets classroom_behavior --checkpoint best --imgsz 640 --device cpu --opset 17 --weights-root model_train/train_result/yolo11n_classroom_behavior_$RUN
+python 02_model_convert/export_onnx.py --model-name yolo11n --datasets classroom_behavior --checkpoint best --imgsz 640 --device cpu --opset 17 --weights-root 01_model_train/train_result/yolo11n_classroom_behavior_$RUN
 ```
 - **执行目录**：WSL `…/project/preparation/model_classroom_behavior`
-- **预期产物**：`model_export/artifacts/yolo11n_classroom_behavior_best.onnx` + `export_manifest.json`（记录导出时间、Ultralytics 版本、输入尺寸、opset、权重与 ONNX SHA-256）
+- **预期产物**：`02_model_convert/artifacts/yolo11n_classroom_behavior_best.onnx` + `export_manifest.json`（记录导出时间、Ultralytics 版本、输入尺寸、opset、权重与 ONNX SHA-256）
 - **对应门禁**：G3 输入
 - **失败处理**：导出失败 → 保留错误输出，诊断导出/依赖问题，禁止进入 ATC 转换
 - **规则追溯**：spec 5.4 R1/R2
@@ -223,14 +223,14 @@ python model_export/export_onnx.py --model-name yolo11n --datasets classroom_beh
 
 ### 5.1 建立板端隔离 run 目录并上传 staged 文件
 - [ ] 注入 `export SSHPASS=<安全注入>`（前缀空格规避历史），后续板端访问统一 `sshpass -e`
-- [ ] 建立唯一板端 run 目录（对应 model_convert/README L12，IP 替换 + 隔离层，相对结构不变）：
+- [ ] 建立唯一板端 run 目录（对应 02_model_convert/README L12，IP 替换 + 隔离层，相对结构不变）：
 ```bash
-sshpass -e ssh root@$ATLAS 'mkdir -p /root/model_library/model_classroom_behavior/runs/$RUN/model_convert /root/model_library/model_classroom_behavior/runs/$RUN/model_export/artifacts /root/model_library/model_classroom_behavior/runs/$RUN/model_deployment'
+sshpass -e ssh root@$ATLAS 'mkdir -p /root/model_library/model_classroom_behavior/runs/$RUN/02_model_convert /root/model_library/model_classroom_behavior/runs/$RUN/02_model_convert/artifacts /root/model_library/model_classroom_behavior/runs/$RUN/04_model_demo'
 ```
 - [ ] 上传转换脚本、AIPP 配置与本轮 ONNX（对应 README L13–L14，目标路径指向 run 隔离目录；不传数据集与凭据）：
 ```bash
-sshpass -e scp project/preparation/model_classroom_behavior/model_convert/convert_atc.sh project/preparation/model_classroom_behavior/model_convert/aipp_nv21.cfg root@$ATLAS:/root/model_library/model_classroom_behavior/runs/$RUN/model_convert/
-sshpass -e scp project/preparation/model_classroom_behavior/model_export/artifacts/yolo11n_classroom_behavior_best.onnx root@$ATLAS:/root/model_library/model_classroom_behavior/runs/$RUN/model_export/artifacts/
+sshpass -e scp project/preparation/model_classroom_behavior/02_model_convert/convert_atc.sh project/preparation/model_classroom_behavior/02_model_convert/aipp_nv21.cfg root@$ATLAS:/root/model_library/model_classroom_behavior/runs/$RUN/02_model_convert/
+sshpass -e scp project/preparation/model_classroom_behavior/02_model_convert/artifacts/yolo11n_classroom_behavior_best.onnx root@$ATLAS:/root/model_library/model_classroom_behavior/runs/$RUN/02_model_convert/artifacts/
 ```
 - **执行目录**：`C:\Users\miligting\Desktop\Yunshao`（git-bash，自仓库根的相对路径）
 - **预期产物**：板端 `runs/$RUN/` 隔离目录含 staged 脚本/AIPP/ONNX；既有模型与运行时文件不受影响
@@ -243,8 +243,8 @@ sshpass -e scp project/preparation/model_classroom_behavior/model_export/artifac
 ```bash
 cd /root/model_library/model_classroom_behavior/runs/$RUN
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
-file model_convert/convert_atc.sh | grep -q CRLF && tr -d '\r' < model_convert/convert_atc.sh > model_convert/convert_atc_lf.sh && mv model_convert/convert_atc_lf.sh model_convert/convert_atc.sh
-sha256sum model_export/artifacts/yolo11n_classroom_behavior_best.onnx
+file 02_model_convert/convert_atc.sh | grep -q CRLF && tr -d '\r' < 02_model_convert/convert_atc.sh > 02_model_convert/convert_atc_lf.sh && mv 02_model_convert/convert_atc_lf.sh 02_model_convert/convert_atc.sh
+sha256sum 02_model_convert/artifacts/yolo11n_classroom_behavior_best.onnx
 ```
 - [ ] 将 staged ONNX 哈希与开发机 `export_manifest.json` 记录核对一致；CRLF 归一化仅作用于隔离副本，记录归一化后脚本哈希，原始仓库文件不动
 - **执行目录**：板端 SSH 会话（`runs/$RUN/`）
@@ -256,13 +256,13 @@ sha256sum model_export/artifacts/yolo11n_classroom_behavior_best.onnx
 ### 5.3 执行 ATC 转换并校验 OM 产物
 - [ ] 自 staged 模型根运行转换（SOP 原文 L30，cd 路径指向 run 隔离根）：
 ```bash
-bash model_convert/convert_atc.sh model_export/artifacts/yolo11n_classroom_behavior_best.onnx
+bash 02_model_convert/convert_atc.sh 02_model_convert/artifacts/yolo11n_classroom_behavior_best.onnx
 ```
-- [ ] 转换后确认 OM 非空（脚本内建 `test -s` 断言），从 `model_convert/artifacts/yolo11n_classroom_behavior_best/SHA256SUMS` 重算 ONNX/AIPP/OM 三项哈希并核对一致
-- [ ] 校验通过后将 OM 复制到 run 专属部署路径 `…/runs/$RUN/model_deployment/yolo11n_classroom_behavior_best.om`（不手改文件名与清单）
+- [ ] 转换后确认 OM 非空（脚本内建 `test -s` 断言），从 `02_model_convert/artifacts/yolo11n_classroom_behavior_best/SHA256SUMS` 重算 ONNX/AIPP/OM 三项哈希并核对一致
+- [ ] 校验通过后将 OM 复制到 run 专属部署路径 `…/runs/$RUN/04_model_demo/yolo11n_classroom_behavior_best.om`（不手改文件名与清单）
 - [ ] 记录板卡型号（Atlas 200I DK A2 / Ascend 310B4）、CANN/ATC 版本（基线 7.0.RC1）、执行命令与输出 OM 哈希、文件大小
 - **执行目录**：板端 SSH 会话（`runs/$RUN/`）
-- **预期产物**：`model_convert/artifacts/yolo11n_classroom_behavior_best/yolo11n_classroom_behavior_best.om` + `SHA256SUMS` + 部署路径副本
+- **预期产物**：`02_model_convert/artifacts/yolo11n_classroom_behavior_best/yolo11n_classroom_behavior_best.om` + `SHA256SUMS` + 部署路径副本
 - **对应门禁**：**G4**（OM 为空或哈希不符 → 不复制、不进入评估）
 - **失败处理**：ATC 转换失败 → 保留错误输出截图，诊断归类（导出/ATC/运行时）后再定重试路径；OM 校验失败 → 禁止复制与评估，报告差异项
 - **规则追溯**：spec 5.5 R5、异常 5.5.3-2/3
@@ -282,24 +282,24 @@ bash model_convert/convert_atc.sh model_export/artifacts/yolo11n_classroom_behav
 ## 6. 精度、性能与内存评估复刻（阶段五，I5 → 门禁 G5）
 
 ### 6.1 开发机 ONNX 端三项评估
-- [ ] 在 WSL `yunshao` 环境依次执行 ONNX 端精度/性能/内存评估（SOP 原文 model_val/README L23/L40–L41，`--output` 追加 run-id 隔离段）：
+- [ ] 在 WSL `yunshao` 环境依次执行 ONNX 端精度/性能/内存评估（SOP 原文 03_model_val/README L23/L40–L41，`--output` 追加 run-id 隔离段）：
 ```bash
-python model_val/accuracy_eval.py --backend onnx --model model_export/artifacts/yolo11n_classroom_behavior_best.onnx --data model_train/datasets/classroom_behavior/data.yaml --split test --output model_val/reports/release/$RUN/onnx --imgsz 640 --conf 0.25 --iou 0.45 --device 0 --warmup 5 --metric-mode native
-python model_val/performance_eval.py --backend onnx --model model_export/artifacts/yolo11n_classroom_behavior_best.onnx --data model_train/datasets/classroom_behavior/data.yaml --split test --output model_val/reports/release/$RUN/onnx_performance.json --imgsz 640 --conf 0.25 --iou 0.45 --device 0 --warmup 5
-python model_val/memory_eval.py --backend onnx --model model_export/artifacts/yolo11n_classroom_behavior_best.onnx --data model_train/datasets/classroom_behavior/data.yaml --split test --output model_val/reports/release/$RUN/onnx_memory.json --imgsz 640 --device 0 --limit 1
+python 03_model_val/accuracy_eval.py --backend onnx --model 02_model_convert/artifacts/yolo11n_classroom_behavior_best.onnx --data 01_model_train/datasets/classroom_behavior/data.yaml --split test --output 03_model_val/reports/release/$RUN/onnx --imgsz 640 --conf 0.25 --iou 0.45 --device 0 --warmup 5 --metric-mode native
+python 03_model_val/performance_eval.py --backend onnx --model 02_model_convert/artifacts/yolo11n_classroom_behavior_best.onnx --data 01_model_train/datasets/classroom_behavior/data.yaml --split test --output 03_model_val/reports/release/$RUN/onnx_performance.json --imgsz 640 --conf 0.25 --iou 0.45 --device 0 --warmup 5
+python 03_model_val/memory_eval.py --backend onnx --model 02_model_convert/artifacts/yolo11n_classroom_behavior_best.onnx --data 01_model_train/datasets/classroom_behavior/data.yaml --split test --output 03_model_val/reports/release/$RUN/onnx_memory.json --imgsz 640 --device 0 --limit 1
 ```
 - [ ] 确认精度报告为正式口径：`--metric-mode native --conf 0.25`、无 `--limit`（memory 的 `--limit 1` 为 SOP 允许项）
 - **执行目录**：WSL `…/project/preparation/model_classroom_behavior`
-- **预期产物**：`onnx_report.json` + 逐类 CSV、`onnx_performance.json`、`onnx_memory.json`（均位于 `model_val/reports/release/$RUN/`）
+- **预期产物**：`onnx_report.json` + 逐类 CSV、`onnx_performance.json`、`onnx_memory.json`（均位于 `03_model_val/reports/release/$RUN/`）
 - **对应门禁**：G5 输入
 - **失败处理**：评估中断 → 保留输出诊断后重跑；数据缺失/图片不可读 → 先修复或明确记录差异，不得声称完整集结果
 - **规则追溯**：spec 5.6 R2/R4
 
 ### 6.2 同步数据与脚本至板端 run 目录
-- [ ] 将同一 `data.yaml`、完整数据快照（含 test split 数据）、`model_val/*.py` 及本轮 OM 上传至板端 run 根，保持相对路径与文件内容一致（model_val/README L26 要求）：
+- [ ] 将同一 `data.yaml`、完整数据快照（含 test split 数据）、`03_model_val/*.py` 及本轮 OM 上传至板端 run 根，保持相对路径与文件内容一致（03_model_val/README L26 要求）：
 ```bash
-sshpass -e scp -r project/preparation/model_classroom_behavior/model_train/datasets/classroom_behavior root@$ATLAS:/root/model_library/model_classroom_behavior/runs/$RUN/model_train/datasets/
-sshpass -e scp -r project/preparation/model_classroom_behavior/model_val root@$ATLAS:/root/model_library/model_classroom_behavior/runs/$RUN/
+sshpass -e scp -r project/preparation/model_classroom_behavior/01_model_train/datasets/classroom_behavior root@$ATLAS:/root/model_library/model_classroom_behavior/runs/$RUN/01_model_train/datasets/
+sshpass -e scp -r project/preparation/model_classroom_behavior/03_model_val root@$ATLAS:/root/model_library/model_classroom_behavior/runs/$RUN/
 ```
 - [ ] 核对两端数据路径与图像/标签清单哈希一致
 - **执行目录**：`C:\Users\miligting\Desktop\Yunshao`（git-bash）
@@ -314,9 +314,9 @@ sshpass -e scp -r project/preparation/model_classroom_behavior/model_val root@$A
 cd /root/model_library/model_classroom_behavior/runs/$RUN
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 npu-smi info
-/usr/local/miniconda3/bin/python model_val/accuracy_eval.py --backend om --model model_deployment/yolo11n_classroom_behavior_best.om --data model_train/datasets/classroom_behavior/data.yaml --split test --output model_val/reports/release/$RUN/om --imgsz 640 --conf 0.25 --iou 0.45 --device 0 --warmup 5 --metric-mode native
-/usr/local/miniconda3/bin/python model_val/performance_eval.py --backend om --model model_deployment/yolo11n_classroom_behavior_best.om --data model_train/datasets/classroom_behavior/data.yaml --split test --output model_val/reports/release/$RUN/om_performance.json --imgsz 640 --conf 0.25 --iou 0.45 --device 0 --warmup 5
-/usr/local/miniconda3/bin/python model_val/memory_eval.py --backend om --model model_deployment/yolo11n_classroom_behavior_best.om --data model_train/datasets/classroom_behavior/data.yaml --split test --output model_val/reports/release/$RUN/om_memory.json --imgsz 640 --device 0 --limit 1
+/usr/local/miniconda3/bin/python 03_model_val/accuracy_eval.py --backend om --model 04_model_demo/yolo11n_classroom_behavior_best.om --data 01_model_train/datasets/classroom_behavior/data.yaml --split test --output 03_model_val/reports/release/$RUN/om --imgsz 640 --conf 0.25 --iou 0.45 --device 0 --warmup 5 --metric-mode native
+/usr/local/miniconda3/bin/python 03_model_val/performance_eval.py --backend om --model 04_model_demo/yolo11n_classroom_behavior_best.om --data 01_model_train/datasets/classroom_behavior/data.yaml --split test --output 03_model_val/reports/release/$RUN/om_performance.json --imgsz 640 --conf 0.25 --iou 0.45 --device 0 --warmup 5
+/usr/local/miniconda3/bin/python 03_model_val/memory_eval.py --backend om --model 04_model_demo/yolo11n_classroom_behavior_best.om --data 01_model_train/datasets/classroom_behavior/data.yaml --split test --output 03_model_val/reports/release/$RUN/om_memory.json --imgsz 640 --device 0 --limit 1
 npu-smi info
 ```
 - [ ] 记录板卡温度、健康状态、CANN/运行时版本（7.0.RC1 / Miniconda Python 3.9.2）与并发负载入台账
@@ -327,9 +327,9 @@ npu-smi info
 - **规则追溯**：spec 5.6 R4/R6、异常 5.6.3-2
 
 ### 6.4 执行等价性对比与门禁 G5 判定
-- [ ] 将 OM 端报告 scp 回开发机相同 `model_val/reports/release/$RUN/` 目录，再执行 SOP 原文等价对比（model_val/README L59）：
+- [ ] 将 OM 端报告 scp 回开发机相同 `03_model_val/reports/release/$RUN/` 目录，再执行 SOP 原文等价对比（03_model_val/README L59）：
 ```bash
-python model_val/precision_eval.py --onnx-report model_val/reports/release/$RUN/onnx/onnx_report.json --om-report model_val/reports/release/$RUN/om/om_report.json --output model_val/reports/release/$RUN/onnx_vs_om --max-map-drop 0.02 --max-class-ap50-drop 0.05
+python 03_model_val/precision_eval.py --onnx-report 03_model_val/reports/release/$RUN/onnx/onnx_report.json --om-report 03_model_val/reports/release/$RUN/om/om_report.json --output 03_model_val/reports/release/$RUN/onnx_vs_om --max-map-drop 0.02 --max-class-ap50-drop 0.05
 ```
 - [ ] 判定 G5 四要素：①两报告 `metric_mode=native`、conf=0.25、iou=0.45 完全一致（不一致视为无效对比重跑）；②正式报告无 `--limit`；③parity：mAP50-95 降幅 ≤0.02 且逐类 AP50 降幅 ≤0.05（等价性判断，非绝对质量目标）；④性能/内存报告完整（FPS、延迟分位、模型大小、峰值 RSS、张量大小、npu-smi 前后快照）
 - [ ] 绝对 mAP/FPS/内存阈值：项目未定义 → 结论区如实标"未定义"，仅报告测量值，禁止发明通过阈值
@@ -356,17 +356,17 @@ python model_val/precision_eval.py --onnx-report model_val/reports/release/$RUN/
 
 ### 7.1 准备输入视频与板端源码 staged
 - [ ] 确认前置门禁 G5 已通过（评估未通过时本阶段不启动）
-- [ ] 按输入优先级准备 H.264 输入：授权 H.264 课堂样例或 RTSP 源 → 仓库 `video/classroom_behavior.mp4`（HEVC 时按 SOP 原文 model_deployment/README L21 转码）→ 从留出 test 图像生成合成烟测视频（置于板端 `acceptance_$RUN/`，命名清晰并明确标注"软件链路烟测"，不声称真实课堂流或产品验收）：
+- [ ] 按输入优先级准备 H.264 输入：授权 H.264 课堂样例或 RTSP 源 → 仓库 `video/classroom_behavior.mp4`（HEVC 时按 SOP 原文 04_model_demo/README L21 转码）→ 从留出 test 图像生成合成烟测视频（置于板端 `acceptance_$RUN/`，命名清晰并明确标注"软件链路烟测"，不声称真实课堂流或产品验收）：
 ```bash
 ffmpeg -y -i video/classroom_behavior.mp4 -vf 'scale=trunc(iw/2)*2:trunc(ih/2)*2' -c:v libx264 -pix_fmt yuv420p -an /tmp/classroom_behavior_h264.mp4
-sshpass -e scp /tmp/classroom_behavior_h264.mp4 root@$ATLAS:/root/model_library/model_classroom_behavior/runs/$RUN/model_deployment/
+sshpass -e scp /tmp/classroom_behavior_h264.mp4 root@$ATLAS:/root/model_library/model_classroom_behavior/runs/$RUN/04_model_demo/
 ```
-- [ ] 上传 `model_deployment` 源码（`CMakeLists.txt`、`src/`、`classes.txt`）至板端 run 目录：
+- [ ] 上传 `04_model_demo` 源码（`CMakeLists.txt`、`src/`、`classes.txt`）至板端 run 目录：
 ```bash
-sshpass -e scp -r project/preparation/model_classroom_behavior/model_deployment/CMakeLists.txt project/preparation/model_classroom_behavior/model_deployment/src project/preparation/model_classroom_behavior/model_deployment/classes.txt root@$ATLAS:/root/model_library/model_classroom_behavior/runs/$RUN/model_deployment/
+sshpass -e scp -r project/preparation/model_classroom_behavior/04_model_demo/CMakeLists.txt project/preparation/model_classroom_behavior/04_model_demo/src project/preparation/model_classroom_behavior/04_model_demo/classes.txt root@$ATLAS:/root/model_library/model_classroom_behavior/runs/$RUN/04_model_demo/
 ```
 - **执行目录**：`C:\Users\miligting\Desktop\Yunshao`（git-bash）
-- **预期产物**：板端 `runs/$RUN/model_deployment/` 含源码、classes.txt、H.264 输入视频
+- **预期产物**：板端 `runs/$RUN/04_model_demo/` 含源码、classes.txt、H.264 输入视频
 - **对应门禁**：G6 前置（G5 通过 + 输入就绪）
 - **失败处理**：无可用输入源 → 采用合成烟测方案并在记录中标注；源码上传失败 → 重试
 - **规则追溯**：spec 5.7 R1/R5、D12
@@ -374,14 +374,14 @@ sshpass -e scp -r project/preparation/model_classroom_behavior/model_deployment/
 ### 7.2 CMake 全新构建与类别顺序校验
 - [ ] SSH 进入板端 run 部署目录，加载 CANN 环境后以全新 `build_$RUN` 目录构建（SOP 原文 L33–L37，构建目录按 spec 5.7 R2 隔离）：
 ```bash
-cd /root/model_library/model_classroom_behavior/runs/$RUN/model_deployment
+cd /root/model_library/model_classroom_behavior/runs/$RUN/04_model_demo
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 cmake -S . -B build_$RUN -DCMAKE_BUILD_TYPE=Release
 cmake --build build_$RUN -j2
 ```
 - [ ] 核对 `classes.txt` 三行顺序 = hand-raising、reading、writing（与 `data.yaml`/模型输出一致；不符则 demo 必须明确失败，禁止改标签绕过）
 - [ ] 确认使用本轮 run 专属 OM（5.3 已复制至部署路径）与 classes.txt，不与其他轮次混用
-- **执行目录**：板端 SSH 会话（`runs/$RUN/model_deployment/`）
+- **执行目录**：板端 SSH 会话（`runs/$RUN/04_model_demo/`）
 - **预期产物**：`build_$RUN/atlas_yolo_acl_demo` 可执行文件
 - **对应门禁**：G6 前置（类别顺序规则）
 - **失败处理**：构建失败 → 诊断 CANN ACL/DVPP、OpenCV C++、PkgConfig、FFmpeg 开发依赖；类别顺序错误或形状不匹配 → 明确失败退出，不输出含糊成功
@@ -393,19 +393,19 @@ cmake --build build_$RUN -j2
 ./build_$RUN/atlas_yolo_acl_demo --model yolo11n_classroom_behavior_best.om --video classroom_behavior_h264.mp4 --output detected.h264 --labels classes.txt --conf 0.25 --iou 0.45 --vpss-group 1 --region-handle 1
 ```
 - [ ] 记录运行统计：退出码、模型输出形状、处理/编码帧数、有效 FPS、推理/后处理/OSD/编码耗时、峰值 RSS、输出 `detected.h264` 的 SHA-256；使用合成视频时明确标注"软件链路烟测"
-- **执行目录**：板端 SSH 会话（`runs/$RUN/model_deployment/`）
+- **执行目录**：板端 SSH 会话（`runs/$RUN/04_model_demo/`）
 - **预期产物**：`detected.h264` + 完整运行统计记录
 - **对应门禁**：G6 输入
 - **失败处理**：VPSS group / Region handle 资源冲突 → 改选空闲 ID（`--vpss-group <空闲组号>` / `--region-handle <空闲编号>`）重试并记录所换 ID，不动运行中的课堂产品服务
 - **规则追溯**：spec 5.7 R4/R6、异常 5.7.3-1
 
 ### 7.4 ffprobe 输出验证与门禁 G6 判定
-- [ ] 执行 SOP 原文输出验证（model_deployment/README L60）：
+- [ ] 执行 SOP 原文输出验证（04_model_demo/README L60）：
 ```bash
 ffprobe -v error -f h264 -count_frames -show_entries stream=codec_name,width,height,nb_read_frames -of default=noprint_wrappers=1 detected.h264
 ```
 - [ ] 判定 G6：demo 退出码 0 且运行统计齐全；ffprobe 三条件——codec=H.264、输出非空可解码、`nb_read_frames` = demo 日志处理帧数
-- **执行目录**：板端 SSH 会话（`runs/$RUN/model_deployment/`）
+- **执行目录**：板端 SSH 会话（`runs/$RUN/04_model_demo/`）
 - **预期产物**：G6 通过/失败结论 + ffprobe 输出记录
 - **对应门禁**：**G6**（不通过 → 判定失败并保留错误证据）
 - **失败处理**：输出为空、不可解码或帧数与日志不符 → 判定失败，保留错误输出截图与日志，禁止把失败烟测包装成验收通过

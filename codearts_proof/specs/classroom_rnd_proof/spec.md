@@ -14,7 +14,7 @@
 ## **1.2 核心输入**
 
 1. **Skill 工作流**：华为云码道智能体加载的 `yunshao-classroom-model-rnd` Skill，来源为码道 Skill 环境，内容为课堂行为检测模型七步研发工作流（数据集固定与校验 → 训练验证 → ONNX 导出 → Atlas 板端 ATC 转换 → 精度/性能/内存评估 → H.264 演示验收 → 证据打包）。
-2. **仓库 SOP 文档**：`project/docs/Specification/classroom_behavior_detection/spec.md`、`project/preparation/model_classroom_behavior/WORKFLOW.md` 及 `model_train`、`model_export`、`model_convert`、`model_val`、`model_deployment` 五个阶段目录的 README.md，来源为仓库现有文件。
+2. **仓库 SOP 文档**：`project/docs/Specification/classroom_behavior_detection/spec.md`、`project/preparation/model_classroom_behavior/WORKFLOW.md` 及 `01_model_train`、`02_model_convert`、`02_model_convert`、`03_model_val`、`04_model_demo` 四个阶段目录的 README.md，来源为仓库现有文件。
 3. **数据集凭据**：Roboflow API key（`ROBOFLOW_API_KEY`），来源为环境变量或受批准的密钥存储，禁止写入文件。
 4. **板卡访问通道**：Atlas 200I DK A2（Ascend 310B4）板卡，部署环境信息为 IP `10.160.13.173`、SSH 用户 `root`；SSH 认证凭据（密码或密钥）由用户在会话中提供，仅通过交互式输入或临时环境注入等安全方式使用，绝不写入本规格、源文件、日志、报告或任何将被提交的文件。
 5. **Git 远程仓库**：atomgit.com/milo-ally-stu/Yunshao 的远程地址与 `dev` 分支（本轮唯一提交目标分支），来源为仓库现有配置。
@@ -334,7 +334,7 @@ Op -> Agent : 对导出命令与校验输出截图归档
 
 1. **板卡与环境规则**：必须使用 Atlas 200I DK A2（Ascend 310B4，部署环境信息：IP `10.160.13.173`、SSH 用户 `root`）与 SOP 声明的 CANN 版本；SSH 认证凭据由用户提供并仅通过交互式输入或临时环境注入等安全方式使用，禁止将板卡密码等凭据写入源码、规格、日志、报告或将提交的文件。
    a. 验收条件：连接板卡 → 使用用户提供的安全注入凭据；提交的文件与截图中无任何凭据明文，IP 与用户名仅作为部署环境信息出现。
-2. **staged 校验规则**：转换前必须加载 `/usr/local/Ascend/ascend-toolkit/set_env.sh`，核对 staged ONNX 哈希与 `export_manifest.json` 一致，再从 staged 模型根运行 `model_convert/convert_atc.sh`。
+2. **staged 校验规则**：转换前必须加载 `/usr/local/Ascend/ascend-toolkit/set_env.sh`，核对 staged ONNX 哈希与 `export_manifest.json` 一致，再从 staged 模型根运行 `02_model_convert/convert_atc.sh`。
    a. 验收条件：staged ONNX 哈希不匹配 → 停止转换并报告。
 3. **隔离与实验目录规则**：每次实验必须放在唯一板端 run 目录；不得覆盖既有模型与运行时文件。
    a. 验收条件：再次实验 → 新 run 目录，既有文件保持原样。
@@ -439,7 +439,7 @@ Op -> Agent : 对两份报告与对比结论截图归档
 
 1. **前置门禁规则**：只有评估阶段通过后才允许构建与运行 demo；评估未通过时禁止进入本阶段。
    a. 验收条件：评估门禁未通过 → demo 阶段不启动。
-2. **构建规则**：必须从 staged `model_deployment` 源码以 CMake 在全新 `build_<run-id>` 目录构建；传入 run 专属 OM 与 `classes.txt`。
+2. **构建规则**：必须从 staged `04_model_demo` 源码以 CMake 在全新 `build_<run-id>` 目录构建；传入 run 专属 OM 与 `classes.txt`。
    a. 验收条件：构建执行 → 使用新构建目录，OM 与 labels 来自本轮 run，不与其他轮次混用。
 3. **类别顺序规则**：必须校验 labels 顺序保持 hand-raising、reading、writing，且模型输出与 demo 兼容；错误输入或输出形状不匹配时明确失败。
    a. 验收条件：labels 顺序错误或形状不匹配 → demo 明确报错退出，不输出含糊成功。

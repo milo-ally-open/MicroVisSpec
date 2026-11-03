@@ -21,7 +21,7 @@ description: "Generalized Yunshao vertical detection-model R&D engine. Turn any 
 
 - 分类 / 分割 / 关键点等非检测任务
 - 拿不到开发板时——可跑到 G3，G4 起逐项标「待补」，不要用模拟结果顶替
-- 只要一个演示、不需要证据链——直接照 `model_deployment/README.md` 走
+- 只要一个演示、不需要证据链——直接照 `04_model_demo/README.md` 走
 
 ## 开工前先定这 8 件事
 
@@ -40,18 +40,18 @@ description: "Generalized Yunshao vertical detection-model R&D engine. Turn any 
 
 ## 场景骨架
 
-固定五阶段，根目录 `project/preparation/model_<scenario>/`：
+固定四阶段，根目录 `project/preparation/model_<scenario>/`：
 
 ```text
 model_<scenario>/
 ├── WORKFLOW.md            # 只做阶段索引，根部不放总 README
 ├── environment.yml
 ├── .gitignore
-├── model_train/           # 下载 / 分析 / 训练 / 验证
-├── model_export/          # 固定输入 ONNX
-├── model_convert/         # Atlas ATC
-├── model_val/             # 精度 / 性能 / 内存
-└── model_deployment/      # H.264 demo
+├── 01_model_train/           # 下载 / 分析 / 训练 / 验证
+├── 02_model_convert/          # 固定输入 ONNX
+├── 02_model_convert/         # Atlas ATC
+├── 03_model_val/             # 精度 / 性能 / 内存
+└── 04_model_demo/      # H.264 demo
 ```
 
 新场景直接照 `model_manhole_cover` 复制骨架——它是从 `model_classroom_behavior` 移植、并补了显式 `--run-name` 的版本，移植适配说明写在它的 `WORKFLOW.md` 里。
@@ -62,7 +62,7 @@ model_<scenario>/
 
 | 门 | 阶段 | 关键产出 | 通过条件 | 不通过怎么办 |
 |---|---|---|---|---|
-| G0 | 场景立项 | 五阶段骨架、`WORKFLOW.md`、数据源与类别选定 | 目录齐套、既有场景零改动、类别序写入文档 | 回到需求，先定类别与数据源 |
+| G0 | 场景立项 | 四阶段骨架、`WORKFLOW.md`、数据源与类别选定 | 目录齐套、既有场景零改动、类别序写入文档 | 回到需求，先定类别与数据源 |
 | G1 | 数据集校验 | 下载与分析报告、`data.yaml` 哈希、去重记录 | 三划分非空、零跨 split 重复、零缺标、类别 ID 与 `data.yaml` 一致 | 修复或重下，绝不在脏数据上开训 |
 | G2 | 训练 + 验证 | best/last 权重、逐类指标、训练日志 | valid 出完整指标；test 全程留出 | 换新 `--run-name` 重训，失败证据保留 |
 | G3 | ONNX 导出 | `export_manifest.json`、ONNX 哈希 | 输入 1×3×640×640 静态、opset 17、类别序与哈希全部对齐 | 修导出脚本，不要为此改模型结构 |
@@ -94,8 +94,8 @@ model_<scenario>/
 
 - run-id：`<scenario>_<yyyymmdd>`，同日多轮加 `_b`、`_c`
 - run-name：`<baseline>_<scenario>`，每次重试换新名
-- 产物：`model_train/train_result/<run-name>/`、`model_val/reports/release/<run-id>/`、`model_deployment/build_<run-id>/`、`acceptance_<run-id>/`
-- 证据：`model_deployment/run_records/<run-id>.md`，按 `references/evidence-ledger.md` 填
+- 产物：`01_model_train/train_result/<run-name>/`、`03_model_val/reports/release/<run-id>/`、`04_model_demo/build_<run-id>/`、`acceptance_<run-id>/`
+- 证据：`04_model_demo/run_records/<run-id>.md`，按 `references/evidence-ledger.md` 填
 
 **禁止提交**：`datasets/`、`runs/`、`*.pt`、`*.onnx`、`*.om`、生成的视频、密钥与令牌、`.env`。
 
@@ -103,7 +103,7 @@ model_<scenario>/
 
 ## 交接给产品 runtime
 
-交付物是：OM + `classes.txt` + AIPP 预处理参数 + 精度/性能/内存报告 + demo 验收记录。交接说明只写一份，放 `model_deployment/README.md` 或 `run_records/<run-id>.md`，产品侧只读这份。板端路径、CANN 与 runtime 版本写死具体版本号，不写「最新」。
+交付物是：OM + `classes.txt` + AIPP 预处理参数 + 精度/性能/内存报告 + demo 验收记录。交接说明只写一份，放 `04_model_demo/README.md` 或 `run_records/<run-id>.md`，产品侧只读这份。板端路径、CANN 与 runtime 版本写死具体版本号，不写「最新」。
 
 ## 反模式
 

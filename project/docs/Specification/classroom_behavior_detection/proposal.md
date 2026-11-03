@@ -25,7 +25,7 @@
 - Atlas 边缘运行时、设备身份、心跳、配置同步、MQTT 事件上报、幂等本地缓存与状态回报。
 - `hand-raising`、`reading`、`writing` 三类可配置规则；每类独立启用、置信度阈值、持续条件和事件等级；默认全部关闭。
 - 端云的事件/证据、媒体预览、设备及算法状态接口，以及 Web/PWA 配置和展示。
-- 在 `model_classroom_behavior/model_deployment/` 保留独立的 AscendCL 视频推理验收 demo，并为课堂、车辆、仓储三套 `model_xxx` 工作流的训练、导出、转换、评估、部署阶段补齐 README SOP；模型根目录不新增总 README。该 demo 只验证模型/媒体路径，不承载产品服务和模型包生命周期。
+- 在 `model_classroom_behavior/04_model_demo/` 保留独立的 AscendCL 视频推理验收 demo，并为课堂、车辆、仓储三套 `model_xxx` 工作流的训练、导出、转换、评估、部署阶段补齐 README SOP；模型根目录不新增总 README。该 demo 只验证模型/媒体路径，不承载产品服务和模型包生命周期。
 
 ### 本次不包含 / 保持不变
 
@@ -38,7 +38,7 @@
 
 - 代码依据：`project/src/device_sides/atlas200idka2/` 包含 agent/model catalog 基础以及正在并入的 classroom-runtime/plugin/多模型配置；权重与转换产物位于 `project/preparation/model_classroom_behavior/`。本次实现需让正式 Atlas 产品构建直接包含推理和媒体模块。
 - 用户已确认：首发场景教室行为检测；选择 `WORKFLOW.md` 中 YOLO11n/640 流程；所有告警规则默认关闭且可配置；权重已提供，先实现运行时和模型转换。
-- 工程组织参考 [device_side_ax650](https://gitee.com/milo-ally-intern/manhole-cover-detection/tree/master/model_deployment/device_side_ax650) 的通用模型插件、manager/pipeline、逐流配置与独立告警规则；该项目运行在 AX650，Atlas 侧只沿用职责边界并实现 AscendCL/CANN 接口。
+- 工程组织参考 [device_side_ax650](https://gitee.com/milo-ally-intern/manhole-cover-detection/tree/master/04_model_demo/device_side_ax650) 的通用模型插件、manager/pipeline、逐流配置与独立告警规则；该项目运行在 AX650，Atlas 侧只沿用职责边界并实现 AscendCL/CANN 接口。
 - Atlas 设备已核验为 200I DK A2 / Ascend 310B4，Ubuntu 22.04 aarch64，CANN 7.0.RC1；板上未安装 Go。优先使用现有 C++/AscendCL 路径；MQTT 客户端库、编码推流路径仍需在实现环境核验。
 - 真实教室视频只能使用经授权的样例或录制；模型验收不能由模拟数据代替。
 
@@ -71,4 +71,4 @@
 |---|---|---|
 | 2026-10-18 | 将首发场景改为教室行为检测，告警默认关闭，权重后续提供 | 用户决定 |
 | 2026-10-19 | Atlas 侧按插件/manager/逐流配置组织课堂运行时，遵循 AscendCL 硬件接口 | 用户指定 AX650 参考仓库 |
-| 2026-10-20 | 恢复课堂模型研发目录内的独立视频推理 demo，并补齐三套模型工作流的阶段 README SOP | 用户要求恢复 model_deployment 代码并使模型研发过程可复现；正式产品 runtime 仍位于 Atlas 产品树 |
+| 2026-10-20 | 恢复课堂模型研发目录内的独立视频推理 demo，并补齐三套模型工作流的阶段 README SOP | 用户要求恢复 04_model_demo 代码并使模型研发过程可复现；正式产品 runtime 仍位于 Atlas 产品树 |

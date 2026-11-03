@@ -14,9 +14,9 @@ Roboflow API key 保存在本机用户级 `ROBOFLOW_API_KEY` 环境变量中，�
 
 ```powershell
 $env:ROBOFLOW_API_KEY = [Environment]::GetEnvironmentVariable('ROBOFLOW_API_KEY', 'User')
-.venv\Scripts\python.exe model_train\1-download-dataset.py
-.venv\Scripts\python.exe model_train\2-analyse-dataset.py
-.venv\Scripts\python.exe model_train\3-train-models.py --datasets classroom_behavior --epochs 100 --imgsz 640 --batch 8 --device 0 --workers 4 --seed 42 --deterministic --name yolo11n
+.venv\Scripts\python.exe 01_model_train\1-download-dataset.py
+.venv\Scripts\python.exe 01_model_train\2-analyse-dataset.py
+.venv\Scripts\python.exe 01_model_train\3-train-models.py --datasets classroom_behavior --epochs 100 --imgsz 640 --batch 8 --device 0 --workers 4 --seed 42 --deterministic --name yolo11n
 Remove-Item Env:\ROBOFLOW_API_KEY
 ```
 

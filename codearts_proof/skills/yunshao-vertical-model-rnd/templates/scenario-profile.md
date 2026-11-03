@@ -65,4 +65,4 @@
 |---|---|
 | demo 输入 | 真实流 / 合成烟测 |
 | 交付物 | OM + classes.txt + AIPP 参数 + 报告 + 验收记录 |
-| 交接文档位置 | `model_deployment/README.md` 或 `run_records/<run-id>.md` |
+| 交接文档位置 | `04_model_demo/README.md` 或 `run_records/<run-id>.md` |

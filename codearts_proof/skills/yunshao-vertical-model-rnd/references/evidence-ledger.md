@@ -1,6 +1,6 @@
 # 证据台账模板
 
-放在 `project/preparation/model_<scenario>/model_deployment/run_records/<run-id>.md`。
+放在 `project/preparation/model_<scenario>/04_model_demo/run_records/<run-id>.md`。
 每过一道门就补一次，不要等最后一次性回忆填写。**没有的一律写「待补」，不写空、不写推测值。**
 
 ```markdown

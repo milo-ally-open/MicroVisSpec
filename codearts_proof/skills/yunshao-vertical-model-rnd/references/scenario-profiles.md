@@ -6,7 +6,7 @@
 
 | 场景 id | 目标物体 | 数据源 | 类别序 | 状态 |
 |---|---|---|---|---|
-| `model_classroom_behavior` | 课堂行为 | Roboflow `main-vdoys` / `student-dataset-demo` / v1 | `hand-raising`, `reading`, `writing` | 五阶段走通 |
+| `model_classroom_behavior` | 课堂行为 | Roboflow `main-vdoys` / `student-dataset-demo` / v1 | `hand-raising`, `reading`, `writing` | 四阶段走通 |
 | `model_manhole_cover` | 井盖 | Roboflow Universe `roboflow-universe-projects/manhole-cover-detection` / v1 / Public Domain | 单类，以 `data.yaml` names 为准 | G0–G6 PASS（2026-10-22） |
 | `model_vehicle_detection` | 待补 | 待补 | 待补 | 待补 |
 | `model_warehouse_detection` | 待补 | 待补 | 待补 | 待补 |
@@ -28,7 +28,7 @@
 - 数据清洗：原始 2297 张存在 535 处跨 split 重复（test/train 泄漏 149 张），SHA-256 去重后 1149 张（train 572 / valid 355 / test 222）
 - 基座：YOLO11n / 640 / 100 epoch / seed 42
 - 实测：test mAP50 = 0.8718、mAP50-95 = 0.6215；OM mAP50-95 = 0.6194（降幅 0.0005）；OM NPU 58.6 FPS；demo 97 帧 / 23.25 FPS
-- 证据：`model_deployment/run_records/rnd_proof_20261022.md`，截图索引 `codearts_proof/images/README.md`
+- 证据：`04_model_demo/run_records/rnd_proof_20261022.md`，截图索引 `codearts_proof/images/README.md`
 
 ## 新增一个场景
 

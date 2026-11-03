@@ -121,6 +121,7 @@ video/                         # 演示视频
 - [服务端说明](project/src/services/README.md)：服务启动、检查、日志与数据维护
 - [Atlas 边缘运行时](project/src/device_sides/atlas200idka2/README.md)：边缘端构建、模型接入和视频测试
 - [课堂行为检测任务](project/docs/Specification/classroom_behavior_detection/tasks.md)：首发模型任务与验证记录
+- [单模型标准研发流程](project/preparation/README.md)：每个场景固定使用 01–04 四阶段目录
 - [MicroVisSpec 产品展示页](readme/microvisspec-exhibit.html)
 - [汇报材料索引](ppt/README.md)
 - [协作与提交约定](ONBOARDING.md)

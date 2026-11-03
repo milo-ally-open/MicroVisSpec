@@ -69,7 +69,7 @@
 
 **验收条件**
 
-- **AC-05.1** Given Ascend 310B4 兼容 OM、与模型类别顺序一致的 labels 文件和 H.264 文件/RTSP 输入，When 构建并运行 `model_deployment` demo，Then demo 校验模型输入/输出与类别数、逐帧运行检测及 OSD，并输出 H.264 和处理/推理统计；错误输入或输出形状不匹配时明确失败。
+- **AC-05.1** Given Ascend 310B4 兼容 OM、与模型类别顺序一致的 labels 文件和 H.264 文件/RTSP 输入，When 构建并运行 `04_model_demo` demo，Then demo 校验模型输入/输出与类别数、逐帧运行检测及 OSD，并输出 H.264 和处理/推理统计；错误输入或输出形状不匹配时明确失败。
 - **AC-05.2** Given 课堂模型开发或复现人员，When 按训练、导出、转换、评估、部署各阶段目录中的 README.md SOP 操作，Then 可定位固定数据集版本、模型参数、产物路径、转换命令、评估方法和设备要求；文档不含真实密钥/密码，也不把烟测描述成精度验收。
 - **AC-05.3** Given 产品发布或服务运维，When 使用正式边缘服务，Then 生产推理仍由 `project/src/device_sides/atlas200idka2/` 内的 `classroom-runtime` 执行；研发 demo 不替代或重复模型 catalog、安装、激活、规则上报或 systemd 服务。
 
