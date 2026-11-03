@@ -8,7 +8,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 option(MICROVISSPEC_AGENT_ONLY "Build the agent target for remote first-time provisioning" OFF)
 
 set(MICROVIS_CANN_ENV_FILE "/etc/yunshao/cann.env" CACHE FILEPATH
-  "CANN runtime environment file shared with systemd services")
+  "Legacy-compatible CANN runtime environment file shared by MicroVisSpec systemd services")
 if(NOT DEFINED ASCEND_TOOLKIT_HOME AND EXISTS "${MICROVIS_CANN_ENV_FILE}")
   file(STRINGS "${MICROVIS_CANN_ENV_FILE}" _cann_toolkit_home_line
     REGEX "^ASCEND_TOOLKIT_HOME=")

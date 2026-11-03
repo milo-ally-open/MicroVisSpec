@@ -259,7 +259,7 @@ int activation_command(int argc, char** argv,
         const std::string api_ca = choose_ca(options.api_ca, existing, "MICROVIS_EDGE_API_CA");
         const std::string mqtt_ca = choose_ca(options.mqtt_ca, existing, "MICROVIS_MQTT_CA");
         if (::access(api_ca.c_str(), R_OK) != 0 || ::access(mqtt_ca.c_str(), R_OK) != 0) {
-            throw std::runtime_error("找不到 TLS CA 文件；请先将受信任 CA 安装到 /etc/yunshao/mqtt-ca.pem，或通过参数指定");
+            throw std::runtime_error("MicroVisSpec agent 找不到 TLS CA 文件；请将受信任 CA 安装到兼容路径 /etc/yunshao/mqtt-ca.pem，或通过参数指定");
         }
 
         SensitiveString ticket = options.ticket_from_stdin ? read_ticket_from_stdin() : read_hidden_ticket();

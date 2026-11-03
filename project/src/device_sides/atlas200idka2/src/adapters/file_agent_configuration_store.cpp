@@ -172,7 +172,7 @@ void FileAgentConfigurationStore::write_agent_environment(Environment updates) {
     }
 
     const auto* group = ::getgrnam("yunshao");
-    if (!group) throw std::runtime_error("找不到 yunshao 服务组，不能安全写入 agent.env");
+    if (!group) throw std::runtime_error("找不到 MicroVisSpec 设备 agent 的兼容服务组 yunshao，不能安全写入 agent.env");
     const auto temporary = agent_environment_path_.string() + ".activation." + std::to_string(::getpid());
     const int descriptor = ::open(temporary.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0600);
     if (descriptor < 0) throw std::runtime_error("无法创建 agent.env 临时文件");

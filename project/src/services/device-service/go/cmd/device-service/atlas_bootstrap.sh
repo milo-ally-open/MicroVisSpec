@@ -51,6 +51,7 @@ tar -xzf "$archive_file" -C "$work_dir" 2>/dev/null || {
 source_dir="$work_dir"
 
 ensure_service_user() {
+  # Keep the established Atlas account and filesystem locations for in-place upgrades.
   if ! getent group yunshao >/dev/null 2>&1; then groupadd --system yunshao; fi
   if ! getent passwd yunshao >/dev/null 2>&1; then
     useradd --system --gid yunshao --home-dir /var/lib/yunshao --no-create-home --shell /usr/sbin/nologin yunshao

@@ -72,7 +72,7 @@ Atlas RTSP 输出地址需由 media-service 所在网络实际可达。以板卡
 }
 ```
 
-将清单和对应 OM 复制到 Atlas 后，以 `yunshao` 服务账号执行：
+将清单和对应 OM 复制到 Atlas 后，以 MicroVisSpec 设备端兼容服务账号 `yunshao` 执行：
 
 ```bash
 sudo -u yunshao /usr/local/bin/microvisspec-agent model install --manifest /path/to/model_classroom_behavior_detection.manifest.json --model /path/to/yolo11n_classroom_behavior_best.om
